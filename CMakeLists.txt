@@ -32,7 +32,6 @@ add_executable(alphawire WIN32
 )
 
 target_compile_definitions(alphawire PRIVATE -DM_USE_SDL -DM_USE_STDLIB)
-target_compile_definitions(alphawire PRIVATE -DUSE_SDL)
 target_include_directories(alphawire PRIVATE src src/imgui)
 target_compile_options(alphawire PRIVATE -ggdb -Wall)
 target_compile_features(alphawire PRIVATE cxx_std_17)
@@ -40,14 +39,14 @@ target_compile_features(alphawire PRIVATE cxx_std_17)
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -DM_MEM_DEBUG -DM_ASSERT")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -DM_MEM_DEBUG -DM_ASSERT")
 
-IF(APPLE)
+if(APPLE)
     find_library(SDL3_LIBRARY SDL3 REQUIRED)
     find_package(OpenGL REQUIRED)
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
     target_link_libraries(alphawire ${COCOA_LIBRARY} ${SDL3_LIBRARY} ${OPENGL_LIBRARIES})
-ENDIF()
+endif()
 
-IF(MINGW)
+if(MINGW)
     # Include the command that downloads libraries
     include(FetchContent)
 
@@ -60,7 +59,6 @@ IF(MINGW)
                 GIT_SHALLOW    TRUE
                 GIT_PROGRESS   TRUE
         )
-
         FetchContent_MakeAvailable(${libName})
     endfunction()
 
@@ -86,4 +84,4 @@ IF(MINGW)
                 VERBATIM
         )
     endif()
-ENDIF()
+endif()

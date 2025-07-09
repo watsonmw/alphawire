@@ -488,8 +488,8 @@ PropValueEnum Control_SelectMediaFormat[] = {
 #define PROP_ENUM_SET(a) .form.enums = {.values=(a), .size=MStaticArraySize(a)}
 
 static PtpControl ptpControlsMetadata[] = {
-    {DPC_S1_BUTTON,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Release (S1) Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_S2_BUTTON,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release (S2) Button", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_SHUTTER_HALF_PRESS,           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Press Button", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(Control_UpDown)},
     {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(Control_UpDown)},
     {DPC_AFL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AFL Button", PROP_ENUM_SET(Control_UpDown)},
     {DPC_RELEASE_LOCK,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Release Button", PROP_ENUM_SET(Control_UpDown)},
@@ -521,7 +521,7 @@ static PtpControl ptpControlsMetadata[] = {
     {DPC_FORMAT_MEDIA,                 PTP_DT_UINT16, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(Control_SelectMediaFormat)},
     {DPC_REMOTE_TOUCH_XY,              PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Remote Touch (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
     {DPC_REMOTE_TOUCH_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Remote Touch Cancel", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_S1_AND_S2_BUTTON,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_SHUTTER_BOTH,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(Control_UpDown)},
     {DPC_FORMAT_MEDIA_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media Cancel", PROP_ENUM_SET(Control_UpDown)},
     {DPC_SAVE_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Save Zoom and Focus Position"},
     {DPC_LOAD_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Load Zoom and Focus Position"},
@@ -4198,7 +4198,20 @@ PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode) {
 
 PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PropValue value) {
     PtpControl* control = PTPControl_GetControl(self, controlCode);
-    return SDIO_ControlDevice(self, controlCode, control->dataType, value);
+    if (control) {
+        return SDIO_ControlDevice(self, controlCode, control->dataType, value);
+    } else {
+        return PTP_GENERAL_ERROR;
+    }
+}
+
+PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed) {
+    PtpControl* control = PTPControl_GetControl(self, controlCode);
+    if (control) {
+        return SDIO_ControlDevice(self, controlCode, control->dataType, (PropValue){.u16=pressed?2:1});
+    } else {
+        return PTP_GENERAL_ERROR;
+    }
 }
 
 b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PropValueEnums* outEnums) {

@@ -21,13 +21,14 @@
 //     Linux
 //     IP
 //   Timing / Position
-//   Multi connect
+//   Connect multiple cameras
 //   Live View
 //     - Focus Area
 //     - Click to focus
 //     - Click to zoom
 //   Capture Button
 //   Event callback?
+//   Logging levels
 
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
@@ -260,7 +261,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
     ImGui::SameLine();
-    ImGui::Checkbox("Debug", &c.propDebug);
+    ImGui::Checkbox("Debug", &c.showWindowPropDebug);
     ImGui::Separator();
 
     MStr propAsString = {};
@@ -349,7 +350,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
         }
     }
 
-    if (c.propDebug) {
+    if (c.showWindowPropDebug) {
         char text[32];
 
         Ptp_GetPropValueStr((PTPDataType) property->dataType, property->defaultValue, text,
@@ -403,7 +404,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
     ImGui::SameLine();
-    ImGui::Checkbox("Debug", &c.propDebug);
+    ImGui::Checkbox("Debug", &c.showWindowPropDebug);
     ImGui::Separator();
 
     if (control->formFlag == PTP_FORM_FLAG_ENUM) {
@@ -452,7 +453,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
             }
         }
 
-        if (c.propDebug) {
+        if (c.showWindowPropDebug) {
             ImGuiInputIntDuel(control->dataType, &c.selectedControlValue);
             ImGui::SameLine();
             if (ImGui::Button("Set")) {
@@ -470,7 +471,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
 
         ImGuiSlider(control->dataType, &c.selectedControlValue, control->form.range.min, control->form.range.step, control->form.range.max);
 
-        if (c.propDebug) {
+        if (c.showWindowPropDebug) {
             ImGuiInputIntDuel(control->dataType, &c.selectedControlValue);
         } else {
             ImGuiInputIntDuel(control->dataType, &c.selectedControlValue, control->form.range.min, control->form.range.max);
@@ -485,8 +486,8 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
     }
 }
 
-void ShowDebugExtendedInfoWindow(AppContext& c) {
-    ImGui::Begin("Info", &c.showExtendedInfoWindow);
+static void ShowDebugPropertyOrControl(AppContext& c) {
+    ImGui::Begin("Debug Info", &c.showWindowDebugPropertyOrControl);
     PtpProperty *property = c.selectedProperty;
     PtpControl *control = c.selectedControl;
     if (property) {
@@ -519,27 +520,11 @@ void ShowDebugPropertyListTab(AppContext& c) {
             c.liveViewLastTime = ImGui::GetTime();
         }
 
-        bool refresh = false;
         if (ImGui::Button("Refresh")) {
-            refresh = true;
+            c.propAutoRefresh = true;
         }
 
         ImGui::Checkbox("Auto Refresh", &c.propAutoRefresh);
-        if (c.propAutoRefresh && !refresh) {
-            double currentTime = ImGui::GetTime();
-            refresh = (currentTime - c.propertyLastRefreshTime >= 2.0f);
-        }
-
-        if (refresh) {
-            PtpControl_UpdateProperties(&c.ptp);
-            c.propertyLastRefreshTime = ImGui::GetTime();
-            c.propTable.needsRebuild = true;
-        }
-
-        if (c.propTable.needsRebuild) {
-            c.propTable.rebuild(c.ptp);
-            c.propTable.needsSort = true;
-        }
 
         ImGuiTableFlags flags =
                 ImGuiTableFlags_Sortable |
@@ -601,7 +586,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                     c.selectedProperty = property;
                     c.selectedControl = nullptr;
                     c.selectedControlValue = {};
-                    c.showExtendedInfoWindow = true;
+                    c.showWindowDebugPropertyOrControl = true;
                 }
 
                 ImGui::TableNextColumn();
@@ -660,7 +645,96 @@ void ShowDebugPropertyListTab(AppContext& c) {
 void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Begin("Camera Controls");
 
+    ImGui::Text("Model: %s", c.ptp.model.str);
+    ImGui::SameLine();
+    ImGui::Text("Serial Number: %s", c.ptp.serialNumber.str);
+
     ImGui::Checkbox("LiveView", &c.liveViewOpen);
+    ImGui::SameLine();
+    ImGui::Checkbox("Inspect Controls", &c.showWindowDeviceDebug);
+
+    if (ImGui::Button("Shutter")) {
+        PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER, false);
+    }
+    if (ImGui::IsItemHovered()) {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER, true);
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Half-Press", &c.shutterHalfPress)) {
+        PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER_HALF_PRESS, c.shutterHalfPress);
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Checkbox("Auto-Focus", &c.autoFocusButton)) {
+        PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
+    }
+
+    ImGui::Spacing();
+
+    if (ImGui::CollapsingHeader("Capture Files", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("Files On Camera: %d", PtpControl_GetPendingFiles(&c.ptp));
+        ImGui::Text("Last Download Time: %lldms (%lldms)", c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
+        ImGui::Text("Last Filename: %s", c.fileDownloadPath.c_str());
+        ImGui::SameLine();
+        ImGui::Text("Size: %llu", c.fileDownloadTotalBytes);
+
+        ImGui::Checkbox("Auto Download", &c.fileDownloadAuto);
+
+        ImGui::SameLine();
+
+        bool fileDownload = false;
+        if (c.fileDownloadAuto && PtpControl_GetPendingFiles(&c.ptp)) {
+            fileDownload = true;
+        }
+
+        if (c.fileDownloadAuto) {
+            ImGui::BeginDisabled();
+        }
+
+        if (ImGui::Button("Download")) {
+            fileDownload = true;
+        }
+
+        if (c.fileDownloadAuto) {
+            ImGui::EndDisabled();
+        }
+
+        if (fileDownload) {
+            MMemIO fileContents{};
+            PtpCapturedImageInfo cii = {};
+            SDL_Time startTime = 0;
+            SDL_GetCurrentTime(&startTime);
+            PTPResult r = PtpControl_GetCapturedImage(&c.ptp, &fileContents, &cii);
+            SDL_Time dlTime = 0;
+            SDL_GetCurrentTime(&dlTime);
+            if (r != PTP_OK) {
+                MLogf("Error fetching image from camera: %d", r);
+            } else {
+                MFileWriteDataFully(cii.filename.str, fileContents.mem, fileContents.size);
+                SDL_Time writeTime = 0;
+                SDL_GetCurrentTime(&writeTime);
+                c.fileDownloadTotalMillis = (writeTime - startTime) / (1000*1000);
+                c.fileDownloadTimeMillis = (dlTime - startTime) / (1000*1000);
+                MLogf("Total image save time %lld (dl time %lld)",
+                    c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
+                c.fileDownloadTotalBytes = fileContents.size;
+                c.fileDownloadPath = cii.filename.str;
+                MMemFree(&fileContents);
+                MStrFree(cii.filename);
+            }
+        }
+
+        if (c.device->backendType == PTP_BACKEND_LIBUSBK) {
+            if (ImGui::Button("Read Event")) {
+                PTPUsbkDevice_ReadEvent(c.device);
+            }
+        }
+    }
+
+    ImGui::Spacing();
 
     if (ImGui::CollapsingHeader("Settings File")) {
         bool showSettingsFileInput = false;
@@ -702,60 +776,33 @@ void ShowCameraControlsWindow(AppContext& c) {
         }
     }
 
-    if (ImGui::CollapsingHeader("Capture File")) {
-        ImGui::Text("Files On Camera: %d", PtpControl_GetPendingFiles(&c.ptp));
-        ImGui::Text("Last Download Time: %lldms (%lldms)", c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
-        ImGui::Text("Last Filename: %s", c.fileDownloadPath.c_str());
-        ImGui::SameLine();
-        ImGui::Text("Size: %llu", c.fileDownloadTotalBytes);
-
-        ImGui::Checkbox("Auto Download", &c.fileDownloadAuto);
-
-        bool fileDownload = false;
-        if (c.fileDownloadAuto && PtpControl_GetPendingFiles(&c.ptp)) {
-            fileDownload = true;
-        }
-
-        if (ImGui::Button("Download")) {
-            fileDownload = true;
-        }
-
-        if (fileDownload) {
-            MMemIO memIo{};
-            PtpCapturedImageInfo cii = {};
-            SDL_Time startTime = 0;
-            SDL_GetCurrentTime(&startTime);
-            PTPResult r = PtpControl_GetCapturedImage(&c.ptp, &memIo, &cii);
-            SDL_Time dlTime = 0;
-            SDL_GetCurrentTime(&dlTime);
-            if (r != PTP_OK) {
-                MLogf("Error fetching image from camera: %d", r);
-            } else {
-                MFileWriteDataFully(cii.filename.str, memIo.mem, memIo.size);
-                SDL_Time writeTime = 0;
-                SDL_GetCurrentTime(&writeTime);
-                c.fileDownloadTotalMillis = (writeTime - startTime) / (1000*1000);
-                c.fileDownloadTimeMillis = (dlTime - startTime) / (1000*1000);
-                MLogf("Total image save time %lld (dl time %lld)",
-                    c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
-                c.fileDownloadTotalBytes = memIo.size;
-                c.fileDownloadPath = cii.filename.str;
-                MMemFree(&memIo);
-            }
-        }
-
-        if (c.device->backendType == PTP_BACKEND_LIBUSBK) {
-            if (ImGui::Button("Read Event")) {
-                PTPUsbkDevice_ReadEvent(c.device);
-            }
-        }
-    }
-
     ImGui::End();
 }
 
-void ShowMainDeviceDebugWindow(AppContext& c) {
-    ImGui::Begin("Device Debug", &c.deviceDebugOpen);
+const float AUTO_REFRESH_INTERVAL_SECS = 2.0f;
+
+static void RefreshProperties(AppContext& c) {
+    if (c.propAutoRefresh) {
+        double currentTime = ImGui::GetTime();
+        if (currentTime - c.propertyLastRefreshTime >= AUTO_REFRESH_INTERVAL_SECS) {
+            c.propRefresh = true;
+        }
+    }
+
+    if (c.propRefresh) {
+        PtpControl_UpdateProperties(&c.ptp);
+        c.propertyLastRefreshTime = ImGui::GetTime();
+        c.propTable.needsRebuild = true;
+    }
+
+    if (c.propTable.needsRebuild) {
+        c.propTable.rebuild(c.ptp);
+        c.propTable.needsSort = true;
+    }
+}
+
+static void ShowMainDeviceDebugWindow(AppContext& c) {
+    ImGui::Begin("Inspect Controls", &c.showWindowDeviceDebug);
     if (c.connected) {
         if (ImGui::BeginTabBar("Device Info Tabs")) {
             if (ImGui::BeginTabItem("Info")) {
@@ -912,7 +959,7 @@ void ShowMainDeviceDebugWindow(AppContext& c) {
                             c.selectedControlValue = {};
                             c.selectedControl = control;
                             c.selectedProperty = nullptr;
-                            c.showExtendedInfoWindow = true;
+                            c.showWindowDebugPropertyOrControl = true;
                         }
 
                         ImGui::TableNextColumn();
@@ -1002,7 +1049,7 @@ void ShowMainDeviceDebugWindow(AppContext& c) {
     ImGui::End();
 }
 
-void ShowDeviceListWindow(AppContext& c) {
+static void ShowDeviceListWindow(AppContext& c) {
     ImGui::Begin("Device List");
 
     if (!c.ptpDeviceList.listUpToDate) {
@@ -1084,12 +1131,14 @@ void UiPtpShow(AppContext& c) {
     ShowDeviceListWindow(c);
 
     if (c.connected) {
-        if (c.deviceDebugOpen) {
+        RefreshProperties(c);
+
+        if (c.showWindowDeviceDebug) {
             ShowMainDeviceDebugWindow(c);
         }
 
-        if (c.showExtendedInfoWindow) {
-            ShowDebugExtendedInfoWindow(c);
+        if (c.showWindowDebugPropertyOrControl) {
+            ShowDebugPropertyOrControl(c);
         }
 
         if (c.liveViewOpen) {

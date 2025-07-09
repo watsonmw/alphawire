@@ -150,13 +150,16 @@ struct AppContext {
     bool connected = false;
 
     // Window state
-    bool showExtendedInfoWindow = false;
-    bool deviceDebugOpen = true;
-    bool propDebug = false;
+    bool showWindowDebugPropertyOrControl = false;
+    bool showWindowDeviceDebug = false;
+    bool showWindowPropDebug = false;
 
-    // Property & Controls
+    // Properties refresh
     double propertyLastRefreshTime = 0.;
     bool propAutoRefresh = true;
+    bool propRefresh = true;
+
+    // Property & Controls Debug
     PtpProperty* selectedProperty = nullptr;
     PtpControl* selectedControl = nullptr;
     PropValue selectedControlValue;
@@ -183,6 +186,9 @@ struct AppContext {
     bool fileDownloadAuto = false;
     std::string fileDownloadPath = "";
 
+    bool shutterHalfPress = false;
+    bool autoFocusButton = false;
+
     void refreshDevices() {
         selectedDeviceIndex = -1;
         PTPDeviceList_RefreshList(&ptpDeviceList);
@@ -198,7 +204,6 @@ struct AppContext {
                 PTPControl_Init(&ptp, &device->transport);
                 PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
                 connected = true;
-                deviceDebugOpen = true;
             }
         }
         propTable.reset();
@@ -215,6 +220,7 @@ struct AppContext {
         selectedControl = nullptr;
         cameraSettingsSaveEnabled = false;
         cameraSettingsReadEnabled = false;
+        shutterHalfPress = false;
         propTable.reset();
     }
 
@@ -222,6 +228,7 @@ struct AppContext {
         if (device != NULL) {
             PTPControl_Cleanup(&ptp);
             PTPDeviceList_DisconnectDevice(&ptpDeviceList, device);
+            MMemFree(&this->liveViewImage);
             device = NULL;
         }
     }

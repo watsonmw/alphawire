@@ -254,6 +254,8 @@ MINTERNAL void MMemReset(MMemIO* memIO) {
 
 MINTERNAL void MMemFree(MMemIO* memIO) {
     MFree(memIO->mem, memIO->capacity);
+    memIO->pos = NULL;
+    memIO->capacity = 0;
 }
 
 // Add space for bytes, but don't advance used space

@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
-    SDL_Window* window = SDL_CreateWindow("Alpha Remote Debug", 1900, 1300, window_flags);
+    SDL_Window* window = SDL_CreateWindow("AlphaWire Debug", 1900, 1300, window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
     //IM_ASSERT(font != nullptr);
 
     // Our state
-    bool showDemoWindow = true;
+    bool showDemoWindow = false;
     ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
@@ -159,8 +159,8 @@ int main(int argc, char** argv) {
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (showDemoWindow) {
+            // Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
             ImGui::ShowDemoWindow(&showDemoWindow);
         }
 

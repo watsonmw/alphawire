@@ -67,6 +67,7 @@ b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value);
 
 PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode);
 PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PropValue value);
+PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed);
 b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PropValueEnums* outEnums);
 
 int PtpControl_GetPendingFiles(PTPControl* self);
