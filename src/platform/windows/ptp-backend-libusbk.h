@@ -9,11 +9,11 @@ extern "C" {
 
 void ListUsbK();
 
-typedef struct sUsbkDeviceInfo {
+typedef struct {
     void* deviceId;
 } UsbkDeviceInfo;
 
-typedef struct sPTPDeviceUsbk {
+typedef struct {
     void* deviceId;
     void* usbHandle;
     u8 usbBulkIn;
@@ -22,7 +22,7 @@ typedef struct sPTPDeviceUsbk {
     b32 disconnected;
 } PTPDeviceUsbk;
 
-typedef struct sPTPUsbkDeviceList {
+typedef struct {
     UsbkDeviceInfo* devices;
     PTPDeviceUsbk* openDevices;
     void* deviceList;

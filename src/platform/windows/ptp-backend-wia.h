@@ -8,18 +8,18 @@
 extern "C" {
 #endif
 
-typedef struct sWiaDeviceInfo {
+typedef struct {
     void* deviceId;
 } WiaDeviceInfo;
 
-typedef struct sPTPDeviceWia {
+typedef struct {
     PTPDeviceTransport transport;
     IWiaItemExtras* device;
     void* deviceId;
     b32 disconnected;
 } PTPDeviceWia;
 
-typedef struct sPTPWiaDeviceList {
+typedef struct {
     IWiaDevMgr* deviceMgr;
     WiaDeviceInfo* devices;
     IUnknown** eventListeners;

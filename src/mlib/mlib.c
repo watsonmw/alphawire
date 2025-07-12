@@ -47,7 +47,7 @@ void MMemAllocSet(MAllocator* allocator) {
 #define SENTINEL_BEFORE 0x1000
 #define SENTINEL_AFTER 0x1000
 
-typedef struct sMMemAllocation {
+typedef struct {
     size_t size;
     u8* start;
     u8* mem;
@@ -55,7 +55,7 @@ typedef struct sMMemAllocation {
     int line;
 } MMemAllocInfo;
 
-typedef struct sMMemDebugContext {
+typedef struct {
     MMemAllocInfo* allocSlots;
     u32* freeSlots;
     b32 sMemDebugInitialized;

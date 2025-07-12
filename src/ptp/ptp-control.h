@@ -7,7 +7,20 @@
 extern "C" {
 #endif
 
-typedef struct sPTPControl {
+/**
+ * Struct to manage and control a Sony PTP (Picture Transfer Protocol) session.
+ *
+ * This structure is designed to encapsulate the state and resources needed to interact
+ * with devices supporting PTP. It includes information such as the device transport,
+ * session and transaction identifiers, vendor-specific extensions, supported operations,
+ * and allocated memory buffers for data exchange.
+ *
+ * Key responsibilities:
+ * - Managing connection and communication with the device through the associated transport.
+ * - Handling protocol-level information such as supported operations and properties.
+ * - Managing data buffers for incoming and outgoing PTP operations.
+ */
+typedef struct {
     PTPDeviceTransport* deviceTransport;
 
     u16 protocolVersion;
@@ -29,7 +42,7 @@ typedef struct sPTPControl {
     u16* captureFormats;
     u16* imageFormats;
 
-    PtpProperty* properties;
+    PTPProperty* properties;
     PtpControl* controls;
 
     u32 sessionId;
@@ -41,56 +54,137 @@ typedef struct sPTPControl {
     u8* dataOutMem;
     u32 dataOutSize;
     u32 dataOutCapacity;
-    PtpRequest ptpRequest;
-    PtpResponse ptpResponse;
+    PTPRequestHeader ptpRequest;
+    PTPResponseHeader ptpResponse;
 } PTPControl;
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Setup & Cleanup
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Initialize PTPControl struct with the specified device transport.
+ * Follow up with a PTPControl_Connect() to start communicating over the device transport.
+ *
+ * List available devices and connect to the first one:
+ *
+ * @code{.c}
+ *    #include "ptp/ptp-control.h"
+ *    #include "ptp/ptp-device-list.h"
+ *    ...
+ *    PTPDeviceList ptpDeviceList{};
+ *    // Open device list
+ *    PTPDeviceList_Open(&ptpDeviceList);
+ *    // Poll for devices
+ *    PTPDeviceList_RefreshList(&ptpDeviceList);
+ *    // If one or more devices
+ *    if (MArraySize(ptpDeviceList.devices) {
+ *        PTPDeviceInfo* deviceInfo = ptpDeviceList.devices;
+ *        PTPDevice* device = NULL;
+ *        // Establish transport for first device
+ *        PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
+ *        PTPControl ptp{};
+ *        // Init control structure
+ *        PTPControl_Init(&ptp, &device->transport);
+ *        // Connect to device with given mode
+ *        PTPControl_Connect(&ptp, SDI_EXTENSION_VERSION_300);
+ *    }
+ * @endcode
+ *
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
 PTPResult PTPControl_Init(PTPControl* self, PTPDeviceTransport* deviceTransport);
+
+/**
+ * Establishes a connection with a Sony device over PTP (Picture Transfer Protocol), on the previously setup transport.
+ *
+ * Opens a new session to the device, performs authentication, retrieves device and property information, and prepares
+ * the device for control operations.
+ *
+ * @param version The Sony protocol version to connect with.  Year 2020+ cameras support SDI_EXTENSION_VERSION_300,
+ *                which has more properties and controls, along with other API imrpovements over the
+ *                SDI_EXTENSION_VERSION_200 protocol.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
 PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version);
+
+/**
+ * Cleanup the PTPControl structure.
+ * Depending on the underlying transport this may also close the PTP session, if it does not then releasing the
+ * transport will close the PTP session.
+ * After PTPControl_Cleanup() is called, the device transport should be closed.
+ *
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
 PTPResult PTPControl_Cleanup(PTPControl* self);
-PTPResult PtpControl_UpdateProperties(PTPControl* self);
 
-b32 PtpControl_SupportsEvent(PTPControl* self, u16 eventCode);
-b32 PtpControl_SupportsControl(PTPControl* self, u16 controlCode);
-b32 PtpControl_SupportsProperty(PTPControl* self, u16 propertyCode);
-b32 PtpControl_PropertyEnabled(PTPControl* self, u16 propertyCode);
 
-PtpProperty* PtpControl_GetProperty(PTPControl* self, u16 propertyCode);
-b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PropValueEnums* outEnums);
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Check support for various events, controls, and properties
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode);
+b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode);
+b32 PTPControl_SupportsProperty(PTPControl* self, u16 propertyCode);
+b32 PTPControl_PropertyEnabled(PTPControl* self, u16 propertyCode);
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Generic property getter and setters
+//////////////////////////////////////////////////////////////////////////////////////////////
+PTPResult PTPControl_UpdateProperties(PTPControl* self);
+PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode);
+b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PTPPropValueEnums* outEnums);
 b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MStr* strOut);
-PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PropValue value);
+PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PTPPropValue value);
 b32 PTPControl_SetPropertyU16(PTPControl* self, u16 propertyCode, u16 value);
 b32 PTPControl_SetPropertyU32(PTPControl* self, u16 propertyCode, u32 value);
 b32 PTPControl_SetPropertyU64(PTPControl* self, u16 propertyCode, u64 value);
 b32 PTPControl_SetPropertyStr(PTPControl* self, u16 propertyCode, MStr value);
 b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value);
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Generic controls getters and setters
+//////////////////////////////////////////////////////////////////////////////////////////////
 PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode);
-PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PropValue value);
+PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PTPPropValue value);
 PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed);
-b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PropValueEnums* outEnums);
+b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums);
 
-int PtpControl_GetPendingFiles(PTPControl* self);
-PTPResult PtpControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
-PTPResult PtpControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PtpCapturedImageInfo* ciiOut);
-PTPResult PtpControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut);
-PTPResult PtpControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
 
-void Ptp_FreeLiveViewFrames(LiveViewFrames* liveViewFrames);
-void Ptp_FreePropValueEnums(PropValueEnums* outEnums);
+//////////////////////////////////////////////////////////////////////////////////////////////
+// File function functions
+//////////////////////////////////////////////////////////////////////////////////////////////
+int PTPControl_GetPendingFiles(PTPControl* self);
+PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
+PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut);
+PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut);
+PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
 
-char* Ptp_GetOperationStr(u16 operationCode);
-char* Ptp_GetControlStr(u16 controlCode);
-char* Ptp_GetEventStr(u16 eventCode);
-char* Ptp_GetPropertyStr(u16 propCode);
-char* Ptp_GetObjectFormatStr(u16 objectFormatCode);
 
-char* Ptp_GetDataTypeStr(PTPDataType dataType);
-char* Ptp_GetFormFlagStr(PTPFormFlag formFlag);
-char* Ptp_GetPropIsEnabledStr(u8 propIsEnabled);
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Release temporary data
+//////////////////////////////////////////////////////////////////////////////////////////////
+void PTP_FreeLiveViewFrames(LiveViewFrames* liveViewFrames);
+void PTP_FreePropValueEnums(PTPPropValueEnums* outEnums);
 
-void Ptp_GetPropValueStr(PTPDataType dataType, PropValue value, char* buffer, size_t bufferLen);
-b32 Ptp_PropValueEq(PTPDataType dataType, PropValue value1, PropValue value2);
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// String conversion, value helpers
+//////////////////////////////////////////////////////////////////////////////////////////////
+char* PTP_GetOperationStr(u16 operationCode);
+char* PTP_GetControlStr(u16 controlCode);
+char* PTP_GetEventStr(u16 eventCode);
+char* PTP_GetPropertyStr(u16 propCode);
+char* PTP_GetObjectFormatStr(u16 objectFormatCode);
+
+char* PTP_GetDataTypeStr(PTPDataType dataType);
+char* PTP_GetFormFlagStr(PTPFormFlag formFlag);
+char* PTP_GetPropIsEnabledStr(u8 propIsEnabled);
+
+void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen);
+b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2);
 
 #ifdef __cplusplus
 } // extern "C"

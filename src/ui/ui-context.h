@@ -16,7 +16,7 @@
 struct UiPtpProperty {
     char propCode[32];
     char *propName;
-    PtpProperty *prop;
+    PTPProperty *prop;
 
     UiPtpProperty() {
         memset(propCode, 0, 32);
@@ -101,11 +101,11 @@ struct PropTable {
     void rebuild(PTPControl& ptp) {
         items.clear();
         for (size_t i = 0; i < MArraySize(ptp.properties); i++) {
-            PtpProperty *property = ptp.properties + i;
+            PTPProperty *property = ptp.properties + i;
 
             UiPtpProperty uiPtpProperty{};
             sprintf(uiPtpProperty.propCode, "0x%04x", property->propCode);
-            uiPtpProperty.propName = Ptp_GetPropertyStr(property->propCode);
+            uiPtpProperty.propName = PTP_GetPropertyStr(property->propCode);
             if (uiPtpProperty.propName == NULL) {
                 uiPtpProperty.propName = uiPtpProperty.propCode;
             }
@@ -151,7 +151,7 @@ struct AppContext {
 
     // Window state
     bool showWindowDebugPropertyOrControl = false;
-    bool showWindowDeviceDebug = false;
+    bool showWindowDeviceDebug = true;
     bool showWindowPropDebug = false;
 
     // Properties refresh
@@ -160,9 +160,9 @@ struct AppContext {
     bool propRefresh = true;
 
     // Property & Controls Debug
-    PtpProperty* selectedProperty = nullptr;
+    PTPProperty* selectedProperty = nullptr;
     PtpControl* selectedControl = nullptr;
-    PropValue selectedControlValue;
+    PTPPropValue selectedControlValue;
     PropTable propTable{};
 
     // Live View state
@@ -189,16 +189,16 @@ struct AppContext {
     bool shutterHalfPress = false;
     bool autoFocusButton = false;
 
-    void refreshDevices() {
+    void RefreshDevices() {
         selectedDeviceIndex = -1;
         PTPDeviceList_RefreshList(&ptpDeviceList);
     }
 
-    void connect() {
+    void Connect() {
         if (selectedDeviceIndex != -1 && MArraySize(ptpDeviceList.devices) > selectedDeviceIndex) {
             PTPDeviceInfo* deviceInfo = ptpDeviceList.devices + selectedDeviceIndex;
             MLogf("Connecting to device: %s (%s)...", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
-            disconnectDevice();
+            DisconnectDevice();
             b32 ok = PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
             if (ok) {
                 PTPControl_Init(&ptp, &device->transport);
@@ -208,23 +208,32 @@ struct AppContext {
         }
         propTable.reset();
         if (connected) {
-            cameraSettingsSaveEnabled = PtpControl_PropertyEnabled(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
-            cameraSettingsReadEnabled = PtpControl_PropertyEnabled(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
+            cameraSettingsSaveEnabled = PTPControl_PropertyEnabled(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
+            cameraSettingsReadEnabled = PTPControl_PropertyEnabled(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
         }
     }
 
-    void disconnect() {
-        disconnectDevice();
-        connected = false;
-        selectedProperty = nullptr;
-        selectedControl = nullptr;
-        cameraSettingsSaveEnabled = false;
+    void Disconnect() {
+        DisconnectDevice();
         cameraSettingsReadEnabled = false;
+        cameraSettingsSaveEnabled = false;
+        connected = false;
+        liveViewOpen = false;
+        propAutoRefresh = true;
+        propRefresh = true;
+        propertyLastRefreshTime = 0.;
+        selectedControl = nullptr;
+        selectedControl = nullptr;
+        selectedProperty = nullptr;
+        selectedProperty = nullptr;
+        showWindowDebugPropertyOrControl = false;
+        showWindowDeviceDebug = true;
+        showWindowPropDebug = false;
         shutterHalfPress = false;
         propTable.reset();
     }
 
-    void disconnectDevice() {
+    void DisconnectDevice() {
         if (device != NULL) {
             PTPControl_Cleanup(&ptp);
             PTPDeviceList_DisconnectDevice(&ptpDeviceList, device);
@@ -233,8 +242,8 @@ struct AppContext {
         }
     }
 
-    void cleanupAll() {
-        disconnectDevice();
+    void CleanupAll() {
+        DisconnectDevice();
         PTPDeviceList_Close(&ptpDeviceList);
     }
 };

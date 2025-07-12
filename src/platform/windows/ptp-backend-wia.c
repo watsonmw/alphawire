@@ -98,9 +98,7 @@ static void PrintComPropertyValue(PROPVARIANT* pValue) {
     }
 }
 
-typedef struct sWiaEventCallback WiaEventCallback;
-
-typedef struct sWiaEventCallbackVtbl {
+typedef struct {
     HRESULT (STDMETHODCALLTYPE *QueryInterface)(IWiaEventCallback* This, REFIID riid, void** ppvObject);
     ULONG (STDMETHODCALLTYPE *AddRef)(IWiaEventCallback* This);
     ULONG (STDMETHODCALLTYPE *Release)(IWiaEventCallback* This);
@@ -110,7 +108,7 @@ typedef struct sWiaEventCallbackVtbl {
                                                     BSTR bstrFullItemName, ULONG* pulEventType, ULONG ulReserved);
 } WiaEventCallbackVtbl;
 
-typedef struct sWiaEventCallback {
+typedef struct {
     const WiaEventCallbackVtbl* lpVtbl;
     LONG refCount;
     PTPWiaDeviceList* deviceList;
@@ -190,7 +188,7 @@ static const WiaEventCallbackVtbl WiaEventCallback_Vtbl = {
 };
 
 // Helper function to create the event callback object
-HRESULT CreateEventCallback(PTPWiaDeviceList* self, IWiaEventCallback** ppCallback) {
+static HRESULT CreateEventCallback(PTPWiaDeviceList* self, IWiaEventCallback** ppCallback) {
     WiaEventCallback* callback;
 
     if (!ppCallback) {
@@ -213,7 +211,7 @@ HRESULT CreateEventCallback(PTPWiaDeviceList* self, IWiaEventCallback** ppCallba
     return S_OK;
 }
 
-HRESULT RegisterForDeviceConnectDisconnectEvents(PTPWiaDeviceList* self) {
+static HRESULT RegisterForDeviceConnectDisconnectEvents(PTPWiaDeviceList* self) {
     HRESULT hr = S_OK;
     IWiaEventCallback* pCallback = NULL;
 
@@ -249,7 +247,6 @@ cleanup:
     }
     return hr;
 }
-
 
 b32 PTPWiaDeviceList_Open(PTPWiaDeviceList* self) {
     HRESULT hr = 0;
@@ -366,7 +363,7 @@ cleanup:
     }
 }
 
-void* PTPDeviceWia_ReallocBuffers(void* self, PtpBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+void* PTPDeviceWia_ReallocBuffers(void* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = 0;
     if (type == PTP_BUFFER_IN) {
         headerSize = sizeof(WiaPtpRequest);
@@ -384,7 +381,7 @@ void* PTPDeviceWia_ReallocBuffers(void* self, PtpBufferType type, void* dataMem,
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceWia_FreeBuffers(void* self, PtpBufferType type, void* dataMem, size_t dataSize) {
+void PTPDeviceWia_FreeBuffers(void* self, PTPBufferType type, void* dataMem, size_t dataSize) {
     size_t headerSize = 0;
     if (type == PTP_BUFFER_IN) {
         headerSize = sizeof(WiaPtpRequest);
@@ -398,8 +395,8 @@ void PTPDeviceWia_FreeBuffers(void* self, PtpBufferType type, void* dataMem, siz
     }
 }
 
-PTPResult PTPDeviceWia_SendAndRecvEx(void* self, PtpRequest* request, u8* dataIn, size_t dataInSize,
-                                     PtpResponse* response, u8* dataOut, size_t dataOutSize,
+PTPResult PTPDeviceWia_SendAndRecvEx(void* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                     PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                      size_t* actualDataOutSize) {
 
     WiaPtpRequest* requestData = (WiaPtpRequest*)(dataIn-sizeof(WiaPtpRequest));
@@ -563,7 +560,7 @@ b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
 }
 
 // Function to check if process has admin rights
-BOOL IsElevated() {
+static BOOL IsElevated() {
     BOOL fIsElevated = FALSE;
     HANDLE hToken = NULL;
 

@@ -5,12 +5,12 @@
 #include "ptp/utf.h"
 
 
-typedef struct sPropMetadata {
+typedef struct {
     u16 code;
     char* name;
 } PropMetadata;
 
-PropMetadata ptpPropertiesMetadata[] = {
+static PropMetadata sPtpPropertiesMetadata[] = {
     {DPC_COMPRESSION_SETTING, "Compression Setting"},
     {DPC_WHITE_BALANCE, "White Balance"},
     {DPC_F_NUMBER, "F-Number"},
@@ -253,7 +253,7 @@ PropMetadata ptpPropertiesMetadata[] = {
     {DPC_COLOR_TEMPERATURE, "Color Temperature"},
     {DPC_WHITE_BALANCE_GM, "White Balance - Fine-Tune G-M"},
     {DPC_ASPECT_RATIO, "Aspect Ratio"},
-    {DPC_AF_STATUS, "Focus Indication"},
+    {DPC_AUTO_FOCUS_STATUS, "Focus Indication"},
     {DPC_PREDICTED_MAX_FILE_SIZE, "Predicted Maximum File Size"},
     {DPC_PENDING_FILES, "Files Pending"},
     {DPC_AE_LOCK_STATUS, "AELock Indication"},
@@ -442,12 +442,12 @@ PropMetadata ptpPropertiesMetadata[] = {
     {0xE08E, "Assignable Button 11"},
 };
 
-typedef struct sEventsMetadata {
+typedef struct {
     u16 code;
     char* name;
 } EventsMetadata;
 
-EventsMetadata ptpEventsMetadata[] = {
+static EventsMetadata PtpEventsMetadata[] = {
     {0x4004, "StoreAdded"},
     {0x4005, "StoreRemoved"},
     {0xC201, "SDIE_ObjectAdded"},
@@ -473,12 +473,12 @@ EventsMetadata ptpEventsMetadata[] = {
     {0xC224, "SDIE_MovieRecOperationResults"}
 };
 
-PropValueEnum Control_UpDown[] = {
+static PTPPropValueEnum sControl_UpDown[] = {
     {.propValue.u16=0x0001, .str.str="Up", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
     {.propValue.u16=0x0002, .str.str="Down", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
 };
 
-PropValueEnum Control_SelectMediaFormat[] = {
+static PTPPropValueEnum sControl_SelectMediaFormat[] = {
     {.propValue.u16=0x0001, .str.str="Full Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
     {.propValue.u16=0x0002, .str.str="Full Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
     {.propValue.u16=0x0011, .str.str="Quick Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
@@ -487,98 +487,98 @@ PropValueEnum Control_SelectMediaFormat[] = {
 
 #define PROP_ENUM_SET(a) .form.enums = {.values=(a), .size=MStaticArraySize(a)}
 
-static PtpControl ptpControlsMetadata[] = {
-    {DPC_SHUTTER_HALF_PRESS,           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Press Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_AFL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AFL Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_RELEASE_LOCK,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Release Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_REQUEST_ONE_SHOOTING,         PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Request One Shooting", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_MOVIE_RECORD,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FEL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "FEL Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_MEDIA_FORMAT,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FOCUS_MAGNIFIER,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FOCUS_MAGNIFIER_CANCEL,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Cancel", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_REMOTE_KEY_UP,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Up", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_REMOTE_KEY_DOWN,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Down", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_REMOTE_KEY_LEFT,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Left", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_REMOTE_KEY_RIGHT,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Right", PROP_ENUM_SET(Control_UpDown)},
+static PtpControl sPtpControlsMetadata[] = {
+    {DPC_SHUTTER_HALF_PRESS,           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Press Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_AFL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AFL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_RELEASE_LOCK,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Release Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REQUEST_ONE_SHOOTING,         PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Request One Shooting", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_MOVIE_RECORD,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FEL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "FEL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_MEDIA_FORMAT,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_MAGNIFIER,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_MAGNIFIER_CANCEL,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_UP,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Up", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_DOWN,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Down", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_LEFT,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Left", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_RIGHT,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Right", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_MANUAL_FOCUS_ADJUST,          PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Manual Focus Adjust", .form.range={.min.i16=-7,.max.i16=7,.step.i16=1}},
-    {DPC_AUTO_FOCUS_HOLD,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Autofocus Hold", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_PIXEL_SHIFT_SHOOT_CANCEL,     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Cancel", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_PIXEL_SHIFT_SHOOT,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Mode", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_HFR_STANDBY,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Standby", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_HFR_RECORD_CANCEL,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Record Cancel", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FOCUS_STEP_NEAR,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Near", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FOCUS_STEP_FAR,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Far", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_AWB_LOCK,                     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AWBL Button", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_AUTO_FOCUS_HOLD,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Autofocus Hold", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_PIXEL_SHIFT_SHOOT_CANCEL,     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_PIXEL_SHIFT_SHOOT,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Mode", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_HFR_STANDBY,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Standby", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_HFR_RECORD_CANCEL,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Record Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_STEP_NEAR,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Near", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_STEP_FAR,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Far", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_AWB_LOCK,                     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AWBL Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_FOCUS_AREA_X_Y,               PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "AF Area Position (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Unknown Button", PROP_ENUM_SET(Control_UpDown)},
+    {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Unknown Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_ZOOM,                         PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Zoom Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
-    {DPC_CUSTOM_WB_CAPTURE_STANDBY,    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Custom WB Capture Standby", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_CUSTOM_WB_CAPTURE_STANDBY_CANCEL, PTP_DT_UINT16, SDI_CONTROL_BUTTON, PTP_FORM_FLAG_ENUM, "Custom WB Capture Standby Cancel", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_CUSTOM_WB_CAPTURE_STANDBY,    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Custom WB Capture Standby", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_CUSTOM_WB_CAPTURE_STANDBY_CANCEL, PTP_DT_UINT16, SDI_CONTROL_BUTTON, PTP_FORM_FLAG_ENUM, "Custom WB Capture Standby Cancel", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_CUSTOM_WB_CAPTURE,            PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Custom WB Capture", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {DPC_FORMAT_MEDIA,                 PTP_DT_UINT16, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(Control_SelectMediaFormat)},
+    {DPC_FORMAT_MEDIA,                 PTP_DT_UINT16, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_SelectMediaFormat)},
     {DPC_REMOTE_TOUCH_XY,              PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Remote Touch (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {DPC_REMOTE_TOUCH_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Remote Touch Cancel", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_SHUTTER_BOTH,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FORMAT_MEDIA_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media Cancel", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_REMOTE_TOUCH_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Remote Touch Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_BOTH,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FORMAT_MEDIA_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media Cancel", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_SAVE_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Save Zoom and Focus Position"},
     {DPC_LOAD_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Load Zoom and Focus Position"},
-    {DPC_APS_C_FULL_TOGGLE,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "APS-C / Full Toggle", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_APS_C_FULL_TOGGLE,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "APS-C / Full Toggle", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_COLOR_TEMPERATURE_STEP,       PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Color Temperature Step", .form.range={.min.i16=-30,.max.i16=30,.step.i16=1}},
     {DPC_WHITE_BALANCE_TINT_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "White Balance Tint Step", .form.range={.min.i16=-198,.max.i16=198,.step.i16=1}},
     {DPC_FOCUS_OPERATION,              PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Focus Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
-    {DPC_FLICKER_SCAN,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Flicker Scan", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_SETTINGS_RESET,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Settings Reset", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_PIXEL_MAPPING,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Mapping", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_POWER_OFF,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Power Off", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_TIME_CODE_PRESET_RESET,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Time Code Preset Reset", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_USER_BIT_PRESET_RESET,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "User Bit Preset Reset", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_SENSOR_CLEANING,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Sensor Cleaning", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_RESET_PICTURE_PROFILE,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Picture Profile", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_RESET_CREATIVE_LOOK,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Creative Look", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_FLICKER_SCAN,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Flicker Scan", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SETTINGS_RESET,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Settings Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_PIXEL_MAPPING,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Mapping", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_POWER_OFF,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Power Off", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_TIME_CODE_PRESET_RESET,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Time Code Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_USER_BIT_PRESET_RESET,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "User Bit Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SENSOR_CLEANING,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Sensor Cleaning", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_RESET_PICTURE_PROFILE,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Picture Profile", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_RESET_CREATIVE_LOOK,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Creative Look", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_SHUTTER_ECS_NUMBER_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Shutter ECS Number Step", .form.range={.min.i16=-32768,.max.i16=32767,.step.i16=1}},
-    {DPC_MOVIE_RECORD_TOGGLE,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Toggle", PROP_ENUM_SET(Control_UpDown)},
-    {DPC_FOCUS_POSITION_CANCEL,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Position Cancel", PROP_ENUM_SET(Control_UpDown)},
+    {DPC_MOVIE_RECORD_TOGGLE,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Toggle", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_POSITION_CANCEL,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Position Cancel", PROP_ENUM_SET(sControl_UpDown)},
 };
 
-char* Ptp_GetPropertyStr(u16 propCode) {
-    for (int i = 0; i < MStaticArraySize(ptpPropertiesMetadata); i++) {
-        if (ptpPropertiesMetadata[i].code == propCode) {
-            return ptpPropertiesMetadata[i].name;
+char* PTP_GetPropertyStr(u16 propCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpPropertiesMetadata); i++) {
+        if (sPtpPropertiesMetadata[i].code == propCode) {
+            return sPtpPropertiesMetadata[i].name;
         }
     }
 
     return NULL;
 }
 
-char* Ptp_GetControlStr(u16 controlCode) {
-    for (int i = 0; i < MStaticArraySize(ptpControlsMetadata); i++) {
-        if (ptpControlsMetadata[i].controlCode == controlCode) {
-            return ptpControlsMetadata[i].name;
+char* PTP_GetControlStr(u16 controlCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpControlsMetadata); i++) {
+        if (sPtpControlsMetadata[i].controlCode == controlCode) {
+            return sPtpControlsMetadata[i].name;
         }
     }
 
     return NULL;
 }
 
-char* Ptp_GetEventStr(u16 eventCode) {
-    for (int i = 0; i < MStaticArraySize(ptpEventsMetadata); i++) {
-        if (ptpEventsMetadata[i].code == eventCode) {
-            return ptpEventsMetadata[i].name;
+char* PTP_GetEventStr(u16 eventCode) {
+    for (int i = 0; i < MStaticArraySize(PtpEventsMetadata); i++) {
+        if (PtpEventsMetadata[i].code == eventCode) {
+            return PtpEventsMetadata[i].name;
         }
     }
 
     return NULL;
 }
 
-typedef struct sObjectFormatMetadata {
+typedef struct {
     u16 code;
     char* name;
 } ObjectFormatMetadata;
 
-ObjectFormatMetadata ptpObjectFormatMetadata[] = {
+static ObjectFormatMetadata sPtpObjectFormatMetadata[] = {
     {PTP_OFC_FOLDER, "Folder"},
     {PTP_OFC_TEXT, "TEXT"},
     {PTP_OFC_MPEG, "MPEG"},
@@ -591,23 +591,23 @@ ObjectFormatMetadata ptpObjectFormatMetadata[] = {
     {PTP_OFC_MP4, "MP4"},
 };
 
-char* Ptp_GetObjectFormatStr(u16 objectFormatCode) {
-    for (int i = 0; i < MStaticArraySize(ptpObjectFormatMetadata); i++) {
-        if (ptpObjectFormatMetadata[i].code == objectFormatCode) {
-            return ptpObjectFormatMetadata[i].name;
+char* PTP_GetObjectFormatStr(u16 objectFormatCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpObjectFormatMetadata); i++) {
+        if (sPtpObjectFormatMetadata[i].code == objectFormatCode) {
+            return sPtpObjectFormatMetadata[i].name;
         }
     }
 
     return NULL;
 }
 
-typedef struct sOperationMetadata {
+typedef struct {
     u16 code;
     char* name;
     char* description;
 } OperationMetadata;
 
-OperationMetadata ptpOperationMetadata[] = {
+static OperationMetadata sPtpOperationMetadata[] = {
     {PTP_OC_GetDeviceInfo, "GetDeviceInfo", NULL},
     {PTP_OC_OpenSession, "OpenSession", NULL},
     {PTP_OC_CloseSession, "CloseSession", NULL},
@@ -665,17 +665,17 @@ OperationMetadata ptpOperationMetadata[] = {
     {PTP_OC_SDIO_OperationResultsSupported, "SDIO_OperationResultsSupported", "Get the Operation Results Supported."},
 };
 
-char* Ptp_GetOperationStr(u16 operationCode) {
-    for (int i = 0; i < MStaticArraySize(ptpOperationMetadata); i++) {
-        if (ptpOperationMetadata[i].code == operationCode) {
-            return ptpOperationMetadata[i].name;
+char* PTP_GetOperationStr(u16 operationCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpOperationMetadata); i++) {
+        if (sPtpOperationMetadata[i].code == operationCode) {
+            return sPtpOperationMetadata[i].name;
         }
     }
 
     return NULL;
 }
 
-char* Ptp_GetDataTypeStr(PTPDataType dataType) {
+char* PTP_GetDataTypeStr(PTPDataType dataType) {
     switch (dataType) {
         case PTP_DT_UNDEF:
             return "undef";
@@ -725,7 +725,7 @@ char* Ptp_GetDataTypeStr(PTPDataType dataType) {
     return NULL;
 }
 
-char* Ptp_GetFormFlagStr(PTPFormFlag formFlag) {
+char* PTP_GetFormFlagStr(PTPFormFlag formFlag) {
     switch (formFlag) {
         case PTP_FORM_FLAG_NONE:
             return "";
@@ -737,7 +737,7 @@ char* Ptp_GetFormFlagStr(PTPFormFlag formFlag) {
     return NULL;
 }
 
-char* Ptp_GetPropIsEnabledStr(u8 propIsEnabled) {
+char* PTP_GetPropIsEnabledStr(u8 propIsEnabled) {
     switch (propIsEnabled) {
         case 0x0:
             return "N/A";
@@ -749,7 +749,7 @@ char* Ptp_GetPropIsEnabledStr(u8 propIsEnabled) {
     return NULL;
 }
 
-void Ptp_GetPropValueStr(PTPDataType dataType, PropValue value, char* buffer, size_t bufferLen) {
+void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen) {
     switch (dataType) {
         case PTP_DT_INT8:
             snprintf(buffer, bufferLen, " %hhd (%02hhx)",  value.i8, value.i8);
@@ -807,7 +807,7 @@ void Ptp_GetPropValueStr(PTPDataType dataType, PropValue value, char* buffer, si
     }
 }
 
-b32 Ptp_PropValueEq(PTPDataType dataType, PropValue value1, PropValue value2) {
+b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2) {
     switch (dataType) {
         case PTP_DT_INT8:
             return value1.i8 == value2.i8;
@@ -857,7 +857,7 @@ b32 Ptp_PropValueEq(PTPDataType dataType, PropValue value1, PropValue value2) {
     return FALSE;
 }
 
-size_t Ptp_PropValueSize(PTPDataType dataType, PropValue value) {
+size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
     switch (dataType) {
         case PTP_DT_INT8:
         case PTP_DT_UINT8:
@@ -909,7 +909,7 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PropValue value) {
     return 0;
 }
 
-void PropValueFree(PTPDataType dataType, PropValue* value) {
+void PropValueFree(PTPDataType dataType, PTPPropValue* value) {
     if (value == NULL) {
         return;
     }
@@ -918,7 +918,7 @@ void PropValueFree(PTPDataType dataType, PropValue* value) {
     }
 }
 
-typedef struct sPTPObjectInfo {
+typedef struct {
     u32 storageID;
     u16 objectFormat; // ObjectFormatMetadata
     u16 protectionStatus;
@@ -948,13 +948,13 @@ void Ptp_FreeObjectInfo(PTPObjectInfo *objectInfo) {
     MStrFree(objectInfo->keywords);
 }
 
-void Ptp_FreeLiveViewFrames(LiveViewFrames* liveViewFrames) {
+void PTP_FreeLiveViewFrames(LiveViewFrames* liveViewFrames) {
     MArrayFree(liveViewFrames->focus.frames);
     MArrayFree(liveViewFrames->face.frames);
     MArrayFree(liveViewFrames->tracking.frames);
 }
 
-void Ptp_FreePropValueEnums(PropValueEnums* outEnums) {
+void PTP_FreePropValueEnums(PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(outEnums->values); ++i) {
         if (outEnums->values[i].str.size) {
             MStrFree(outEnums->values[i].str);
@@ -1030,7 +1030,7 @@ static char* ReadPtpString16(MMemIO* memIo) {
     return NULL;
 }
 
-static i32 ReadPropertyValue(MMemIO* memIo, u16 dataType, PropValue* value) {
+static i32 ReadPropertyValue(MMemIO* memIo, u16 dataType, PTPPropValue* value) {
     i32 r = 0;
     switch (dataType) {
         case PTP_DT_INT8:
@@ -1092,7 +1092,7 @@ static i32 ReadPropertyValue(MMemIO* memIo, u16 dataType, PropValue* value) {
     return r;
 }
 
-static void PrintPropertyValue(u16 dataType, PropValue* value) {
+static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
     switch (dataType) {
         case PTP_DT_INT8:
             MLogf(" %d (%02x)", value->i8, value->i8);
@@ -1155,7 +1155,7 @@ static void PrintPropertyValue(u16 dataType, PropValue* value) {
 void PrintProperties(PTPControl* self) {
     size_t numProperties = MArraySize(self->properties);
     for (int i = 0; i < numProperties; i++) {
-        PtpProperty* p = self->properties + i;
+        PTPProperty* p = self->properties + i;
         MLogf("Property Code: %04x GetSet: %02x IsEnabled: %02x Type: %04x Form: %02x",
             p->propCode, p->getSet, p->isEnabled, p->dataType, p->formFlag);
 
@@ -1229,11 +1229,11 @@ void PTPControl_FreeDataBuffers(PTPControl* self) {
     self->dataOutCapacity = 0;
 }
 
-PtpRequest BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u16 opCode) {
+PTPRequestHeader BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u16 opCode) {
     u32 dataInSize = dataInExtra;
     u32 dataOutSize = dataOutExtra;
     PTPControl_InitDataBuffers(self, dataInSize, dataOutSize);
-    PtpRequest r = {
+    PTPRequestHeader r = {
         .OpCode = opCode,
         .NextPhase = PTP_NEXT_PHASE_READ_DATA,
         .SessionId = self->sessionId,
@@ -1242,16 +1242,16 @@ PtpRequest BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u
     return r;
 }
 
-typedef struct sPTPResponse {
+typedef struct {
     PTPResult result;
-    PtpResponse* dataOut;
+    PTPResponseHeader* dataOut;
     MMemIO memIo;
 } PTPResponse;
 
 #define OK(a) ((a) == PTP_OK)
 #define RETURN_IF_FAIL(r) if ((r).result != PTP_OK || (r).memIo.mem == NULL || (r).memIo.size == 0) { return (r).result; }
 
-PTPResponse SendReq(PTPControl* self, PtpRequest* request) {
+static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
     size_t actualDataOutSize = 0;
     PTPResult r = self->deviceTransport->sendAndRecvEx(self->deviceTransport,
         request, self->dataInMem, self->dataInSize,
@@ -1265,7 +1265,7 @@ PTPResponse SendReq(PTPControl* self, PtpRequest* request) {
 
     response.dataOut = &self->ptpResponse;
     response.result = response.dataOut->ResponseCode;
-    if (actualDataOutSize > sizeof(PtpResponse)) {
+    if (actualDataOutSize > sizeof(PTPResponseHeader)) {
         MMemReadInit(&response.memIo, self->dataOutMem, actualDataOutSize);
     } else {
         response.memIo.mem = NULL;
@@ -1277,8 +1277,8 @@ PTPResponse SendReq(PTPControl* self, PtpRequest* request) {
     return response;
 }
 
-PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInExtra, size_t dataOutExtra, int numParams, ...) {
-    PtpRequest req = BuildReq(self, dataInExtra, dataOutExtra, opCode);
+static PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInExtra, size_t dataOutExtra, int numParams, ...) {
+    PTPRequestHeader req = BuildReq(self, dataInExtra, dataOutExtra, opCode);
 
     va_list vargs;
     va_start(vargs, numParams);
@@ -1291,26 +1291,26 @@ PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInExtra, size_t d
     return SendReq(self, &req);
 }
 
-PTPResult OpenSession(PTPControl* self, u32 sessionId) {
+static PTPResult OpenSession(PTPControl* self, u32 sessionId) {
     PTPResponse r = DoRequest(self, PTP_OC_OpenSession, 0, 8, 1, sessionId);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-PTPResult CloseSession(PTPControl* self) {
+static PTPResult CloseSession(PTPControl* self) {
     PTPResponse r = DoRequest(self, PTP_OC_CloseSession, 0, 8, 0);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-PTPResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
+static PTPResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
     PTPResponse r = DoRequest(self, PTP_OC_SDIO_Connect, 0, 8,
                               3, phase, connectionId, connectionId);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-PTPResult PTP_GetDeviceInfo(PTPControl* self) {
+static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     PTPResponse r = DoRequest(self, PTP_OC_GetDeviceInfo, 0, 0x1000, 0);
     RETURN_IF_FAIL(r);
 
@@ -1379,8 +1379,8 @@ PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     return r.result;
 }
 
-PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
-    PtpRequest req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
+static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
+    PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
     if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
         req.Params[0] = incremental ? 0x1 : 0x0;
         req.Params[1] = addExtended ? 0x1 : 0x0;
@@ -1415,9 +1415,9 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
                     memset(control, 0, sizeof(PtpControl));
                     control->controlCode = propCode;
 
-                    size_t numControlsMeta = MStaticArraySize(ptpControlsMetadata);
+                    size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
                     for (int j = 0; j < numControlsMeta; j++) {
-                        PtpControl* controlDesc = ptpControlsMetadata + j;
+                        PtpControl* controlDesc = sPtpControlsMetadata + j;
                         if (controlDesc->controlCode == propCode) {
                             control->name = controlDesc->name;
                             break;
@@ -1431,7 +1431,7 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
                 u8 isEnabled = 0;
                 MMemReadU8(&r.memIo, &isEnabled);
 
-                PropValue dummy;
+                PTPPropValue dummy;
                 ReadPropertyValue(&r.memIo, control->dataType, &dummy);
                 ReadPropertyValue(&r.memIo, control->dataType, &dummy);
 
@@ -1443,7 +1443,7 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
                     MArrayInit(control->form.enums.values, numEnumSet);
                     memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
                     for (int j = 0; j < numEnumSet; j++) {
-                        PropValueEnum *value = MArrayAddPtr(control->form.enums.values);
+                        PTPPropValueEnum *value = MArrayAddPtr(control->form.enums.values);
                         ReadPropertyValue(&r.memIo, control->dataType, &value->propValue);
                     }
                     control->form.enums.size = numEnumSet;
@@ -1454,13 +1454,13 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
                     ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.step);
                 }
             } else {
-                PtpProperty *property = NULL;
+                PTPProperty *property = NULL;
                 if (incremental) {
-                    property = PtpControl_GetProperty(self, propCode);
+                    property = PTPControl_GetProperty(self, propCode);
                 }
                 if (!property) {
                     property = MArrayAddPtr(self->properties);
-                    memset(property, 0, sizeof(PtpProperty));
+                    memset(property, 0, sizeof(PTPProperty));
                     property->propCode = propCode;
                 }
 
@@ -1478,7 +1478,7 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
                     MMemReadU16LE(&r.memIo, &numEnumSet);
                     MArrayInit(property->form.enums.set, numEnumSet);
                     for (int j = 0; j < numEnumSet; j++) {
-                        PropValue* value = MArrayAddPtr(property->form.enums.set);
+                        PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
                         ReadPropertyValue(&r.memIo, property->dataType, value);
                     }
                 } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
@@ -1491,16 +1491,16 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
     } else {
         if (!incremental) {
             MArrayInit(self->properties, numProperties);
-            memset(self->properties, 0, numProperties * sizeof(PtpProperty));
+            memset(self->properties, 0, numProperties * sizeof(PTPProperty));
         }
 
         for (int i = 0; i < numProperties; i++) {
             u16 propCode = 0;
             MMemReadU16LE(&r.memIo, &propCode);
 
-            PtpProperty *property = NULL;
+            PTPProperty *property = NULL;
             if (incremental) {
-                property = PtpControl_GetProperty(self, propCode);
+                property = PTPControl_GetProperty(self, propCode);
             }
             if (!property) {
                 property = MArrayAddPtr(self->properties);
@@ -1521,14 +1521,14 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
                 MMemReadU16LE(&r.memIo, &numEnumSet);
                 MArrayInit(property->form.enums.set, numEnumSet);
                 for (int j = 0; j < numEnumSet; j++) {
-                    PropValue* value = MArrayAddPtr(property->form.enums.set);
+                    PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
                     ReadPropertyValue(&r.memIo, property->dataType, value);
                 }
                 u16 numEnumGetSet = 0;
                 MMemReadU16LE(&r.memIo, &numEnumGetSet);
                 MArrayInit(property->form.enums.getSet, numEnumGetSet);
                 for (int j = 0; j < numEnumGetSet; j++) {
-                    PropValue* value = MArrayAddPtr(property->form.enums.getSet);
+                    PTPPropValue* value = MArrayAddPtr(property->form.enums.getSet);
                     ReadPropertyValue(&r.memIo, property->dataType, value);
                 }
             } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
@@ -1542,10 +1542,10 @@ PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 ad
     return r.result;
 }
 
-PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PropValue value) {
+static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
     size_t size = Ptp_PropValueSize(dataType, value);
 
-    PtpRequest req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
+    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
     req.Params[0] = propCode;
     req.NumParams = 1;
@@ -1583,10 +1583,10 @@ PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataTyp
     return r.result;
 }
 
-PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PropValue value) {
+static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
     size_t size = Ptp_PropValueSize(dataType, value);
 
-    PtpRequest req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
+    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
     req.Params[0] = propCode;
     req.NumParams = 1;
@@ -1624,7 +1624,7 @@ PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PropV
     return r.result;
 }
 
-PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
+static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetDisplayStringList,
                               0,
@@ -1656,7 +1656,7 @@ PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displ
             MMemReadU16(&r.memIo, &displayStringNum);
             MLogf("Display String List: %04x Data: %04x Num: %d", listType, dataType, displayStringNum);
             for (int k = 0; k < displayStringNum; k++) {
-                PropValue value;
+                PTPPropValue value;
                 ReadPropertyValue(&r.memIo, dataType, &value);
                 char* str = ReadPtpString16(&r.memIo);
                 MLogf(" -- %s", str);
@@ -1667,7 +1667,7 @@ PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displ
     return r.result;
 }
 
-PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
+static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetLensInformation,
                               0,
@@ -1708,7 +1708,7 @@ PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
     return r.result;
 }
 
-PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
+static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetExtDeviceInfo,
                               0,
@@ -1743,7 +1743,7 @@ PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 exten
     return r.result;
 }
 
-PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
+static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_GetObjectInfo,
                               0,
@@ -1777,7 +1777,7 @@ PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* o
     return r.result;
 }
 
-PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
+static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
     fileOut->pos = fileOut->mem;
     fileOut->size = 0;
 
@@ -1830,16 +1830,18 @@ PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* file
 
             MMemReadSkipBytes(&r.memIo, 6);
 
-            MArrayInit(focusFrames->frames, frameNum);
+            if (frameNum) {
+                MArrayInit(focusFrames->frames, frameNum);
 
-            for (int i = 0; i < frameNum; ++i) {
-                FocusFrame* focusFrame = focusFrames->frames + i;
-                MMemReadU16LE(&r.memIo, &focusFrame->frameType);
-                MMemReadU16LE(&r.memIo, &focusFrame->focusFrameState);
-                MMemReadU8(&r.memIo, &focusFrame->priority);
-                MMemReadSkipBytes(&r.memIo, 3);
-                MMemReadU32LE(&r.memIo, &focusFrame->width);
-                MMemReadU32LE(&r.memIo, &focusFrame->height);
+                for (int i = 0; i < frameNum; ++i) {
+                    FocusFrame* focusFrame = focusFrames->frames + i;
+                    MMemReadU16LE(&r.memIo, &focusFrame->frameType);
+                    MMemReadU16LE(&r.memIo, &focusFrame->focusFrameState);
+                    MMemReadU8(&r.memIo, &focusFrame->priority);
+                    MMemReadSkipBytes(&r.memIo, 3);
+                    MMemReadU32LE(&r.memIo, &focusFrame->width);
+                    MMemReadU32LE(&r.memIo, &focusFrame->height);
+                }
             }
 
             if (liveViewFrames->version > 101) {
@@ -1872,8 +1874,8 @@ PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, M
     return r.result;
 }
 
-int PtpControl_GetPendingFiles(PTPControl* self) {
-    PtpProperty* property = PtpControl_GetProperty(self, DPC_PENDING_FILES);
+int PTPControl_GetPendingFiles(PTPControl* self) {
+    PTPProperty* property = PTPControl_GetProperty(self, DPC_PENDING_FILES);
     if (property != NULL && property->dataType == PTP_DT_UINT16) {
         u16 value = property->value.u16;
         if (value & 0x8000) {
@@ -1884,7 +1886,7 @@ int PtpControl_GetPendingFiles(PTPControl* self) {
     return 0;
 }
 
-PTPResult PtpControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
+PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
     if (r != PTP_OK) {
@@ -1894,7 +1896,7 @@ PTPResult PtpControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
     return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
 }
 
-PTPResult PtpControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PtpCapturedImageInfo* ciiOut) {
+PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
     if (r != PTP_OK) {
@@ -1909,7 +1911,7 @@ PTPResult PtpControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PtpCapt
     return PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
 }
 
-PTPResult PtpControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
+PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
     if (r != PTP_OK) {
@@ -1920,7 +1922,7 @@ PTPResult PtpControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
 }
 
 PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
-    PtpRequest req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
+    PTPRequestHeader req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
     req.Params[0] = objectHandle;
     req.NumParams = 1;
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
@@ -1933,7 +1935,7 @@ PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
     return r.result;
 }
 
-PTPResult PtpControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
+PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
     return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
 }
 
@@ -1979,7 +1981,7 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         }
     }
     if (!gotExtDeviceInfo) {
-        return FALSE;
+        return PTP_GENERAL_ERROR;
     }
 
     // 4. Authentication Phase 3
@@ -2009,9 +2011,9 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
                 control = MArrayAddPtr(self->controls);
 
                 b32 found = FALSE;
-                size_t numControlsMeta = MStaticArraySize(ptpControlsMetadata);
+                size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
                 for (int j = 0; j < numControlsMeta; j++) {
-                    PtpControl *meta = ptpControlsMetadata + j;
+                    PtpControl *meta = sPtpControlsMetadata + j;
                     if (meta->controlCode == controlCode) {
                         memcpy(control, meta, sizeof(PtpControl));
                         found = TRUE;
@@ -2031,9 +2033,9 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
             PtpControl* control = MArrayAddPtr(self->controls);
             b32 found = FALSE;
-            size_t numControlsMeta = MStaticArraySize(ptpControlsMetadata);
+            size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
             for (int j = 0; j < numControlsMeta; j++) {
-                PtpControl* meta = ptpControlsMetadata + j;
+                PtpControl* meta = sPtpControlsMetadata + j;
                 if (meta->controlCode == controlCode) {
                     memcpy(control, meta, sizeof(PtpControl));
                     found = TRUE;
@@ -2047,12 +2049,12 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         }
     }
 
-    return TRUE;
+    return PTP_OK;
 }
 
 PTPResult PTPControl_Cleanup(PTPControl* self) {
     ////////////////////////////////////////////
-    // Open Session (if not done by transport layer implicitly)
+    // Close session (if not done by transport layer implicitly)
     ////////////////////////////////////////////
     if (self->deviceTransport->requiresSessionOpenClose) {
         CloseSession(self);
@@ -2072,7 +2074,7 @@ PTPResult PTPControl_Cleanup(PTPControl* self) {
     MArrayFree(self->captureFormats);
     MArrayFree(self->imageFormats);
     for (int i = 0; i < MArraySize(self->properties); ++i) {
-        PtpProperty* property = self->properties + i;
+        PTPProperty* property = self->properties + i;
         PropValueFree(property->dataType, &property->value);
         PropValueFree(property->dataType, &property->defaultValue);
         if (property->formFlag == PTP_FORM_FLAG_ENUM) {
@@ -2105,7 +2107,7 @@ PTPResult PTPControl_Cleanup(PTPControl* self) {
     return PTP_OK;
 }
 
-b32 PtpControl_SupportsEvent(PTPControl* self, u16 eventCode) {
+b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode) {
     for (int i = 0; i < MArraySize(self->supportedEvents); ++i) {
         if (self->supportedEvents[i] == eventCode) {
             return TRUE;
@@ -2114,7 +2116,7 @@ b32 PtpControl_SupportsEvent(PTPControl* self, u16 eventCode) {
     return FALSE;
 }
 
-b32 PtpControl_SupportsControl(PTPControl* self, u16 controlCode) {
+b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode) {
     for (int i = 0; i < MArraySize(self->supportedControls); ++i) {
         if (self->supportedControls[i] == controlCode) {
             return TRUE;
@@ -2123,7 +2125,7 @@ b32 PtpControl_SupportsControl(PTPControl* self, u16 controlCode) {
     return FALSE;
 }
 
-b32 PtpControl_SupportsProperty(PTPControl* self, u16 propertyCode) {
+b32 PTPControl_SupportsProperty(PTPControl* self, u16 propertyCode) {
     for (int i = 0; i < MArraySize(self->supportedProperties); ++i) {
         if (self->supportedProperties[i] == propertyCode) {
             return TRUE;
@@ -2132,8 +2134,8 @@ b32 PtpControl_SupportsProperty(PTPControl* self, u16 propertyCode) {
     return FALSE;
 }
 
-b32 PtpControl_PropertyEnabled(PTPControl* self, u16 propertyCode) {
-    PtpProperty* prop = PtpControl_GetProperty(self, propertyCode);
+b32 PTPControl_PropertyEnabled(PTPControl* self, u16 propertyCode) {
+    PTPProperty* prop = PTPControl_GetProperty(self, propertyCode);
     if (!prop) {
         return FALSE;
     }
@@ -2143,7 +2145,7 @@ b32 PtpControl_PropertyEnabled(PTPControl* self, u16 propertyCode) {
     return FALSE;
 }
 
-PtpProperty* PtpControl_GetProperty(PTPControl* self, u16 propertyCode) {
+PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode) {
     for (int i = 0; i < MArraySize(self->properties); ++i) {
         if (self->properties[i].propCode == propertyCode) {
             return self->properties + i;
@@ -2152,26 +2154,26 @@ PtpProperty* PtpControl_GetProperty(PTPControl* self, u16 propertyCode) {
     return NULL;
 }
 
-PTPResult PtpControl_UpdateProperties(PTPControl* self) {
+PTPResult PTPControl_UpdateProperties(PTPControl* self) {
     return SDIO_GetAllExtDevicePropInfo(self, TRUE, TRUE);
 }
 
-typedef struct sEnumValueU8 {
+typedef struct {
     u8 value;
     char* str;
 } EnumValueU8;
 
-typedef struct sEnumValueU16 {
+typedef struct {
     u16 value;
     char* str;
 } EnumValueU16;
 
-typedef struct sEnumValueU32 {
+typedef struct {
     u32 value;
     char* str;
 } EnumValueU32;
 
-char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8 lookupValue) {
+static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8 lookupValue) {
     for (int j = 0; j < numEnumValues; j++) {
         u8 enumValue = enumValues[j].value;
         if (lookupValue == enumValue) {
@@ -2181,11 +2183,11 @@ char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8 lookup
     return NULL;
 }
 
-b32 BuildEnumsFromListU8(PTPControl* self, PtpProperty* property, EnumValueU8* enumValues, size_t numEnumValues, PropValueEnums* outEnums) {
+static b32 BuildEnumsFromListU8(PTPControl* self, PTPProperty* property, EnumValueU8* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u8 lookupValue = property->form.enums.getSet[i].u8;
         char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u8 = lookupValue;
         propEnum->str.str = str;
@@ -2195,12 +2197,12 @@ b32 BuildEnumsFromListU8(PTPControl* self, PtpProperty* property, EnumValueU8* e
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PropValueEnum* prop = outEnums->values + j;
+            PTPPropValueEnum* prop = outEnums->values + j;
             prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
         }
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
             u8 lookupValue = property->form.enums.set[i].u8;
-            PropValueEnum* prop = NULL;
+            PTPPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u8 enumValue = outEnums->values[j].propValue.u8;
                 if (lookupValue == enumValue) {
@@ -2212,7 +2214,7 @@ b32 BuildEnumsFromListU8(PTPControl* self, PtpProperty* property, EnumValueU8* e
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-                PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u8 = lookupValue;
                 propEnum->str.str = str;
@@ -2224,7 +2226,7 @@ b32 BuildEnumsFromListU8(PTPControl* self, PtpProperty* property, EnumValueU8* e
     return TRUE;
 }
 
-char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, u16 lookupValue) {
+static char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, u16 lookupValue) {
     for (int j = 0; j < numEnumValues; j++) {
         u16 enumValue = enumValues[j].value;
         if (lookupValue == enumValue) {
@@ -2234,11 +2236,11 @@ char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, u16 loo
     return NULL;
 }
 
-b32 BuildEnumsFromListU16(PTPControl* self, PtpProperty* property, EnumValueU16* enumValues, size_t numEnumValues, PropValueEnums* outEnums) {
+static b32 BuildEnumsFromListU16(PTPControl* self, PTPProperty* property, EnumValueU16* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u16 lookupValue = property->form.enums.getSet[i].u16;
         char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-        PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u16 = lookupValue;
         propEnum->str.str = str;
@@ -2248,12 +2250,12 @@ b32 BuildEnumsFromListU16(PTPControl* self, PtpProperty* property, EnumValueU16*
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PropValueEnum* prop = outEnums->values + j;
+            PTPPropValueEnum* prop = outEnums->values + j;
             prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
         }
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
             u16 lookupValue = property->form.enums.set[i].u16;
-            PropValueEnum* prop = NULL;
+            PTPPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u16 enumValue = outEnums->values[j].propValue.u16;
                 if (lookupValue == enumValue) {
@@ -2265,7 +2267,7 @@ b32 BuildEnumsFromListU16(PTPControl* self, PtpProperty* property, EnumValueU16*
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-                PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u16 = lookupValue;
                 propEnum->str.str = str;
@@ -2277,7 +2279,7 @@ b32 BuildEnumsFromListU16(PTPControl* self, PtpProperty* property, EnumValueU16*
     return TRUE;
 }
 
-char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, u32 lookupValue) {
+static char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, u32 lookupValue) {
     for (int j = 0; j < numEnumValues; j++) {
         u32 enumValue = enumValues[j].value;
         if (lookupValue == enumValue) {
@@ -2287,11 +2289,11 @@ char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, u32 loo
     return NULL;
 }
 
-b32 BuildEnumsFromListU32(PTPControl* self, PtpProperty* property, EnumValueU32* enumValues, size_t numEnumValues, PropValueEnums* outEnums) {
+static b32 BuildEnumsFromListU32(PTPControl* self, PTPProperty* property, EnumValueU32* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u32 lookupValue = property->form.enums.getSet[i].u32;
         char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-        PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u32 = lookupValue;
         propEnum->str.str = str;
@@ -2301,12 +2303,12 @@ b32 BuildEnumsFromListU32(PTPControl* self, PtpProperty* property, EnumValueU32*
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PropValueEnum* prop = outEnums->values + j;
+            PTPPropValueEnum* prop = outEnums->values + j;
             prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
         }
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
             u32 lookupValue = property->form.enums.set[i].u32;
-            PropValueEnum* prop = NULL;
+            PTPPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u32 enumValue = outEnums->values[j].propValue.u32;
                 if (lookupValue == enumValue) {
@@ -2318,7 +2320,7 @@ b32 BuildEnumsFromListU32(PTPControl* self, PtpProperty* property, EnumValueU32*
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-                PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u32 = lookupValue;
                 propEnum->str.str = str;
@@ -2330,7 +2332,7 @@ b32 BuildEnumsFromListU32(PTPControl* self, PtpProperty* property, EnumValueU32*
     return TRUE;
 }
 
-MStr GetFNumberAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetFNumberAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     int whole = value / 100;
@@ -2361,7 +2363,7 @@ MStr GetFNumberAsString(PTPControl* self, PtpProperty* property, PropValue propV
     return r;
 }
 
-MStr GetShutterSpeedAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetShutterSpeedAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     u32 value = propValue.u32;
     MStr r = {};
     if (value == 0xffffffff) {
@@ -2393,7 +2395,7 @@ MStr GetShutterSpeedAsString(PTPControl* self, PtpProperty* property, PropValue 
     return r;
 }
 
-MStr GetWhiteBalanceGMAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetWhiteBalanceGMAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     int value = propValue.u8;
     if (value > 0xE4 || value < 0x9C) {
@@ -2439,7 +2441,7 @@ MStr GetWhiteBalanceGMAsString(PTPControl* self, PtpProperty* property, PropValu
     return r;
 }
 
-MStr GetWhiteBalanceABAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetWhiteBalanceABAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     int value = propValue.u8;
     if (value > 0xE4 || value < 0x9C) {
@@ -2485,7 +2487,7 @@ MStr GetWhiteBalanceABAsString(PTPControl* self, PtpProperty* property, PropValu
     return r;
 }
 
-MStr GetPendingFileInfoAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetPendingFileInfoAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
@@ -2511,7 +2513,7 @@ MStr GetPendingFileInfoAsString(PTPControl* self, PtpProperty* property, PropVal
     return r;
 }
 
-MStr GetPixelShootingNumberAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetPixelShootingNumberAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0) {
@@ -2530,7 +2532,7 @@ MStr GetPixelShootingNumberAsString(PTPControl* self, PtpProperty* property, Pro
     return r;
 }
 
-MStr GetPixelShootingIntervalAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetPixelShootingIntervalAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0xFFFF) {
@@ -2548,7 +2550,7 @@ MStr GetPixelShootingIntervalAsString(PTPControl* self, PtpProperty* property, P
     return r;
 }
 
-MStr GetPixelShootingProgressAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetPixelShootingProgressAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     char text[32];
@@ -2562,7 +2564,7 @@ MStr GetPixelShootingProgressAsString(PTPControl* self, PtpProperty* property, P
     return r;
 }
 
-MStr GetBatteryRemainingAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetBatteryRemainingAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     i8 value = propValue.i8;
     if (value == -1) {
@@ -2579,7 +2581,7 @@ MStr GetBatteryRemainingAsString(PTPControl* self, PtpProperty* property, PropVa
     return r;
 }
 
-MStr GetPredictedMaxFileSizeAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetPredictedMaxFileSizeAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     char text[32];
@@ -2592,7 +2594,7 @@ MStr GetPredictedMaxFileSizeAsString(PTPControl* self, PtpProperty* property, Pr
     return r;
 }
 
-MStr GetTemperatureAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetTemperatureAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
@@ -2611,7 +2613,7 @@ MStr GetTemperatureAsString(PTPControl* self, PtpProperty* property, PropValue p
     return r;
 }
 
-MStr GetIsoAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetIsoAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 mode = value >> 24;
@@ -2656,7 +2658,7 @@ MStr GetIsoAsString(PTPControl* self, PtpProperty* property, PropValue propValue
     return r;
 }
 
-MStr GetExposureBiasAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetExposureBiasAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     i16 value = propValue.i16;
     MStr r = {};
     int whole = value / 1000;
@@ -2674,7 +2676,7 @@ MStr GetExposureBiasAsString(PTPControl* self, PtpProperty* property, PropValue 
     return r;
 }
 
-MStr GetFlashCompAsString(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetFlashCompAsString(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     i16 value = propValue.i16;
     MStr r = {};
     int whole = value / 1000;
@@ -2692,7 +2694,7 @@ MStr GetFlashCompAsString(PTPControl* self, PtpProperty* property, PropValue pro
     return r;
 }
 
-MStr GetZoomScale(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetZoomScale(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     int whole = propValue.u32 / 1000;
     int decimals = (propValue.u32 % 1000) / 100;
@@ -2711,7 +2713,7 @@ MStr GetZoomScale(PTPControl* self, PtpProperty* property, PropValue propValue) 
     return r;
 }
 
-MStr GetZoomBarInfo(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetZoomBarInfo(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 zoomPosition = value & 0xffff;
@@ -2727,32 +2729,32 @@ MStr GetZoomBarInfo(PTPControl* self, PtpProperty* property, PropValue propValue
     return r;
 }
 
-static EnumValueU8 Prop_OnOff0[] = {
+static EnumValueU8 sProp_OnOff0[] = {
     {0x00, "Off"},
     {0x01, "On"}
 };
 
-static EnumValueU8 Prop_OnOff1[] = {
+static EnumValueU8 sProp_OnOff1[] = {
     {0x01, "Off"},
     {0x02, "On"}
 };
 
-static EnumValueU8 Prop_EnabledDisabled[] = {
+static EnumValueU8 sProp_EnabledDisabled[] = {
     {0x00, "Disabled"},
     {0x01, "Enabled"}
 };
 
-static EnumValueU8 Prop_PixelShiftShootingMode[] = {
+static EnumValueU8 sProp_PixelShiftShootingMode[] = {
     {0x00, "Off"},
     {0x01, "Burst Shooting"}
 };
 
-static EnumValueU8 Prop_PixelShiftShootingStatus[] = {
+static EnumValueU8 sProp_PixelShiftShootingStatus[] = {
     {0x00, "Not Shooting"},
     {0x01, "Shooting"}
 };
 
-static EnumValueU8 Prop_CompressionSetting[] = {
+static EnumValueU8 sProp_CompressionSetting[] = {
     {0x01, "ECO/LIGHT"},
     {0x02, "STD"},
     {0x03, "FINE"},
@@ -2774,7 +2776,7 @@ static EnumValueU8 Prop_CompressionSetting[] = {
     {0x44, "RAW+HEIF(XFINE)"},
 };
 
-static EnumValueU16 Prop_WhiteBalance[] = {
+static EnumValueU16 sProp_WhiteBalance[] = {
     {0x0001, "Manual"},
     {0x0002, "AWB"},
     {0x0003, "One-push Automatic"},
@@ -2796,7 +2798,7 @@ static EnumValueU16 Prop_WhiteBalance[] = {
     {0x8030, "Underwater Auto"},
 };
 
-static EnumValueU16 Prop_FocusMode[] = {
+static EnumValueU16 sProp_FocusMode[] = {
     {0x0001, "Manual"},
     {0x0002, "AF-S"},
     {0x0003, "Auto-Macro"},
@@ -2808,7 +2810,7 @@ static EnumValueU16 Prop_FocusMode[] = {
     {0x8009, "Preset Focus"},
 };
 
-static EnumValueU8 Prop_ImageSize[] = {
+static EnumValueU8 sProp_ImageSize[] = {
     {0x01, "L"},
     {0x02, "M"},
     {0x03, "S"},
@@ -2836,7 +2838,7 @@ static EnumValueU8 Prop_ImageSize[] = {
     {0x19, "VGA"},
 };
 
-static EnumValueU16 Prop_ExposureMeteringMode[] = {
+static EnumValueU16 sProp_ExposureMeteringMode[] = {
     {0x0001, "Average"},
     {0x0002, "Center Weighted Average"},
     {0x0003, "Multi Spot"},
@@ -2852,7 +2854,7 @@ static EnumValueU16 Prop_ExposureMeteringMode[] = {
     {0x8013, "Spotlight"},
 };
 
-static EnumValueU16 Prop_FlashMode[] = {
+static EnumValueU16 sProp_FlashMode[] = {
     {0x0001, "Auto flash"},
     {0x0002, "Flash off"},
     {0x0003, "Fill flash"},
@@ -2871,7 +2873,7 @@ static EnumValueU16 Prop_FlashMode[] = {
     {0x8042, "Rear Sync Wireless"},
 };
 
-static EnumValueU16 Prop_ExposureProgramMode16[] = {
+static EnumValueU16 sProp_ExposureProgramMode16[] = {
     {0x0001, "Manual (M)"},
     {0x0002, "Automatic (P)"},
     {0x0003, "Aperture Priority (A)"},
@@ -2935,7 +2937,7 @@ static EnumValueU16 Prop_ExposureProgramMode16[] = {
     {0x8097, "Interval REC (Movie) (Auto)"},
 };
 
-static EnumValueU32 Prop_ExposureProgramMode32[] = {
+static EnumValueU32 sProp_ExposureProgramMode32[] = {
     {0x00000001, "Manual (M)"},
     {0x00010002, "Automatic (P)"},
     {0x00020003, "Aperture Priority (A)"},
@@ -2999,7 +3001,7 @@ static EnumValueU32 Prop_ExposureProgramMode32[] = {
     {0x000C8097, "Interval REC (Movie) (Auto)"},
 };
 
-static EnumValueU32 Prop_CaptureMode32[] = {
+static EnumValueU32 sProp_CaptureMode32[] = {
     {0x00000001, "Normal"},
     {0x00010002, "Continuous Shooting Hi"},
     {0x00018010, "Continuous Shooting Hi+"},
@@ -3155,7 +3157,7 @@ static EnumValueU32 Prop_CaptureMode32[] = {
     {0x000A8040, "Focus Bracket"},
 };
 
-static EnumValueU16 Prop_CaptureMode16[] = {
+static EnumValueU16 sProp_CaptureMode16[] = {
     {0x0001, "Normal"},
     {0x0002, "Continuous Shooting Hi"},
     {0x0003, "Timelapse"},
@@ -3311,49 +3313,49 @@ static EnumValueU16 Prop_CaptureMode16[] = {
     {0x8530, "Single Bracket 3.0 EV 5 Img."},
 };
 
-static EnumValueU8 Prop_IrisMode[] = {
+static EnumValueU8 sProp_IrisMode[] = {
     {0x01, "Automatic"},
     {0x02, "Manual"},
 };
 
-static EnumValueU8 Prop_ApertureDriveAF[] = {
+static EnumValueU8 sProp_ApertureDriveAF[] = {
     {0x01, "Not Target"},
     {0x02, "Standard"},
     {0x03, "Silent Priority"},
 };
 
-static EnumValueU8 Prop_SilentModePowerOff[] = {
+static EnumValueU8 sProp_SilentModePowerOff[] = {
     {0x01, "Not Target"},
     {0x02, "Off"},
 };
 
-static EnumValueU8 Prop_SilentModeAutoPixelMapping[] = {
+static EnumValueU8 sProp_SilentModeAutoPixelMapping[] = {
     {0x01, "Not Target"},
     {0x02, "Off"},
 };
 
-static EnumValueU8 Prop_ShutterType[] = {
+static EnumValueU8 sProp_ShutterType[] = {
     {0x01, "Auto"},
     {0x02, "Mechanical Shutter"},
     {0x03, "Electronic Shutter"},
 };
 
-static EnumValueU8 Prop_ShutterMode[] = {
+static EnumValueU8 sProp_ShutterMode[] = {
     {0x01, "Speed"},
     {0x02, "Angle"},
 };
 
-static EnumValueU8 Prop_ShutterModeSetting[] = {
+static EnumValueU8 sProp_ShutterModeSetting[] = {
     {0x01, "Automatic"},
     {0x02, "Manual"},
 };
 
-static EnumValueU8 Prop_GainControl[] = {
+static EnumValueU8 sProp_GainControl[] = {
     {0x01, "Automatic"},
     {0x02, "Manual"},
 };
 
-static EnumValueU8 Prop_DRO[] = {
+static EnumValueU8 sProp_DRO[] = {
     {0x01, "DRO Off"},
     {0x02, "DRO"},
     {0x10, "DRO+"},
@@ -3372,25 +3374,25 @@ static EnumValueU8 Prop_DRO[] = {
     {0x26, "HDR 6.0EV"},
 };
 
-static EnumValueU8 Prop_LiveViewStatus[] = {
+static EnumValueU8 sProp_LiveViewStatus[] = {
     {0x00, "Disabled"}, // Supported, don't get Live View yet... wait for 'Enabled' status
     {0x01, "Enabled"},
     {0x02, "Not Supported"},
 };
 
-static EnumValueU8 Prop_TimeCodeFormat[] = {
+static EnumValueU8 sProp_TimeCodeFormat[] = {
     {0x01, "NF"},
     {0x02, "NDF"},
 };
 
-static EnumValueU8 Prop_AspectRatio[] = {
+static EnumValueU8 sProp_AspectRatio[] = {
     {0x01, "3:2"},
     {0x02, "16:9"},
     {0x03, "4:3"},
     {0x04, "1:1"},
 };
 
-static EnumValueU16 Prop_PictureEffect[] = {
+static EnumValueU16 sProp_PictureEffect[] = {
     {0x8000, "Off"},
     {0x8001, "Toy Camera Normal"},
     {0x8002, "Toy Camera Cool"},
@@ -3427,13 +3429,13 @@ static EnumValueU16 Prop_PictureEffect[] = {
     {0x80C2, "Miniature Illustration High"},
 };
 
-static EnumValueU16 Prop_PcRemoteSaveDest[] = {
+static EnumValueU16 sProp_PcRemoteSaveDest[] = {
     {0x0001, "PC"},
     {0x0010, "Camera Media Card"},
     {0x0011, "PC & Camera Media Card"},
 };
 
-static EnumValueU16 Prop_FocusArea[] = {
+static EnumValueU16 sProp_FocusArea[] = {
     {0x0000, "Unknown"},
     {0x0001, "Wide"},
     {0x0002, "Zone"},
@@ -3463,13 +3465,13 @@ static EnumValueU16 Prop_FocusArea[] = {
     {0x1203, "Lock on AF Flexible Spot Free Size 3"},
 };
 
-static EnumValueU8 Prop_LiveViewSettingEffect[] = {
+static EnumValueU8 sProp_LiveViewSettingEffect[] = {
     {0x00, "N/A"},
     {0x01, "On"},
     {0x02, "Off"}
 };
 
-static EnumValueU8 Prop_PictureProfile[] = {
+static EnumValueU8 sProp_PictureProfile[] = {
     {0x00, "Off"},
     {0x01, "Profile 1"},
     {0x02, "Profile 2"},
@@ -3488,7 +3490,7 @@ static EnumValueU8 Prop_PictureProfile[] = {
     {0x44, "Profile LUT 4"},
 };
 
-static EnumValueU8 Prop_CreativeStyle[] = {
+static EnumValueU8 sProp_CreativeStyle[] = {
     {0x01, "Standard"},
     {0x02, "Vivid"},
     {0x03, "Portrait"},
@@ -3510,7 +3512,7 @@ static EnumValueU8 Prop_CreativeStyle[] = {
     {0x13, "Creative BOX6"},
 };
 
-static EnumValueU16 Prop_CreativeLook[] = {
+static EnumValueU16 sProp_CreativeLook[] = {
     {0x01, "ST (Standard)"},
     {0x0002, "PT (Portrait)"},
     {0x0003, "NT (Neutral)"},
@@ -3531,7 +3533,7 @@ static EnumValueU16 Prop_CreativeLook[] = {
     {0x0106, "Custom Look 6"},
 };
 
-static EnumValueU8 Prop_MovieFormat[] = {
+static EnumValueU8 sProp_MovieFormat[] = {
     {0x01, "DVD"},
     {0x02, "M2PS"},
     {0x03, "AVCHD"},
@@ -3565,7 +3567,7 @@ static EnumValueU8 Prop_MovieFormat[] = {
     {0x1F, "XAVC S-I 422"},
 };
 
-static EnumValueU16 Prop_MovieQuality[] = {
+static EnumValueU16 sProp_MovieQuality[] = {
     {0x0001, "60p 50M / XAVC S"},
     {0x0002, "30p 50M / XAVC S"},
     {0x0003, "24p 50M / XAVC S"},
@@ -3637,14 +3639,14 @@ static EnumValueU16 Prop_MovieQuality[] = {
     {0x0045, "260M 422 10bit"},
 };
 
-static EnumValueU8 Prop_ImageQuality[] = {
+static EnumValueU8 sProp_ImageQuality[] = {
     {0x01, "Extra Fine"},
     {0x02, "Fine"},
     {0x03, "Standard"},
     {0x04, "Light"},
 };
 
-static EnumValueU8 Prop_ImageFileFormat[] = {
+static EnumValueU8 sProp_ImageFileFormat[] = {
     {0x01, "RAW"},
     {0x02, "RAW & JPEG"},
     {0x03, "JPEG"},
@@ -3652,7 +3654,7 @@ static EnumValueU8 Prop_ImageFileFormat[] = {
     {0x05, "HEIF"},
 };
 
-static EnumValueU8 Prop_AFTrackingSensitivity[] = {
+static EnumValueU8 sProp_AFTrackingSensitivity[] = {
     {0x01, "1 (Locked on)"},
     {0x02, "2"},
     {0x03, "3 (Standard)"},
@@ -3660,14 +3662,14 @@ static EnumValueU8 Prop_AFTrackingSensitivity[] = {
     {0x05, "5 (Responsive)"},
 };
 
-static EnumValueU8 Prop_ZoomSetting[] = {
+static EnumValueU8 sProp_ZoomSetting[] = {
     {0x01, "Optical Zoom"},
     {0x02, "Smart Zoom"},
     {0x03, "Clear Image Zoom"},
     {0x04, "Digital Zoom"},
 };
 
-static EnumValueU8 Prop_PcSaveImage[] = {
+static EnumValueU8 sProp_PcSaveImage[] = {
     {0x01, "RAW & JPEG"},
     {0x02, "JPEG Only"},
     {0x03, "RAW Only"},
@@ -3675,17 +3677,17 @@ static EnumValueU8 Prop_PcSaveImage[] = {
     {0x05, "HEIF Only"},
 };
 
-static EnumValueU8 Prop_ImageTransferSize[] = {
+static EnumValueU8 sProp_ImageTransferSize[] = {
     {0x01, "Original"},
     {0x02, "Small Size JPEG"},
 };
 
-static EnumValueU8 Prop_LiveViewImageQuality[] = {
+static EnumValueU8 sProp_LiveViewImageQuality[] = {
     {0x01, "Low"},
     {0x02, "High"},
 };
 
-static EnumValueU8 Prop_RawFileType[] = {
+static EnumValueU8 sProp_RawFileType[] = {
     {0x01, "Compressed"},
     {0x02, "Lossless L"},
     {0x03, "Lossless M"},
@@ -3694,19 +3696,19 @@ static EnumValueU8 Prop_RawFileType[] = {
     {0x06, "Lossless"},
 };
 
-static EnumValueU8 Prop_CompressedImageFileFormat[] = {
+static EnumValueU8 sProp_CompressedImageFileFormat[] = {
     {0x01, "JPEG"},
     {0x02, "HEIF (4:2:2)"},
     {0x03, "HEIF (4:2:0)"},
 };
 
-static EnumValueU8 Prop_TouchOperation[] = {
+static EnumValueU8 sProp_TouchOperation[] = {
     {0x01, "Off"},
     {0x02, "On"},
     {0x03, "Playback Only"},
 };
 
-static EnumValueU8 Prop_TouchOperationFunction[] = {
+static EnumValueU8 sProp_TouchOperationFunction[] = {
     {0x01, "OFF"},
     {0x02, "Touch Shutter"},
     {0x03, "Touch Focus"},
@@ -3720,7 +3722,7 @@ static EnumValueU8 Prop_TouchOperationFunction[] = {
     {0x0B, "Touch Tracking + Touch AE OFF"},
 };
 
-static EnumValueU8 Prop_BatteryLevel[] = {
+static EnumValueU8 sProp_BatteryLevel[] = {
     {0x01, "Fake Battery"},
     {0x02, "N/A"},
     {0x03, "Empty"},
@@ -3740,14 +3742,14 @@ static EnumValueU8 Prop_BatteryLevel[] = {
     {0xFF, "No Battery"},
 };
 
-static EnumValueU8 Prop_MovieRecState[] = {
+static EnumValueU8 sProp_MovieRecState[] = {
    {0x00, "Not Recording"},
    {0x01, "Recording"},
    {0x02, "Recording Failed"},
    {0x03, "Waiting Record"},
 };
 
-static EnumValueU8 Prop_MovieFrameRate[] = {
+static EnumValueU8 sProp_MovieFrameRate[] = {
     {0x01, "120p"},
     {0x02, "100p"},
     {0x03, "60p"},
@@ -3796,7 +3798,7 @@ static EnumValueU8 Prop_MovieFrameRate[] = {
     {0x57, "119.88i"},
 };
 
-static EnumValueU8 Prop_AutoFocusStatus[] = {
+static EnumValueU8 sProp_AutoFocusStatus[] = {
     {0x01, "Unlock"},
     {0x02, "[AF-S] Focused, AF Locked"},
     {0x03, "[AF-S] No focus / Low Contrast"},
@@ -3808,12 +3810,12 @@ static EnumValueU8 Prop_AutoFocusStatus[] = {
     {0x09, "Pause"},
 };
 
-static EnumValueU8 Prop_MediaPlayback[] = {
+static EnumValueU8 sProp_MediaPlayback[] = {
     {0x01, "Slot 1"},
     {0x02, "Slot 2"},
 };
 
-static EnumValueU8 Prop_MediaSlotStatus[] = {
+static EnumValueU8 sProp_MediaSlotStatus[] = {
     {0x01, "OK"},
     {0x02, "No Card"},
     {0x03, "Card Error"},
@@ -3825,28 +3827,28 @@ static EnumValueU8 Prop_MediaSlotStatus[] = {
     {0x09, "Card Error (Read-Only)"},
 };
 
-static EnumValueU8 Prop_DeviceOverheatingState[] = {
+static EnumValueU8 sProp_DeviceOverheatingState[] = {
     {0x00, "Not Overheating"},
     {0x01, "Pre Overheating"},
     {0x02, "Overheating"},
 };
 
-static EnumValueU8 Prop_LockedUnlocked[] = {
+static EnumValueU8 sProp_LockedUnlocked[] = {
     {0x01, "Unlocked"},
     {0x02, "Locked"},
 };
 
-static EnumValueU8 Prop_IntervalRecStatus[] = {
+static EnumValueU8 sProp_IntervalRecStatus[] = {
     {0x00, "Waiting"},
     {0x01, "Shooting"},
 };
 
-static EnumValueU8 Prop_ExposureModeKey[] = {
+static EnumValueU8 sProp_ExposureModeKey[] = {
     {0x00, "Camera"},
     {0x01, "PC Remote"},
 };
 
-static MStr GetFocusMagnifyScale(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetFocusMagnifyScale(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     int whole = value / 10;
@@ -3867,7 +3869,7 @@ static MStr GetFocusMagnifyScale(PTPControl* self, PtpProperty* property, PropVa
     return r;
 }
 
-static MStr GetFocusMagnifyPos(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetFocusMagnifyPos(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 x = (value >> 16) & 0xffff;
@@ -3882,7 +3884,7 @@ static MStr GetFocusMagnifyPos(PTPControl* self, PtpProperty* property, PropValu
     return r;
 }
 
-static MStr GetFocusSpotPos(PTPControl* self, PtpProperty* property, PropValue propValue) {
+static MStr GetFocusSpotPos(PTPControl* self, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 x = (value >> 16) & 0xffff;
@@ -3903,10 +3905,10 @@ typedef union uFixedEnums {
     EnumValueU32* u32;
 } FixedEnums;
 
-typedef b32 (*PTP_PropBuildEnumsFunc_t)(PTPControl* self, PtpProperty* property, PropValueEnums* outEnums);
-typedef MStr (*PTP_PropValueAsStringFunc_t)(PTPControl* self, PtpProperty* property, PropValue value);
+typedef b32 (*PTP_PropBuildEnumsFunc_t)(PTPControl* self, PTPProperty* property, PTPPropValueEnums* outEnums);
+typedef MStr (*PTP_PropValueAsStringFunc_t)(PTPControl* self, PTPProperty* property, PTPPropValue value);
 
-typedef struct sPropertyMetadata {
+typedef struct {
     char* name;
     u16 propCode;
     u16 type;
@@ -3929,127 +3931,127 @@ typedef struct sPropertyMetadata {
 #define META_FUNC_I32(n, c, f, g) {n, c, PTP_DT_INT32, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
 #define META_FUNC_U32(n, c, f, g) {n, c, PTP_DT_UINT32, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
 
-static PropertyMetadata propertyMetadata[] = {
-    META_ENUM_U8 ("image-file-format", DPC_COMPRESSION_SETTING, Prop_CompressionSetting),
-    META_ENUM_U8 ("image-file-format", DPC_IMAGE_FILE_FORMAT, Prop_ImageFileFormat),
-    META_ENUM_U8 ("raw-file-type", DPC_RAW_FILE_TYPE, Prop_RawFileType),
-    META_ENUM_U8 ("compressed-file-type", DPC_COMPRESSED_IMAGE_FILE_FORMAT, Prop_CompressedImageFileFormat),
-    META_ENUM_U8 ("image-quality", DPC_IMAGE_QUALITY, Prop_ImageQuality),
-    META_ENUM_U8 ("image-size", DPC_IMAGE_SIZE, Prop_ImageSize),
-    META_ENUM_U16("image-save-destination", DPC_IMAGE_SAVE_DESTINATION, Prop_PcRemoteSaveDest),
-    META_ENUM_U8 ("pc-save-image", DPC_PC_SAVE_IMAGE, Prop_PcSaveImage),
-    META_ENUM_U8 ("image-transfer-size", DPC_IMAGE_TRANSFER_SIZE, Prop_ImageTransferSize),
+static PropertyMetadata sPropertyMetadata[] = {
+    META_ENUM_U8 ("image-file-format", DPC_COMPRESSION_SETTING, sProp_CompressionSetting),
+    META_ENUM_U8 ("image-file-format", DPC_IMAGE_FILE_FORMAT, sProp_ImageFileFormat),
+    META_ENUM_U8 ("raw-file-type", DPC_RAW_FILE_TYPE, sProp_RawFileType),
+    META_ENUM_U8 ("compressed-file-type", DPC_COMPRESSED_IMAGE_FILE_FORMAT, sProp_CompressedImageFileFormat),
+    META_ENUM_U8 ("image-quality", DPC_IMAGE_QUALITY, sProp_ImageQuality),
+    META_ENUM_U8 ("image-size", DPC_IMAGE_SIZE, sProp_ImageSize),
+    META_ENUM_U16("image-save-destination", DPC_IMAGE_SAVE_DESTINATION, sProp_PcRemoteSaveDest),
+    META_ENUM_U8 ("pc-save-image", DPC_PC_SAVE_IMAGE, sProp_PcSaveImage),
+    META_ENUM_U8 ("image-transfer-size", DPC_IMAGE_TRANSFER_SIZE, sProp_ImageTransferSize),
 
-    META_ENUM_U16("program-mode", DPC_EXPOSURE_PROGRAM_MODE, Prop_ExposureProgramMode16),
-    META_ENUM_U32("program-mode", DPC_EXPOSURE_PROGRAM_MODE, Prop_ExposureProgramMode32),
-    META_ENUM_U8 ("program-mode-key", DPC_EXPOSURE_MODE_KEY, Prop_ExposureModeKey),
-    META_ENUM_U16("capture-mode", DPC_CAPTURE_MODE, Prop_CaptureMode16),
-    META_ENUM_U32("capture-mode", DPC_CAPTURE_MODE, Prop_CaptureMode32),
+    META_ENUM_U16("program-mode", DPC_EXPOSURE_PROGRAM_MODE, sProp_ExposureProgramMode16),
+    META_ENUM_U32("program-mode", DPC_EXPOSURE_PROGRAM_MODE, sProp_ExposureProgramMode32),
+    META_ENUM_U8 ("program-mode-key", DPC_EXPOSURE_MODE_KEY, sProp_ExposureModeKey),
+    META_ENUM_U16("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode16),
+    META_ENUM_U32("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode32),
     META_FUNC_U16("f-number", DPC_F_NUMBER, NULL, GetFNumberAsString),
     META_FUNC_U32("shutter-speed", DPC_SHUTTER_SPEED, NULL, GetShutterSpeedAsString),
     META_FUNC_U32("iso", DPC_ISO, NULL, GetIsoAsString),
     META_FUNC_U32("iso-current", DPC_ISO_CURRENT, NULL, GetIsoAsString),
-    META_ENUM_U8 ("shutter-mode", DPC_SHUTTER_MODE, Prop_ShutterMode),
-    META_ENUM_U8 ("shutter-type", DPC_SHUTTER_TYPE, Prop_ShutterType),
-    META_ENUM_U8 ("shutter-mode-setting", DPC_SHUTTER_MODE_SETTING, Prop_ShutterModeSetting),
-    META_ENUM_U8 ("silent-mode", DPC_SILENT_MODE, Prop_OnOff1),
-    META_ENUM_U8 ("silent-mode-aperture-drive-af", DPC_SILENT_MODE_APERTURE_DRIVE_AF, Prop_ApertureDriveAF),
-    META_ENUM_U8 ("silent-mode-power-off", DPC_SILENT_MODE_POWER_OFF, Prop_SilentModePowerOff),
-    META_ENUM_U8 ("silent-mode-auto-pixel-mapping", DPC_SILENT_MODE_AUTO_PIXEL_MAPPING, Prop_SilentModeAutoPixelMapping),
+    META_ENUM_U8 ("shutter-mode", DPC_SHUTTER_MODE, sProp_ShutterMode),
+    META_ENUM_U8 ("shutter-type", DPC_SHUTTER_TYPE, sProp_ShutterType),
+    META_ENUM_U8 ("shutter-mode-setting", DPC_SHUTTER_MODE_SETTING, sProp_ShutterModeSetting),
+    META_ENUM_U8 ("silent-mode", DPC_SILENT_MODE, sProp_OnOff1),
+    META_ENUM_U8 ("silent-mode-aperture-drive-af", DPC_SILENT_MODE_APERTURE_DRIVE_AF, sProp_ApertureDriveAF),
+    META_ENUM_U8 ("silent-mode-power-off", DPC_SILENT_MODE_POWER_OFF, sProp_SilentModePowerOff),
+    META_ENUM_U8 ("silent-mode-auto-pixel-mapping", DPC_SILENT_MODE_AUTO_PIXEL_MAPPING, sProp_SilentModeAutoPixelMapping),
 
-    META_ENUM_U8 ("aspect-ratio", DPC_ASPECT_RATIO, Prop_AspectRatio),
-    META_ENUM_U8 ("iris-mode", DPC_IRIS_MODE, Prop_IrisMode),
+    META_ENUM_U8 ("aspect-ratio", DPC_ASPECT_RATIO, sProp_AspectRatio),
+    META_ENUM_U8 ("iris-mode", DPC_IRIS_MODE, sProp_IrisMode),
 
-    META_ENUM_U16("white-balance", DPC_WHITE_BALANCE, Prop_WhiteBalance),
+    META_ENUM_U16("white-balance", DPC_WHITE_BALANCE, sProp_WhiteBalance),
     META_FUNC_U16("white-balance-custom-temp", DPC_COLOR_TEMPERATURE, NULL, GetTemperatureAsString),
     META_FUNC_U8 ("white-balance-gm", DPC_WHITE_BALANCE_GM, NULL, GetWhiteBalanceGMAsString),
     META_FUNC_U8 ("white-balance-ab", DPC_WHITE_BALANCE_AB, NULL, GetWhiteBalanceABAsString),
 
-    META_ENUM_U8 ("gain-control", DPC_GAIN_CONTROL, Prop_GainControl),
-    META_ENUM_U16("exposure-metering-mode", DPC_EXPOSURE_METERING_MODE, Prop_ExposureMeteringMode),
+    META_ENUM_U8 ("gain-control", DPC_GAIN_CONTROL, sProp_GainControl),
+    META_ENUM_U16("exposure-metering-mode", DPC_EXPOSURE_METERING_MODE, sProp_ExposureMeteringMode),
     META_FUNC_I16("exposure-bias-compensation", DPC_EXPOSURE_COMPENSATION, NULL, GetExposureBiasAsString),
-    META_ENUM_U8 ("dro-hdr-mode", DPC_DRO_HDR_MODE, Prop_DRO),
+    META_ENUM_U8 ("dro-hdr-mode", DPC_DRO_HDR_MODE, sProp_DRO),
 
-    META_ENUM_U8 ("awb-lock-satus", DPC_AWB_LOCK_STATUS, Prop_LockedUnlocked),
-    META_ENUM_U8 ("fel-lock-satus", DPC_FEL_LOCK_STATUS, Prop_LockedUnlocked),
-    META_ENUM_U8 ("ae-lock-satus", DPC_AE_LOCK_STATUS, Prop_LockedUnlocked),
+    META_ENUM_U8 ("awb-lock-satus", DPC_AWB_LOCK_STATUS, sProp_LockedUnlocked),
+    META_ENUM_U8 ("fel-lock-satus", DPC_FEL_LOCK_STATUS, sProp_LockedUnlocked),
+    META_ENUM_U8 ("ae-lock-satus", DPC_AE_LOCK_STATUS, sProp_LockedUnlocked),
 
-    META_ENUM_U16("focus-mode", DPC_FOCUS_MODE, Prop_FocusMode),
-    META_ENUM_U16("focus-area", DPC_FOCUS_AREA, Prop_FocusArea),
-    META_ENUM_U8 ("manual-focus-adjust-enabled", DPC_MANUAL_FOCUS_ADJUST_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("af-tracking-sens", DPC_AF_TRACKING_SENS, Prop_AFTrackingSensitivity),
-    META_ENUM_U8 ("auto-focus-status", DPC_AF_STATUS, Prop_AutoFocusStatus),
+    META_ENUM_U16("focus-mode", DPC_FOCUS_MODE, sProp_FocusMode),
+    META_ENUM_U16("focus-area", DPC_FOCUS_AREA, sProp_FocusArea),
+    META_ENUM_U8 ("manual-focus-adjust-enabled", DPC_MANUAL_FOCUS_ADJUST_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("af-tracking-sens", DPC_AF_TRACKING_SENS, sProp_AFTrackingSensitivity),
+    META_ENUM_U8 ("auto-focus-status", DPC_AUTO_FOCUS_STATUS, sProp_AutoFocusStatus),
     META_FUNC_U16("focus-magnify-scale", DPC_FOCUS_MAGNIFY_SCALE, NULL, GetFocusMagnifyScale),
     META_FUNC_U32("focus-magnify-pos", DPC_FOCUS_MAGNIFY_POS, NULL, GetFocusMagnifyPos),
     META_FUNC_U32("focus-spot-pos", DPC_FOCUS_AREA_POS_OLD, NULL, GetFocusSpotPos),
 
-    META_ENUM_U16("flash-mode", DPC_FLASH_MODE, Prop_FlashMode),
-    META_ENUM_U8 ("wireless-flash", DPC_WIRELESS_FLASH, Prop_OnOff0),
-    META_ENUM_U8 ("red-eye-reduction", DPC_RED_EYE_REDUCTION, Prop_OnOff0),
+    META_ENUM_U16("flash-mode", DPC_FLASH_MODE, sProp_FlashMode),
+    META_ENUM_U8 ("wireless-flash", DPC_WIRELESS_FLASH, sProp_OnOff0),
+    META_ENUM_U8 ("red-eye-reduction", DPC_RED_EYE_REDUCTION, sProp_OnOff0),
     META_FUNC_I16("flash-compensation", DPC_FLASH_COMPENSATION, NULL, GetFlashCompAsString),
 
-    META_ENUM_U16("picture-effect", DPC_PICTURE_EFFECT, Prop_PictureEffect),
-    META_ENUM_U8 ("picture-profile", DPC_PICTURE_PROFILE, Prop_PictureProfile),
-    META_ENUM_U8 ("creative-style", DPC_CREATIVE_STYLE, Prop_CreativeStyle),
-    META_ENUM_U16("creative-look", DPC_CREATIVE_LOOK, Prop_CreativeLook),
+    META_ENUM_U16("picture-effect", DPC_PICTURE_EFFECT, sProp_PictureEffect),
+    META_ENUM_U8 ("picture-profile", DPC_PICTURE_PROFILE, sProp_PictureProfile),
+    META_ENUM_U8 ("creative-style", DPC_CREATIVE_STYLE, sProp_CreativeStyle),
+    META_ENUM_U16("creative-look", DPC_CREATIVE_LOOK, sProp_CreativeLook),
 
-    META_ENUM_U8 ("movie-format", DPC_MOVIE_FILE_FORMAT, Prop_MovieFormat),
-    META_ENUM_U8 ("movie-format-proxy", DPC_MOVIE_FILE_FORMAT_PROXY, Prop_MovieFormat),
-    META_ENUM_U16("movie-quality", DPC_MOVIE_QUALITY, Prop_MovieQuality),
-    META_ENUM_U8 ("movie-recording-state", DPC_MOVIE_REC_STATE, Prop_MovieRecState),
-    META_ENUM_U8 ("movie-frame-rate", DPC_MOVIE_FRAME_RATE, Prop_MovieFrameRate),
+    META_ENUM_U8 ("movie-format", DPC_MOVIE_FILE_FORMAT, sProp_MovieFormat),
+    META_ENUM_U8 ("movie-format-proxy", DPC_MOVIE_FILE_FORMAT_PROXY, sProp_MovieFormat),
+    META_ENUM_U16("movie-quality", DPC_MOVIE_QUALITY, sProp_MovieQuality),
+    META_ENUM_U8 ("movie-recording-state", DPC_MOVIE_REC_STATE, sProp_MovieRecState),
+    META_ENUM_U8 ("movie-frame-rate", DPC_MOVIE_FRAME_RATE, sProp_MovieFrameRate),
 
-    META_ENUM_U8 ("interval-record-mode", DPC_INTERVAL_RECORD_MODE, Prop_OnOff1),
-    META_ENUM_U8 ("interval-record-status", DPC_INTERVAL_RECORD_STATUS, Prop_IntervalRecStatus),
+    META_ENUM_U8 ("interval-record-mode", DPC_INTERVAL_RECORD_MODE, sProp_OnOff1),
+    META_ENUM_U8 ("interval-record-status", DPC_INTERVAL_RECORD_STATUS, sProp_IntervalRecStatus),
 
-    META_ENUM_U8 ("media-playback", DPC_PLAYBACK_MEDIA, Prop_MediaPlayback),
-    META_ENUM_U8 ("media-slot1-status", DPC_MEDIA_SLOT1_STATUS, Prop_MediaSlotStatus),
-    META_ENUM_U8 ("media-slot2-status", DPC_MEDIA_SLOT2_STATUS, Prop_MediaSlotStatus),
-    META_ENUM_U8 ("format-media-slot1-enabled", DPC_FORMAT_MEDIA_SLOT1_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("format-media-slot2-enabled", DPC_FORMAT_MEDIA_SLOT2_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("format-media-quick-slot1-enabled", DPC_FORMAT_MEDIA_QUICK_SLOT1_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("format-media-quick-slot1-enabled", DPC_FORMAT_MEDIA_QUICK_SLOT2_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("format-media-cancel-enabled", DPC_FORMAT_MEDIA_CANCEL_ENABLED, Prop_EnabledDisabled),
+    META_ENUM_U8 ("media-playback", DPC_PLAYBACK_MEDIA, sProp_MediaPlayback),
+    META_ENUM_U8 ("media-slot1-status", DPC_MEDIA_SLOT1_STATUS, sProp_MediaSlotStatus),
+    META_ENUM_U8 ("media-slot2-status", DPC_MEDIA_SLOT2_STATUS, sProp_MediaSlotStatus),
+    META_ENUM_U8 ("format-media-slot1-enabled", DPC_FORMAT_MEDIA_SLOT1_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("format-media-slot2-enabled", DPC_FORMAT_MEDIA_SLOT2_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("format-media-quick-slot1-enabled", DPC_FORMAT_MEDIA_QUICK_SLOT1_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("format-media-quick-slot1-enabled", DPC_FORMAT_MEDIA_QUICK_SLOT2_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("format-media-cancel-enabled", DPC_FORMAT_MEDIA_CANCEL_ENABLED, sProp_EnabledDisabled),
 
-    META_ENUM_U8 ("contents-transfer-enabled", DPC_CONTENTS_TRANSFER_ENABLED, Prop_EnabledDisabled),
+    META_ENUM_U8 ("contents-transfer-enabled", DPC_CONTENTS_TRANSFER_ENABLED, sProp_EnabledDisabled),
 
-    META_ENUM_U8 ("live-view-quality", DPC_LIVE_VIEW_QUALITY, Prop_LiveViewImageQuality),
-    META_ENUM_U8 ("live-view-status", DPC_LIVE_VIEW_STATUS, Prop_LiveViewStatus),
-    META_ENUM_U8 ("live-view-setting-effect", DPC_LIVE_VIEW_SETTING_EFFECT, Prop_LiveViewSettingEffect),
+    META_ENUM_U8 ("live-view-quality", DPC_LIVE_VIEW_QUALITY, sProp_LiveViewImageQuality),
+    META_ENUM_U8 ("live-view-status", DPC_LIVE_VIEW_STATUS, sProp_LiveViewStatus),
+    META_ENUM_U8 ("live-view-setting-effect", DPC_LIVE_VIEW_SETTING_EFFECT, sProp_LiveViewSettingEffect),
 
     META_FUNC_I8 ("battery-remaining", DPC_BATTERY_REMAINING, NULL, GetBatteryRemainingAsString),
-    META_ENUM_U8 ("battery-level", DPC_BATTERY_LEVEL, Prop_BatteryLevel),
-    META_ENUM_U8 ("device-overheating-state", DPC_DEVICE_OVERHEATING_STATE, Prop_DeviceOverheatingState),
-    META_ENUM_U8 ("touch-operation", DPC_TOUCH_OPERATION, Prop_TouchOperation),
-    META_ENUM_U8 ("touch-operation-function", DPC_TOUCH_OPERATION_FUNCTION, Prop_TouchOperationFunction),
-    META_ENUM_U8 ("remote-touch-enabled", DPC_REMOTE_TOUCH_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("remote-touch-cancel-enabled", DPC_REMOTE_TOUCH_CANCEL_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("time-code-format", DPC_TIME_CODE_FORMAT, Prop_TimeCodeFormat),
+    META_ENUM_U8 ("battery-level", DPC_BATTERY_LEVEL, sProp_BatteryLevel),
+    META_ENUM_U8 ("device-overheating-state", DPC_DEVICE_OVERHEATING_STATE, sProp_DeviceOverheatingState),
+    META_ENUM_U8 ("touch-operation", DPC_TOUCH_OPERATION, sProp_TouchOperation),
+    META_ENUM_U8 ("touch-operation-function", DPC_TOUCH_OPERATION_FUNCTION, sProp_TouchOperationFunction),
+    META_ENUM_U8 ("remote-touch-enabled", DPC_REMOTE_TOUCH_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("remote-touch-cancel-enabled", DPC_REMOTE_TOUCH_CANCEL_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("time-code-format", DPC_TIME_CODE_FORMAT, sProp_TimeCodeFormat),
     META_FUNC_U32("predicted-max-file-size", DPC_PREDICTED_MAX_FILE_SIZE, NULL, GetPredictedMaxFileSizeAsString),
     META_FUNC_U16("pending-files", DPC_PENDING_FILES, NULL, GetPendingFileInfoAsString),
 
-    META_ENUM_U8 ("pixel-shift-shooting-mode", DPC_PIXEL_SHIFT_SHOOTING_MODE, Prop_PixelShiftShootingMode),
+    META_ENUM_U8 ("pixel-shift-shooting-mode", DPC_PIXEL_SHIFT_SHOOTING_MODE, sProp_PixelShiftShootingMode),
     META_FUNC_U16("pixel-shift-shooting-number", DPC_PIXEL_SHIFT_SHOOTING_NUMBER, NULL, GetPixelShootingNumberAsString),
     META_FUNC_U16("pixel-shift-shooting-interval", DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, NULL, GetPixelShootingIntervalAsString),
-    META_ENUM_U8 ("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_STATUS, Prop_PixelShiftShootingStatus),
+    META_ENUM_U8 ("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_STATUS, sProp_PixelShiftShootingStatus),
     META_FUNC_U16("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, NULL, GetPixelShootingProgressAsString),
 
-    META_ENUM_U8 ("zoom-operation-enabled", DPC_ZOOM_OPERATION_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("zoom-setting", DPC_ZOOM_SETTING, Prop_ZoomSetting),
-    META_ENUM_U8 ("zoom-type-status", DPC_ZOOM_TYPE_STATUS, Prop_ZoomSetting),
+    META_ENUM_U8 ("zoom-operation-enabled", DPC_ZOOM_OPERATION_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("zoom-setting", DPC_ZOOM_SETTING, sProp_ZoomSetting),
+    META_ENUM_U8 ("zoom-type-status", DPC_ZOOM_TYPE_STATUS, sProp_ZoomSetting),
     META_FUNC_U32("zoom-scale", DPC_ZOOM_SCALE, NULL, GetZoomScale),
     META_FUNC_U32("zoom-bar-info", DPC_ZOOM_BAR_INFO, NULL, GetZoomBarInfo),
 
-    META_ENUM_U8 ("remote-restrict-status", DPC_REMOTE_RESTRICT_STATUS, Prop_EnabledDisabled),
-    META_ENUM_U8 ("lens-info-enabled", DPC_LENS_INFORMATION_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("camera-settings-save-enabled", DPC_CAMERA_SETTING_SAVE_ENABLED, Prop_EnabledDisabled),
-    META_ENUM_U8 ("camera-settings-read-enabled", DPC_CAMERA_SETTING_READ_ENABLED, Prop_EnabledDisabled),
+    META_ENUM_U8 ("remote-restrict-status", DPC_REMOTE_RESTRICT_STATUS, sProp_EnabledDisabled),
+    META_ENUM_U8 ("lens-info-enabled", DPC_LENS_INFORMATION_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("camera-settings-save-enabled", DPC_CAMERA_SETTING_SAVE_ENABLED, sProp_EnabledDisabled),
+    META_ENUM_U8 ("camera-settings-read-enabled", DPC_CAMERA_SETTING_READ_ENABLED, sProp_EnabledDisabled),
 };
 
-b32 BuildEnumsFromGetFunc(PTPControl* self, PtpProperty* property, PropertyMetadata* meta, PropValueEnums* outEnums) {
+b32 BuildEnumsFromGetFunc(PTPControl* self, PTPProperty* property, PropertyMetadata* meta, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        PropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
-        PropValue propValue = property->form.enums.getSet[i];
+        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValue propValue = property->form.enums.getSet[i];
         propEnum->propValue = propValue;
         propEnum->str = meta->valueAsStringFunc(self, property, propValue);
         if (propEnum->str.size) {
@@ -4062,16 +4064,16 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, PtpProperty* property, PropertyMetad
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PropValueEnum* prop = outEnums->values + j;
+            PTPPropValueEnum* prop = outEnums->values + j;
             prop->flags &= ~ENUM_VALUE_WRITE;
         }
 
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            PropValue lookupValue = property->form.enums.set[i];
-            PropValueEnum* prop = NULL;
+            PTPPropValue lookupValue = property->form.enums.set[i];
+            PTPPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
-                PropValue enumValue = outEnums->values[j].propValue;
-                if (Ptp_PropValueEq(property->dataType, lookupValue, enumValue)) {
+                PTPPropValue enumValue = outEnums->values[j].propValue;
+                if (PTP_PropValueEq(property->dataType, lookupValue, enumValue)) {
                     prop = outEnums->values + j;
                     break;
                 }
@@ -4094,13 +4096,13 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, PtpProperty* property, PropertyMetad
     return TRUE;
 }
 
-b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PropValueEnums* outEnums) {
-    PtpProperty* property = PtpControl_GetProperty(self, propertyCode);
+b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PTPPropValueEnums* outEnums) {
+    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
     if (property->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
-    for (int i = 0; i < MStaticArraySize(propertyMetadata); i++) {
-        PropertyMetadata* meta = propertyMetadata + i;
+    for (int i = 0; i < MStaticArraySize(sPropertyMetadata); i++) {
+        PropertyMetadata* meta = sPropertyMetadata + i;
         if (propertyCode == meta->propCode && meta->type == property->dataType) {
             if (meta->fixedEnumsSize) {
                 switch (meta->type) {
@@ -4122,10 +4124,10 @@ b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PropValue
 }
 
 b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MStr* strOut) {
-    PtpProperty* property = PtpControl_GetProperty(self, propertyCode);
+    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
     char* str = NULL;
-    for (int i = 0; i < MStaticArraySize(propertyMetadata); i++) {
-        PropertyMetadata* meta = propertyMetadata + i;
+    for (int i = 0; i < MStaticArraySize(sPropertyMetadata); i++) {
+        PropertyMetadata* meta = sPropertyMetadata + i;
         if (propertyCode == meta->propCode && meta->type == property->dataType) {
             if (meta->fixedEnumsSize) {
                 switch (meta->type) {
@@ -4155,8 +4157,8 @@ b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MStr* strOut
     return FALSE;
 }
 
-PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PropValue value) {
-    PtpProperty* property = PtpControl_GetProperty(self, propertyCode);
+PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PTPPropValue value) {
+    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
     if (!property) {
         return PTP_GENERAL_ERROR;
     }
@@ -4196,7 +4198,7 @@ PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode) {
     return NULL;
 }
 
-PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PropValue value) {
+PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PTPPropValue value) {
     PtpControl* control = PTPControl_GetControl(self, controlCode);
     if (control) {
         return SDIO_ControlDevice(self, controlCode, control->dataType, value);
@@ -4208,13 +4210,13 @@ PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PropValue val
 PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed) {
     PtpControl* control = PTPControl_GetControl(self, controlCode);
     if (control) {
-        return SDIO_ControlDevice(self, controlCode, control->dataType, (PropValue){.u16=pressed?2:1});
+        return SDIO_ControlDevice(self, controlCode, control->dataType, (PTPPropValue){.u16=pressed?2:1});
     } else {
         return PTP_GENERAL_ERROR;
     }
 }
 
-b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PropValueEnums* outEnums) {
+b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums) {
     PtpControl* control = PTPControl_GetControl(self, controlCode);
     if (control->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;

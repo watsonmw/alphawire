@@ -9,7 +9,7 @@ extern "C" {
 typedef __int128 i128;
 typedef unsigned __int128 u128;
 
-typedef enum ePTPDataType {
+typedef enum {
     PTP_DT_UNDEF = 0x0000,
     PTP_DT_INT8 = 0x0001,
     PTP_DT_UINT8 = 0x0002,
@@ -34,13 +34,13 @@ typedef enum ePTPDataType {
     PTP_DT_STR = 0xFFFF,
 } PTPDataType;
 
-typedef enum ePTPFormFlag {
+typedef enum {
     PTP_FORM_FLAG_NONE = 0x00,
     PTP_FORM_FLAG_RANGE = 0x01,
     PTP_FORM_FLAG_ENUM = 0x02,
 } PTPFormFlag;
 
-typedef union uPropValue {
+typedef union {
     u8 u8;
     i8 i8;
     u16 u16;
@@ -52,63 +52,63 @@ typedef union uPropValue {
     u128 u128;
     i128 i128;
     MStr str;
-} PropValue;
+} PTPPropValue;
 
-typedef struct sPtpRange {
-    PropValue min;
-    PropValue max;
-    PropValue step;
-} PtpRange;
+typedef struct {
+    PTPPropValue min;
+    PTPPropValue max;
+    PTPPropValue step;
+} PTPRange;
 
-typedef struct sPtpPropertyEnum {
-    PropValue* set;
-    PropValue* getSet;
-} PtpPropertyEnum;
+typedef struct {
+    PTPPropValue* set;
+    PTPPropValue* getSet;
+} PTPPropertyEnum;
 
-enum EnumValueFlags {
+enum PTPEnumValueFlags {
     ENUM_VALUE_READ = 0x1,
     ENUM_VALUE_WRITE = 0x2,
     ENUM_VALUE_STR_CONST = 0x4
 };
 
-typedef struct sPropValueEnum {
-    PropValue propValue;
+typedef struct {
+    PTPPropValue propValue;
     MStr str;
     u16 flags;
-} PropValueEnum;
+} PTPPropValueEnum;
 
-typedef struct sPropValueEnums {
-    PropValueEnum* values;
-} PropValueEnums;
+typedef struct {
+    PTPPropValueEnum* values;
+} PTPPropValueEnums;
 
-typedef struct sPropValueEnums1 {
-    PropValueEnum* values;
+typedef struct {
+    PTPPropValueEnum* values;
     size_t size;
     b32 owned;
-} PropValueEnums1;
+} PTPPropValueEnumArray;
 
-typedef struct sPtpProperty {
+typedef struct {
     u16 propCode;
     u16 dataType;
     u8 getSet;
     u8 isEnabled;
-    PropValue defaultValue;
-    PropValue value;
+    PTPPropValue defaultValue;
+    PTPPropValue value;
     u8 formFlag;
 
     union {
-        PtpRange range;
-        PtpPropertyEnum enums;
+        PTPRange range;
+        PTPPropertyEnum enums;
     } form;
-} PtpProperty;
+} PTPProperty;
 
-typedef enum eSDI_ControlType {
+typedef enum {
     SDI_CONTROL_BUTTON = 0x81,
     SDI_CONTROL_NOTCH = 0x82,
     SDI_CONTROL_VARIABLE = 0x84,
 } SDI_ControlType;
 
-typedef struct sPtpControl {
+typedef struct {
     u16 controlCode;
     u16 dataType;
     u8 controlType;
@@ -116,8 +116,8 @@ typedef struct sPtpControl {
     char* name;
 
     union {
-        PtpRange range;
-        PropValueEnums1 enums;
+        PTPRange range;
+        PTPPropValueEnumArray enums;
     } form;
 } PtpControl;
 
@@ -158,7 +158,7 @@ enum SDIOOperationCode {
     PTP_OC_SDIO_OperationResultsSupported = 0x922F
 };
 
-typedef enum eDevicePropertiesCode {
+typedef enum {
     DPC_COMPRESSION_SETTING = 0x5004,
     DPC_WHITE_BALANCE = 0x5005,
     DPC_F_NUMBER = 0x5007,
@@ -213,7 +213,7 @@ typedef enum eDevicePropertiesCode {
     DPC_COLOR_TEMPERATURE = 0xD20F,
     DPC_WHITE_BALANCE_GM = 0xD210,
     DPC_ASPECT_RATIO = 0xD211,
-    DPC_AF_STATUS = 0xD213,
+    DPC_AUTO_FOCUS_STATUS = 0xD213,
     DPC_PREDICTED_MAX_FILE_SIZE = 0xD214,
     DPC_PENDING_FILES = 0xD215,
     DPC_AE_LOCK_STATUS = 0xD217,
@@ -336,7 +336,7 @@ typedef enum eDevicePropertiesCode {
     DPC_FOCUS_POSITION_CANCEL = 0XF002,
 } DevicePropertiesCode;
 
-typedef enum eStringDisplayList {
+typedef enum {
     PTP_DL_ALL = 0x00000000,
     PTP_DL_BASE_LOOK_AE_LEVEL_OFFSET_EXPOSURE = 0x01,
     PTP_DL_BASE_LOOK_INPUT = 0x02,
@@ -363,17 +363,17 @@ typedef enum eStringDisplayList {
     PTP_DL_SELECT_REC_FOLDER_NAME = 0x17,
 } PtpStringDisplayList;
 
-typedef enum ePtpFocusUnits {
+typedef enum {
     PTP_FOCUS_UNIT_FEET = 1,
     PTP_FOCUS_UNIT_METERS = 2,
 } PtpFocusUnits;
 
-typedef enum eSonyProtocolVersion {
+typedef enum {
     SDI_EXTENSION_VERSION_200 = 200,
     SDI_EXTENSION_VERSION_300 = 300,
 } SonyProtocolVersion;
 
-typedef enum ePTPResult {
+typedef enum {
     PTP_OK = 0x2001,
     PTP_GENERAL_ERROR = 0x2002,
     PTP_SESSION_NOT_OPEN = 0x2003,
@@ -414,7 +414,7 @@ typedef enum ePTPResult {
     PTP_SD_CAMERA_STATUS_ERR = 0xA106
 } PTPResult;
 
-typedef enum ePTPObjectFormatCode {
+typedef enum {
     PTP_OFC_FOLDER = 0x3001,
     PTP_OFC_TEXT = 0x3004,
     PTP_OFC_MPEG = 0x300B,
@@ -427,20 +427,20 @@ typedef enum ePTPObjectFormatCode {
     PTP_OFC_MP4 = 0xB982,
 } PTPObjectFormatCode;
 
-typedef enum eSD_EnabledDisabled
+typedef enum
 {
     SD_Disabled = 0x00,
     SD_Enabled = 0x01,
 } SD_EnabledDisabled;
 
-typedef enum sSD_ObjectHandle {
+typedef enum {
     SD_OH_CAPTURED_IMAGE = 0xffffc001,
     SD_OH_LIVE_VIEW_IMAGE = 0xffffc002,
     SD_OH_CAMERA_SETTINGS = 0xffffc004,
     SD_OH_FTP_SETTINGS = 0xffffc005
 } SD_ObjectHandle;
 
-typedef enum eSD_FocusFrameType
+typedef enum
 {
     SD_PhaseDetection_AFSensor = 0x0001,
     SD_PhaseDetection_ImageSensor = 0x0002,
@@ -460,7 +460,7 @@ typedef enum eSD_FocusFrameType
     SD_Cross = 0x0010,
 } SD_FocusFrameType;
 
-typedef enum eSD_FocusFrameState
+typedef enum
 {
     SD_NotFocused = 0x0001,
     SD_Focused = 0x0002,
@@ -471,7 +471,7 @@ typedef enum eSD_FocusFrameState
     SD_Island = 0x0007,
 } SD_FocusFrameState;
 
-typedef enum eSD_FaceFrameType
+typedef enum
 {
     SD_DetectedFace = 0x0001,
     SD_AF_TargetFace = 0x0002,
@@ -482,19 +482,19 @@ typedef enum eSD_FaceFrameType
     SD_SmileDetectionSelectFace = 0x0007,
 } SD_FaceFrameType;
 
-typedef enum eSD_SelectionState
+typedef enum
 {
     SD_Unselected = 0x01,
     SD_Selected = 0x02,
 } SD_SelectionState;
 
-typedef enum eTrackingFrameType
+typedef enum
 {
     SD_NonTargetAF = 0x0001,
     SD_TargetAF = 0x0002,
 } SD_TrackingFrameType;
 
-typedef struct sFocusFrame {
+typedef struct {
     u16 frameType; // SD_FocusFrameType
     u16 focusFrameState; // SD_FocusFrameState
     u8 priority;
@@ -502,13 +502,13 @@ typedef struct sFocusFrame {
     u32 width;
 } FocusFrame;
 
-typedef struct sFocusFrames {
+typedef struct {
     u32 xDenominator;
     u32 yDenominator;
     FocusFrame* frames;
 } FocusFrames;
 
-typedef struct sFocusFrameFace {
+typedef struct {
     u16 faceFrameType; // SD_FaceFrameType
     u16 faceFocusFrameState; // SD_FaceFrameState
     u16 selectionState; // SD_SelectionState
@@ -519,13 +519,13 @@ typedef struct sFocusFrameFace {
     u32 width;
 } FocusFrameFace;
 
-typedef struct sFaceFrames {
+typedef struct {
     u32 xDenominator;
     u32 yDenominator;
     FocusFrameFace* frames;
 } FaceFrames;
 
-typedef struct sFocusFrameTracking {
+typedef struct {
     u16 trackingFrameType; // SD_TrackingFrameType
     u16 trackingFrameState; // SD_TrackingFrameState
     u8 priority;
@@ -535,102 +535,102 @@ typedef struct sFocusFrameTracking {
     u32 width;
 } FocusFrameTracking;
 
-typedef struct sTrackingFrames {
+typedef struct {
     u32 xDenominator;
     u32 yDenominator;
     FocusFrameTracking* frames;
 } TrackingFrames;
 
-typedef struct sLiveViewFrames {
+typedef struct {
     u16 version;
     FocusFrames focus;
     FaceFrames face;
     TrackingFrames tracking;
 } LiveViewFrames;
 
-typedef struct sPtpCapturedImageInfo {
+typedef struct {
     MStr filename;
     PTPObjectFormatCode objectFormat;
     size_t size;
-} PtpCapturedImageInfo;
+} PTPCapturedImageInfo;
 
 #define PTP_MAX_PARAMS 5
 
-typedef struct sPtpRequest {
+typedef struct {
     u16 OpCode;
     u32 SessionId;
     u32 TransactionId;
     u32 Params[PTP_MAX_PARAMS];
     u32 NumParams;
     u32 NextPhase;
-} PtpRequest;
+} PTPRequestHeader;
 
-typedef struct sPtpResponse {
+typedef struct {
     u16 ResponseCode;
     u32 SessionId;
     u32 TransactionId;
     u32 NumParams;
     u32 Params[PTP_MAX_PARAMS];
-} PtpResponse;
+} PTPResponseHeader;
 
-typedef enum ePTPNextPhase {
+typedef enum {
     PTP_NEXT_PHASE_READ_DATA = 3,
     PTP_NEXT_PHASE_WRITE_DATA = 4,
     PTP_NEXT_PHASE_NO_DATA = 5
 } PTPNextPhase;
 
-typedef enum ePtpBufferType {
+typedef enum {
     PTP_BUFFER_IN,
     PTP_BUFFER_OUT,
-} PtpBufferType;
+} PTPBufferType;
 
-typedef void* (*PTP_Device_ReallocBuffer_t)(void* deviceSelf, PtpBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize);
-typedef void (*PTP_Device_FreeBuffer_t)(void* deviceSelf, PtpBufferType type, void* dataMem, size_t dataOldSize);
-typedef PTPResult (*PTP_Device_SendAndRecvEx_t)(void* deviceSelf, PtpRequest* request, u8* dataIn, size_t dataInSize,
-                                                PtpResponse* response, u8* dataOut, size_t dataOutSize,
+typedef void* (*PTP_Device_ReallocBuffer_t)(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize);
+typedef void (*PTP_Device_FreeBuffer_t)(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize);
+typedef PTPResult (*PTP_Device_SendAndRecvEx_t)(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                                PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                                 size_t* actualDataOutSize);
 
-typedef struct sPTPDeviceTransport {
+typedef struct {
     PTP_Device_ReallocBuffer_t reallocBuffer;
     PTP_Device_FreeBuffer_t freeBuffer;
     PTP_Device_SendAndRecvEx_t sendAndRecvEx;
     b32 requiresSessionOpenClose;
 } PTPDeviceTransport;
 
-typedef enum ePtpBackendType {
+typedef enum {
     PTP_BACKEND_WIA,
     PTP_BACKEND_LIBUSBK,
-} PtpBackendType;
+} PTPBackendType;
 
-typedef struct sPTPDeviceInfo {
-    PtpBackendType backendType;
+typedef struct {
+    PTPBackendType backendType;
     MStr manufacturer;
     MStr deviceName;
     void* device;
 } PTPDeviceInfo;
 
-typedef struct sPTPDevice {
+typedef struct {
     PTPDeviceTransport transport;
-    PtpBackendType backendType;
+    PTPBackendType backendType;
     b32 disconnected;
     void* device;
 } PTPDevice;
 
-struct sPTPBackend;
+struct PTPBackend;
 
-typedef b32 (*PTP_Backend_Close_t)(struct sPTPBackend* backend);
-typedef b32 (*PTP_Backend_RefreshList_t)(struct sPTPBackend* backend, PTPDeviceInfo** deviceList);
-typedef void (*PTP_Backend_ReleaseList_t)(struct sPTPBackend* backend);
-typedef b32 (*PTP_Backend_OpenDevice_t)(struct sPTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
-typedef b32 (*PTP_Backend_CloseDevice_t)(struct sPTPBackend* backend, PTPDevice* device);
+typedef b32 (*PTPBackend_Close_Func)(struct PTPBackend* backend);
+typedef b32 (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
+typedef void (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
+typedef b32 (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
 
-typedef struct sPTPBackend {
-    PTP_Backend_Close_t close;
-    PTP_Backend_RefreshList_t refreshList;
-    PTP_Backend_ReleaseList_t releaseList;
-    PTP_Backend_OpenDevice_t openDevice;
-    PTP_Backend_CloseDevice_t closeDevice;
-    PtpBackendType type;
+typedef struct PTPBackend {
+    PTPBackend_Close_Func close;
+    PTPBackend_RefreshList_Func refreshList;
+    PTPBackend_ReleaseList_Func releaseList;
+    PTPBackend_OpenDevice_Func openDevice;
+    PTPBackend_CloseDevice_Func closeDevice;
+    PTPBackendType type;
     void* self;
 } PTPBackend;
 

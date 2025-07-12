@@ -46,6 +46,9 @@ bool LoadTextureFromMemory(const MMemIO* memIo, ImTextureID* out_texture, i32* o
 }
 
 void UiPtpLiveViewShow(AppContext& c) {
+    ImGui::SetNextWindowPos(ImVec2(910, 0), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(1000, 660), ImGuiCond_FirstUseEver);
+
     ImGui::Begin("Live View");
 
     if (c.liveViewLastTime == 0) {
@@ -56,8 +59,8 @@ void UiPtpLiveViewShow(AppContext& c) {
     bool refresh = (currentTime - c.liveViewLastTime >= 0.1f);
     if (refresh) {
         c.liveViewLastTime = currentTime;
-        if (PtpControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames) == PTP_OK) {
-            Ptp_FreeLiveViewFrames(&c.liveViewFrames);
+        if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames) == PTP_OK) {
+            PTP_FreeLiveViewFrames(&c.liveViewFrames);
         }
 
         LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId,

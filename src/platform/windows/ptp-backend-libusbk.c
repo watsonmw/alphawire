@@ -36,7 +36,7 @@ typedef MSTRUCTPACKED(struct {
 }) PtpContainerHeader;
 
 b32 PTPUsbkDeviceList_Open(PTPUsbkDeviceList* self) {
-    return FALSE;
+    return TRUE;
 }
 
 b32 PTPUsbkDeviceList_Close(PTPUsbkDeviceList* self) {
@@ -287,7 +287,7 @@ void PTPUsbkDeviceList_ReleaseList(PTPUsbkDeviceList* self) {
     }
 }
 
-void* PTPDeviceUsbk_ReallocBuffer(void* self, PtpBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+void* PTPDeviceUsbk_ReallocBuffer(void* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PtpContainerHeader);
 
     size_t dataSize = dataNewSize + headerSize;
@@ -300,7 +300,7 @@ void* PTPDeviceUsbk_ReallocBuffer(void* self, PtpBufferType type, void* dataMem,
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceUsbk_FreeBuffer(void* self, PtpBufferType type, void* dataMem, size_t dataOldSize) {
+void PTPDeviceUsbk_FreeBuffer(void* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PtpContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -309,8 +309,8 @@ void PTPDeviceUsbk_FreeBuffer(void* self, PtpBufferType type, void* dataMem, siz
     }
 }
 
-PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PtpRequest* request, u8* dataIn, size_t dataInSize,
-                                    PtpResponse* response, u8* dataOut, size_t dataOutSize,
+PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                    PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                     size_t* actualDataOutSize) {
 
     PTPDeviceUsbk* usbk = (PTPDeviceUsbk*)((PTPDevice*)deviceSelf)->device;

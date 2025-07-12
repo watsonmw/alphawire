@@ -5,7 +5,7 @@
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
 
-static PtpBackendType sBackends[] = {
+static PTPBackendType sBackends[] = {
 #ifdef WIN32
     PTP_BACKEND_WIA,
     PTP_BACKEND_LIBUSBK
@@ -13,27 +13,32 @@ static PtpBackendType sBackends[] = {
 };
 
 b32 PTPDeviceList_Open(PTPDeviceList* self) {
+    b32 backendsOpened = FALSE;
     for (int i = 0; i < MStaticArraySize(sBackends); ++i) {
-        PtpBackendType backendType = sBackends[i];
+        PTPBackendType backendType = sBackends[i];
         switch (backendType) {
             case PTP_BACKEND_LIBUSBK: {
                 PTPBackend* backend = MArrayAddPtr(self->backends);
                 backend->type = backendType;
-                PTPUsbkDeviceList_OpenBackend(backend);
+                if (PTPUsbkDeviceList_OpenBackend(backend)) {
+                    backendsOpened = TRUE;
+                }
                 break;
             }
             case PTP_BACKEND_WIA: {
                 PTPBackend* backend = MArrayAddPtr(self->backends);
                 backend->type = backendType;
-                PTPWiaDeviceList_OpenBackend(backend);
+                if (PTPWiaDeviceList_OpenBackend(backend)) {
+                    backendsOpened = TRUE;
+                }
                 break;
             }
         }
     }
-    return TRUE;
+    return backendsOpened;
 }
 
-PTPBackend* PTPDeviceList_GetBackend(PTPDeviceList* self, PtpBackendType backendType) {
+PTPBackend* PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backendType) {
     MArrayEachPtr(self->backends, backend) {
         if (backend.p->type == backendType) {
             return backend.p;

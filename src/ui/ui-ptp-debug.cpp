@@ -26,7 +26,6 @@
 //     - Focus Area
 //     - Click to focus
 //     - Click to zoom
-//   Capture Button
 //   Event callback?
 //   Logging levels
 
@@ -69,7 +68,7 @@ bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSign
     return false;
 }
 
-bool ImGuiInputInt(const char* label, u16 dataType, PropValue* value) {
+bool ImGuiInputInt(const char* label, u16 dataType, PTPPropValue* value) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%hhu", false, 0, 0xff);
@@ -87,7 +86,7 @@ bool ImGuiInputInt(const char* label, u16 dataType, PropValue* value) {
     return false;
 }
 
-bool ImGuiInputHex(const char* label, u16 dataType, PropValue* value) {
+bool ImGuiInputHex(const char* label, u16 dataType, PTPPropValue* value) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%02hhx", false, 0, 0xff);
@@ -105,7 +104,7 @@ bool ImGuiInputHex(const char* label, u16 dataType, PropValue* value) {
     return false;
 }
 
-bool ImGuiInputInt(const char* label, u16 dataType, PropValue* value, PropValue min, PropValue max) {
+bool ImGuiInputInt(const char* label, u16 dataType, PTPPropValue* value, PTPPropValue min, PTPPropValue max) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%hhu", false, min.u8, max.u8);
@@ -123,7 +122,7 @@ bool ImGuiInputInt(const char* label, u16 dataType, PropValue* value, PropValue 
     return false;
 }
 
-bool ImGuiInputHex(const char* label, u16 dataType, PropValue* value, PropValue min, PropValue max) {
+bool ImGuiInputHex(const char* label, u16 dataType, PTPPropValue* value, PTPPropValue min, PTPPropValue max) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%02hhx", false, min.u8, max.u8);
@@ -141,7 +140,7 @@ bool ImGuiInputHex(const char* label, u16 dataType, PropValue* value, PropValue 
     return false;
 }
 
-void ImGuiInputIntDuel(u16 dataType, PropValue* value) {
+void ImGuiInputIntDuel(u16 dataType, PTPPropValue* value) {
     float windowWidth = ImGui::GetWindowWidth();
     float inputWidth = (windowWidth * 0.3f) - 10.0f;
     ImGui::SetNextItemWidth(inputWidth);
@@ -151,7 +150,7 @@ void ImGuiInputIntDuel(u16 dataType, PropValue* value) {
     ImGuiInputHex("hex", dataType, value);
 }
 
-void ImGuiInputIntDuel(u16 dataType, PropValue* value, PropValue min, PropValue max) {
+void ImGuiInputIntDuel(u16 dataType, PTPPropValue* value, PTPPropValue min, PTPPropValue max) {
     float windowWidth = ImGui::GetWindowWidth();
     float inputWidth = (windowWidth * 0.3f) - 10.0f;
     ImGui::SetNextItemWidth(inputWidth);
@@ -161,7 +160,7 @@ void ImGuiInputIntDuel(u16 dataType, PropValue* value, PropValue min, PropValue 
     ImGuiInputHex("hex", dataType, value, min, max);
 }
 
-bool ImGuiSlider(u16 dataType, PropValue* value, PropValue minV, PropValue stepV, PropValue maxV) {
+bool ImGuiSlider(u16 dataType, PTPPropValue* value, PTPPropValue minV, PTPPropValue stepV, PTPPropValue maxV) {
     int v = 0;
     int min = 0;
     int max = 0;
@@ -251,13 +250,13 @@ bool ImGuiSlider(u16 dataType, PropValue* value, PropValue minV, PropValue stepV
     return false;
 }
 
-void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
-    char* label = Ptp_GetPropertyStr(property->propCode);
+void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
+    char* label = PTP_GetPropertyStr(property->propCode);
     ImGui::AlignTextToFramePadding();
     ImGui::Text("%s", label);
     ImGui::SameLine();
     ImGui::TextDisabled("0x%04X", property->propCode);
-    label = Ptp_GetDataTypeStr((PTPDataType)property->dataType);
+    label = PTP_GetDataTypeStr((PTPDataType)property->dataType);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
     ImGui::SameLine();
@@ -272,7 +271,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
         }
     } else {
         char text[32];
-        Ptp_GetPropValueStr((PTPDataType)property->dataType, property->value, text, sizeof(text));
+        PTP_GetPropValueStr((PTPDataType)property->dataType, property->value, text, sizeof(text));
         ImGui::Text("Value: %s", text);
     }
 
@@ -288,7 +287,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
                 ImGuiTableFlags_BordersV |
                 ImGuiTableFlags_ScrollY;
 
-        PropValueEnums outEnums{};
+        PTPPropValueEnums outEnums{};
 
         if (PTPControl_GetEnumsForProperty(&c.ptp, property->propCode, &outEnums) && MArraySize(outEnums.values)) {
             if (ImGui::BeginTable("Properties", 3, flags)) {
@@ -302,13 +301,13 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
                     ImGui::TableNextRow();
                     ImGui::PushID(i);
 
-                    PropValueEnum *valueEnum = outEnums.values + i;
-                    Ptp_GetPropValueStr((PTPDataType)property->dataType, valueEnum->propValue, text, sizeof(text));
+                    PTPPropValueEnum *valueEnum = outEnums.values + i;
+                    PTP_GetPropValueStr((PTPDataType)property->dataType, valueEnum->propValue, text, sizeof(text));
 
                     ImGuiSelectableFlags selectFlags =
                             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
 
-                    bool selected = Ptp_PropValueEq((PTPDataType)property->dataType,
+                    bool selected = PTP_PropValueEq((PTPDataType)property->dataType,
                                                     valueEnum->propValue, property->value);
 
                     ImGui::TableNextColumn();
@@ -342,7 +341,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
             }
         }
 
-        Ptp_FreePropValueEnums(&outEnums);
+        PTP_FreePropValueEnums(&outEnums);
     }
     else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
         if (ImGuiSlider(property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
@@ -353,7 +352,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
     if (c.showWindowPropDebug) {
         char text[32];
 
-        Ptp_GetPropValueStr((PTPDataType) property->dataType, property->defaultValue, text,
+        PTP_GetPropValueStr((PTPDataType) property->dataType, property->defaultValue, text,
                             sizeof(text));
         ImGui::Text("Default: %s", text);
 
@@ -365,13 +364,13 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
 
         switch (property->formFlag) {
             case PTP_FORM_FLAG_RANGE: {
-                Ptp_GetPropValueStr((PTPDataType) property->dataType, property->form.range.min, text,
+                PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.min, text,
                                     sizeof(text));
                 ImGui::Text("Min: %s", text);
-                Ptp_GetPropValueStr((PTPDataType) property->dataType, property->form.range.max, text,
+                PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.max, text,
                                     sizeof(text));
                 ImGui::Text("Max: %s", text);
-                Ptp_GetPropValueStr((PTPDataType) property->dataType, property->form.range.step, text,
+                PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.step, text,
                                     sizeof(text));
                 ImGui::Text("Step: %s", text);
                 break;
@@ -379,14 +378,14 @@ void ShowDebugExtendedPropWindow(AppContext& c, PtpProperty *property) {
             case PTP_FORM_FLAG_ENUM: {
                 ImGui::Text("Set Enum Values:");
                 for (size_t i = 0; i < MArraySize(property->form.enums.set); ++i) {
-                    PropValue v = property->form.enums.set[i];
-                    Ptp_GetPropValueStr((PTPDataType) property->dataType, v, text, sizeof(text));
+                    PTPPropValue v = property->form.enums.set[i];
+                    PTP_GetPropValueStr((PTPDataType) property->dataType, v, text, sizeof(text));
                     ImGui::Text("    %s", text);
                 }
                 ImGui::Text("Get/Set Enum Values:");
                 for (size_t i = 0; i < MArraySize(property->form.enums.getSet); ++i) {
-                    PropValue v = property->form.enums.getSet[i];
-                    Ptp_GetPropValueStr((PTPDataType) property->dataType, v, text, sizeof(text));
+                    PTPPropValue v = property->form.enums.getSet[i];
+                    PTP_GetPropValueStr((PTPDataType) property->dataType, v, text, sizeof(text));
                     ImGui::Text("    %s", text);
                 }
                 break;
@@ -400,7 +399,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
     ImGui::Text("%s", control->name);
     ImGui::SameLine();
     ImGui::TextDisabled("0x%04X", control->controlCode);
-    char* label = Ptp_GetDataTypeStr((PTPDataType)control->dataType);
+    char* label = PTP_GetDataTypeStr((PTPDataType)control->dataType);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
     ImGui::SameLine();
@@ -427,8 +426,8 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
                     ImGui::TableNextRow();
                     ImGui::PushID(i);
 
-                    PropValueEnum *valueEnum = control->form.enums.values + i;
-                    Ptp_GetPropValueStr((PTPDataType)control->dataType, valueEnum->propValue, text, sizeof(text));
+                    PTPPropValueEnum *valueEnum = control->form.enums.values + i;
+                    PTP_GetPropValueStr((PTPDataType)control->dataType, valueEnum->propValue, text, sizeof(text));
 
                     ImGuiSelectableFlags selectFlags =
                             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
@@ -462,11 +461,11 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
         }
     } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
         char text[32];
-        Ptp_GetPropValueStr((PTPDataType)control->dataType, control->form.range.min, text, sizeof(text));
+        PTP_GetPropValueStr((PTPDataType)control->dataType, control->form.range.min, text, sizeof(text));
         ImGui::Text("Min: %s", text);
-        Ptp_GetPropValueStr((PTPDataType)control->dataType, control->form.range.max, text, sizeof(text));
+        PTP_GetPropValueStr((PTPDataType)control->dataType, control->form.range.max, text, sizeof(text));
         ImGui::Text("Max: %s", text);
-        Ptp_GetPropValueStr((PTPDataType)control->dataType, control->form.range.step, text, sizeof(text));
+        PTP_GetPropValueStr((PTPDataType)control->dataType, control->form.range.step, text, sizeof(text));
         ImGui::Text("Step: %s", text);
 
         ImGuiSlider(control->dataType, &c.selectedControlValue, control->form.range.min, control->form.range.step, control->form.range.max);
@@ -487,8 +486,11 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
 }
 
 static void ShowDebugPropertyOrControl(AppContext& c) {
+    ImGui::SetNextWindowPos(ImVec2(910, 965), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(380, 330), ImGuiCond_FirstUseEver);
+
     ImGui::Begin("Debug Info", &c.showWindowDebugPropertyOrControl);
-    PtpProperty *property = c.selectedProperty;
+    PTPProperty *property = c.selectedProperty;
     PtpControl *control = c.selectedControl;
     if (property) {
         ShowDebugExtendedPropWindow(c, property);
@@ -576,7 +578,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
 
-                PtpProperty *property = uiPtpProperty.prop;
+                PTPProperty *property = uiPtpProperty.prop;
                 ImGuiSelectableFlags selectFlags =
                         ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
                 ImGui::PushID(i);
@@ -593,13 +595,13 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 ImGui::Text(uiPtpProperty.propName);
 
                 ImGui::TableNextColumn();
-                char *dataTypeName = Ptp_GetDataTypeStr((PTPDataType) property->dataType);
+                char *dataTypeName = PTP_GetDataTypeStr((PTPDataType) property->dataType);
                 if (dataTypeName) {
                     ImGui::Text(dataTypeName);
                 }
 
                 ImGui::TableNextColumn();
-                char *formTypeName = Ptp_GetFormFlagStr((PTPFormFlag) property->formFlag);
+                char *formTypeName = PTP_GetFormFlagStr((PTPFormFlag) property->formFlag);
                 if (formTypeName) {
                     ImGui::Text(formTypeName);
                 }
@@ -609,7 +611,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 ImGui::Text(text);
 
                 ImGui::TableNextColumn();
-                char *isEnabled = Ptp_GetPropIsEnabledStr(property->isEnabled);
+                char *isEnabled = PTP_GetPropIsEnabledStr(property->isEnabled);
                 if (isEnabled) {
                     ImGui::Text(isEnabled);
                 } else {
@@ -618,7 +620,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 }
 
                 ImGui::TableNextColumn();
-                Ptp_GetPropValueStr((PTPDataType) property->dataType, property->value, text,
+                PTP_GetPropValueStr((PTPDataType) property->dataType, property->value, text,
                                     sizeof(text));
                 ImGui::Text("%s", text);
 
@@ -643,15 +645,15 @@ void ShowDebugPropertyListTab(AppContext& c) {
 }
 
 void ShowCameraControlsWindow(AppContext& c) {
+    ImGui::SetNextWindowPos(ImVec2(910, 660), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(990, 305), ImGuiCond_FirstUseEver);
     ImGui::Begin("Camera Controls");
-
-    ImGui::Text("Model: %s", c.ptp.model.str);
-    ImGui::SameLine();
-    ImGui::Text("Serial Number: %s", c.ptp.serialNumber.str);
 
     ImGui::Checkbox("LiveView", &c.liveViewOpen);
     ImGui::SameLine();
     ImGui::Checkbox("Inspect Controls", &c.showWindowDeviceDebug);
+
+    ImGui::Spacing();
 
     if (ImGui::Button("Shutter")) {
         PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER, false);
@@ -666,16 +668,23 @@ void ShowCameraControlsWindow(AppContext& c) {
     if (ImGui::Checkbox("Half-Press", &c.shutterHalfPress)) {
         PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER_HALF_PRESS, c.shutterHalfPress);
     }
-    ImGui::SameLine();
 
-    if (ImGui::Checkbox("Auto-Focus", &c.autoFocusButton)) {
-        PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Auto-Focus", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Spacing();
+        MStr afStatus = {};
+        PTPControl_GetPropertyAsStr(&c.ptp, DPC_AUTO_FOCUS_STATUS, &afStatus);
+        ImGui::Text("Focus State: %s", afStatus.str);
+
+        if (ImGui::Checkbox("AF-On", &c.autoFocusButton)) {
+            PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
+        }
     }
 
     ImGui::Spacing();
-
     if (ImGui::CollapsingHeader("Capture Files", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Text("Files On Camera: %d", PtpControl_GetPendingFiles(&c.ptp));
+        ImGui::Spacing();
+        ImGui::Text("Files On Camera: %d", PTPControl_GetPendingFiles(&c.ptp));
         ImGui::Text("Last Download Time: %lldms (%lldms)", c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
         ImGui::Text("Last Filename: %s", c.fileDownloadPath.c_str());
         ImGui::SameLine();
@@ -686,7 +695,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::SameLine();
 
         bool fileDownload = false;
-        if (c.fileDownloadAuto && PtpControl_GetPendingFiles(&c.ptp)) {
+        if (c.fileDownloadAuto && PTPControl_GetPendingFiles(&c.ptp)) {
             fileDownload = true;
         }
 
@@ -704,10 +713,10 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         if (fileDownload) {
             MMemIO fileContents{};
-            PtpCapturedImageInfo cii = {};
+            PTPCapturedImageInfo cii = {};
             SDL_Time startTime = 0;
             SDL_GetCurrentTime(&startTime);
-            PTPResult r = PtpControl_GetCapturedImage(&c.ptp, &fileContents, &cii);
+            PTPResult r = PTPControl_GetCapturedImage(&c.ptp, &fileContents, &cii);
             SDL_Time dlTime = 0;
             SDL_GetCurrentTime(&dlTime);
             if (r != PTP_OK) {
@@ -737,6 +746,8 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Spacing();
 
     if (ImGui::CollapsingHeader("Settings File")) {
+        ImGui::Spacing();
+
         bool showSettingsFileInput = false;
 
         if (c.cameraSettingsReadEnabled) {
@@ -746,7 +757,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                     MMemIO memIo{};
                     MMemInit(&memIo, file.data, file.size);
                     memIo.size = file.size;
-                    PTPResult r = PtpControl_PutCameraSettingsFile(&c.ptp, &memIo);
+                    PTPResult r = PTPControl_PutCameraSettingsFile(&c.ptp, &memIo);
                     if (r != PTP_OK) {
                         MLogf("Error uploading file %s", c.cameraSettingsPathBuffer);
                     }
@@ -759,7 +770,7 @@ void ShowCameraControlsWindow(AppContext& c) {
             ImGui::SameLine();
             if (ImGui::Button("Save")) {
                 MMemIO memIo{};
-                PTPResult r = PtpControl_GetCameraSettingsFile(&c.ptp, &memIo);
+                PTPResult r = PTPControl_GetCameraSettingsFile(&c.ptp, &memIo);
                 if (r != PTP_OK) {
                     MLogf("Error fetching settings from camera: %d", r);
                 } else {
@@ -790,7 +801,7 @@ static void RefreshProperties(AppContext& c) {
     }
 
     if (c.propRefresh) {
-        PtpControl_UpdateProperties(&c.ptp);
+        PTPControl_UpdateProperties(&c.ptp);
         c.propertyLastRefreshTime = ImGui::GetTime();
         c.propTable.needsRebuild = true;
     }
@@ -802,6 +813,8 @@ static void RefreshProperties(AppContext& c) {
 }
 
 static void ShowMainDeviceDebugWindow(AppContext& c) {
+    ImGui::SetNextWindowPos(ImVec2(0, 150), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(910, 1150), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspect Controls", &c.showWindowDeviceDebug);
     if (c.connected) {
         if (ImGui::BeginTabBar("Device Info Tabs")) {
@@ -853,7 +866,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::Text(label);
 
                         ImGui::TableNextColumn();
-                        char *objectFormatStr = Ptp_GetObjectFormatStr(imageFormat);
+                        char *objectFormatStr = PTP_GetObjectFormatStr(imageFormat);
                         if (objectFormatStr == NULL) {
                             objectFormatStr = label;
                         }
@@ -902,7 +915,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::Text(label);
 
                         ImGui::TableNextColumn();
-                        char *opName = Ptp_GetOperationStr(propertyCode);
+                        char *opName = PTP_GetOperationStr(propertyCode);
                         if (opName == NULL) {
                             opName = label;
                         }
@@ -970,14 +983,14 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::Text(name);
 
                         ImGui::TableNextColumn();
-                        const char *dataType = Ptp_GetDataTypeStr((PTPDataType)control->dataType);
+                        const char *dataType = PTP_GetDataTypeStr((PTPDataType)control->dataType);
                         if (dataType == NULL) {
                             dataType = "";
                         }
                         ImGui::Text(dataType);
 
                         ImGui::TableNextColumn();
-                        const char *formFlagStr = Ptp_GetFormFlagStr((PTPFormFlag)control->formFlag);
+                        const char *formFlagStr = PTP_GetFormFlagStr((PTPFormFlag)control->formFlag);
                         if (formFlagStr == NULL) {
                             formFlagStr = "";
                         }
@@ -1028,7 +1041,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::Text(label);
 
                         ImGui::TableNextColumn();
-                        char *name = Ptp_GetEventStr(eventCode);
+                        char *name = PTP_GetEventStr(eventCode);
                         if (name == NULL) {
                             name = label;
                         }
@@ -1050,24 +1063,26 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
 }
 
 static void ShowDeviceListWindow(AppContext& c) {
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(910, 150), ImGuiCond_FirstUseEver);
     ImGui::Begin("Device List");
 
     if (!c.ptpDeviceList.listUpToDate) {
-        c.refreshDevices();
+        c.RefreshDevices();
     }
     if (c.device && c.device->disconnected) {
-        c.disconnect();
+        c.Disconnect();
     }
     if (ImGui::Button("Refresh")) {
-        c.refreshDevices();
+        c.RefreshDevices();
     }
     ImGui::SameLine();
     if (ImGui::Button("Connect")) {
-        c.connect();
+        c.Connect();
     }
     ImGui::SameLine();
     if (ImGui::Button("Disconnect")) {
-        c.disconnect();
+        c.Disconnect();
     }
 
     // if (c.device) {
@@ -1109,7 +1124,7 @@ static void ShowDeviceListWindow(AppContext& c) {
                 c.selectedDeviceIndex = i;
             }
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
-                c.connect();
+                c.Connect();
             }
 
             ImGui::SameLine();
