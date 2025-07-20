@@ -42,6 +42,7 @@ A GUI application is included for camera control and PTP protocol debugging.
 - Focus control and image capture
 - Camera settings management
 - Protocol debugging tools
+- Fast download of images
 
 ## Roadmap
 

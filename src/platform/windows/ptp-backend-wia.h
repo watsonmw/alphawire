@@ -17,6 +17,7 @@ typedef struct {
     IWiaItemExtras* device;
     void* deviceId;
     b32 disconnected;
+    PTPLog logger;
 } PTPDeviceWia;
 
 typedef struct {
@@ -25,6 +26,7 @@ typedef struct {
     IUnknown** eventListeners;
     b32 deviceListUpToDate;
     PTPDeviceWia* openDevices;
+    PTPLog logger;
 } PTPWiaDeviceList;
 
 b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend);

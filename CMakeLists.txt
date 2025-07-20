@@ -12,26 +12,30 @@ add_executable(alphawire WIN32
         src/imgui/imgui_impl_sdl3.cpp
         src/imgui/imgui_tables.cpp
         src/imgui/imgui_widgets.cpp
-        src/mlib/mlib.c
         src/mlib/mlib-file-stdlib.c
         src/mlib/mlib-log-stdlib.c
-        src/platform/windows/ptp-backend-wia.h
-        src/platform/windows/ptp-backend-wia.c
-        src/platform/windows/ptp-backend-libusbk.h
+        src/mlib/mlib.c
         src/platform/windows/ptp-backend-libusbk.c
+        src/platform/windows/ptp-backend-libusbk.h
+        src/platform/windows/ptp-backend-wia.c
+        src/platform/windows/ptp-backend-wia.h
+        src/platform/windows/win-utils.c
+        src/platform/windows/win-utils.h
+        src/ptp/ptp-const.h
+        src/ptp/ptp-control.c
+        src/ptp/ptp-control.h
+        src/ptp/ptp-device-list.c
+        src/ptp/ptp-device-list.h
+        src/ptp/ptp-log.c
+        src/ptp/ptp-log.h
+        src/ptp/utf.c
+        src/ptp/utf.h
+        src/ui/ui-live-view.cpp
         src/ui/ui-main.cpp
         src/ui/ui-ptp-debug.cpp
-        src/ui/ui-live-view.cpp
-        src/ptp/ptp-const.h
-        src/ptp/ptp-control.h
-        src/ptp/ptp-control.c
-        src/ptp/ptp-device-list.h
-        src/ptp/ptp-device-list.c
-        src/ptp/utf.h
-        src/ptp/utf.c
 )
 
-target_compile_definitions(alphawire PRIVATE -DM_USE_SDL -DM_USE_STDLIB)
+target_compile_definitions(alphawire PRIVATE -DM_USE_SDL -DM_USE_STDLIB -DPTP_LOG_LEVEL=5)
 target_include_directories(alphawire PRIVATE src src/imgui)
 target_compile_options(alphawire PRIVATE -ggdb -Wall)
 target_compile_features(alphawire PRIVATE cxx_std_17)

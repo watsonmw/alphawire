@@ -458,6 +458,7 @@ b32 PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* device
     wiaDevice->device = pWiaItemExtras;
     wiaDevice->deviceId = wiaDeviceInfo->deviceId;
     wiaDevice->disconnected = FALSE;
+    wiaDevice->logger = self->logger;
 
     (*deviceOut)->transport.reallocBuffer = PTPDeviceWia_ReallocBuffers;
     (*deviceOut)->transport.freeBuffer = PTPDeviceWia_FreeBuffers;
@@ -466,6 +467,7 @@ b32 PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* device
     (*deviceOut)->device = wiaDevice;
     (*deviceOut)->backendType = PTP_BACKEND_WIA;
     (*deviceOut)->disconnected = FALSE;
+    (*deviceOut)->logger = self->logger;
 
     pWiaItemExtras = NULL; // Prevent release in cleanup, ownership is now with PTPDeviceWia
 
@@ -508,7 +510,8 @@ b32 PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device) {
     memset(memOut, 0, 1000);
 
     HRESULT hr = device->device->lpVtbl->Escape(device->device, ESCAPE_PTP_CLEAR_STALLS,
-                                                memIn, 1000, memOut, 1000, &dwActualDataOutSize);
+                                                memIn, 1000, memOut, 1000,
+                                                &dwActualDataOutSize);
 
     if (memIn) {
         CoTaskMemFree(memIn);
@@ -556,6 +559,7 @@ b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
     backend->releaseList = PTPWiaDeviceList_ReleaseList_;
     backend->openDevice = PTPWiaDeviceList_ConnectDevice_;
     backend->closeDevice = PTPWiaDeviceList_DisconnectDevice_;
+    deviceList->logger = backend->logger;
     return PTPWiaDeviceList_Open(deviceList);
 }
 

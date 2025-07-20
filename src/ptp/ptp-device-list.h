@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "ptp-log.h"
 #include "mlib/mlib.h"
 #include "ptp/ptp-const.h"
 
@@ -45,6 +46,9 @@ typedef struct {
     // Does the list need to be refreshed (depending on the backends available, this may be set when a new USB device is
     // plugged in).
     b32 listUpToDate;
+    // Set before calling When PTPDeviceList_Open().  When et to 0 will block during device enumeration.
+    u32 timeoutMilliseconds;
+    PTPLog logger;
 } PTPDeviceList;
 
 /**
@@ -112,6 +116,8 @@ b32 PTPDeviceList_DisconnectDevice(PTPDeviceList* self, PTPDevice* device);
  * @return A pointer to the PTPBackend of the specified type, or NULL if the backend is not available.
  */
 PTPBackend* PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backend);
+
+const char* PTP_GetBackendTypeStr(PTPBackendType type);
 
 #ifdef __cplusplus
 } // extern "C"

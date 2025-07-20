@@ -26,9 +26,10 @@
 //     - Focus Area
 //     - Click to focus
 //     - Click to zoom
-//   Event callback?
-//   Logging levels
-
+//   Events API
+//   Log window to IMGUI
+//   Pre-2020 notch setter for ISO, fstop etc
+//   Settings apply
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
     // Buffer for hex input (max length depends on integer type)
@@ -720,7 +721,7 @@ void ShowCameraControlsWindow(AppContext& c) {
             SDL_Time dlTime = 0;
             SDL_GetCurrentTime(&dlTime);
             if (r != PTP_OK) {
-                MLogf("Error fetching image from camera: %d", r);
+                MLogf("Error fetching image from camera: %04x", r);
             } else {
                 MFileWriteDataFully(cii.filename.str, fileContents.mem, fileContents.size);
                 SDL_Time writeTime = 0;
@@ -738,7 +739,10 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         if (c.device->backendType == PTP_BACKEND_LIBUSBK) {
             if (ImGui::Button("Read Event")) {
-                PTPUsbkDevice_ReadEvent(c.device);
+                PTPEvent event = {};
+                if (PTPUsbkDevice_ReadEvent(c.device, &event, 10)) {
+                    MLogf("event %x %x %x %x", event.code, event.param1, event.param2, event.param3);
+                }
             }
         }
     }
@@ -1104,9 +1108,10 @@ static void ShowDeviceListWindow(AppContext& c) {
                                  ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable |
                                  ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
 
-    if (ImGui::BeginTable("Devices", 2, tableFlags)) {
+    if (ImGui::BeginTable("Devices", 3, tableFlags)) {
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 200.0);
-        ImGui::TableSetupColumn("Manufacturer", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Manufacturer", ImGuiTableColumnFlags_WidthFixed, 300);
+        ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
         for (size_t i = 0; i < MArraySize(c.ptpDeviceList.devices); i++) {
@@ -1132,6 +1137,9 @@ static void ShowDeviceListWindow(AppContext& c) {
 
             ImGui::TableNextColumn();
             ImGui::Text(deviceInfo->manufacturer.str);
+
+            ImGui::TableNextColumn();
+            ImGui::Text(deviceInfo->backendType == PTP_BACKEND_LIBUSBK ? "libusbk" : "Wia");
 
             ImGui::PopID();
         }

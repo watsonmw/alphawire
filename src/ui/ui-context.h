@@ -197,11 +197,10 @@ struct AppContext {
     void Connect() {
         if (selectedDeviceIndex != -1 && MArraySize(ptpDeviceList.devices) > selectedDeviceIndex) {
             PTPDeviceInfo* deviceInfo = ptpDeviceList.devices + selectedDeviceIndex;
-            MLogf("Connecting to device: %s (%s)...", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
             DisconnectDevice();
             b32 ok = PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
             if (ok) {
-                PTPControl_Init(&ptp, &device->transport);
+                PTPControl_Init(&ptp, device);
                 PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
                 connected = true;
             }

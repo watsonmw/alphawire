@@ -447,7 +447,7 @@ typedef struct {
     char* name;
 } EventsMetadata;
 
-static EventsMetadata PtpEventsMetadata[] = {
+static EventsMetadata sPtpEventsMetadata[] = {
     {0x4004, "StoreAdded"},
     {0x4005, "StoreRemoved"},
     {0xC201, "SDIE_ObjectAdded"},
@@ -492,8 +492,8 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_AFL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AFL Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_RELEASE_LOCK,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Release Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_REQUEST_ONE_SHOOTING,         PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Request One Shooting", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_ONE_RESET,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter One Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_ONE,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter One", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_MOVIE_RECORD,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_FEL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "FEL Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_MEDIA_FORMAT,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_UpDown)},
@@ -521,7 +521,7 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_FORMAT_MEDIA,                 PTP_DT_UINT16, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_SelectMediaFormat)},
     {DPC_REMOTE_TOUCH_XY,              PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Remote Touch (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
     {DPC_REMOTE_TOUCH_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Remote Touch Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER_BOTH,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_BOTH,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_FORMAT_MEDIA_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media Cancel", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_SAVE_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Save Zoom and Focus Position"},
     {DPC_LOAD_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Load Zoom and Focus Position"},
@@ -564,9 +564,9 @@ char* PTP_GetControlStr(u16 controlCode) {
 }
 
 char* PTP_GetEventStr(u16 eventCode) {
-    for (int i = 0; i < MStaticArraySize(PtpEventsMetadata); i++) {
-        if (PtpEventsMetadata[i].code == eventCode) {
-            return PtpEventsMetadata[i].name;
+    for (int i = 0; i < MStaticArraySize(sPtpEventsMetadata); i++) {
+        if (sPtpEventsMetadata[i].code == eventCode) {
+            return sPtpEventsMetadata[i].name;
         }
     }
 
@@ -1152,7 +1152,7 @@ static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
     }
 }
 
-void PrintProperties(PTPControl* self) {
+static void PrintProperties(PTPControl* self) {
     size_t numProperties = MArraySize(self->properties);
     for (int i = 0; i < numProperties; i++) {
         PTPProperty* p = self->properties + i;
@@ -1229,7 +1229,7 @@ void PTPControl_FreeDataBuffers(PTPControl* self) {
     self->dataOutCapacity = 0;
 }
 
-PTPRequestHeader BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u16 opCode) {
+static PTPRequestHeader BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u16 opCode) {
     u32 dataInSize = dataInExtra;
     u32 dataOutSize = dataOutExtra;
     PTPControl_InitDataBuffers(self, dataInSize, dataOutSize);
@@ -1857,6 +1857,7 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
 }
 
 PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
+    PTP_TRACE("PTP_GetObject");
     fileOut->pos = fileOut->mem;
     fileOut->size = 0;
 
@@ -1881,12 +1882,14 @@ int PTPControl_GetPendingFiles(PTPControl* self) {
         if (value & 0x8000) {
             value = value & 0x7fff;
         }
+        PTP_TRACE_F("PTPControl_GetPendingFiles -> %d", value);
         return value;
     }
     return 0;
 }
 
 PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
+    PTP_TRACE("PTPControl_GetLiveViewImage");
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
     if (r != PTP_OK) {
@@ -1897,6 +1900,7 @@ PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
 }
 
 PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
+    PTP_INFO("PTPControl_GetCapturedImage");
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
     if (r != PTP_OK) {
@@ -1912,6 +1916,7 @@ PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapt
 }
 
 PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
+    PTP_TRACE("PTPControl_GetCameraSettingsFile");
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
     if (r != PTP_OK) {
@@ -1936,19 +1941,22 @@ PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
 }
 
 PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
+    PTP_TRACE("PTPControl_PutCameraSettingsFile");
     return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
 }
 
-PTPResult PTPControl_Init(PTPControl* self, PTPDeviceTransport* deviceTransport) {
-    if (!self || !deviceTransport) {
+PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device) {
+    if (!self || !device) {
         return PTP_GENERAL_ERROR;
     }
 
-    self->deviceTransport = deviceTransport;
+    self->deviceTransport = &device->transport;
+    self->logger = device->logger;
     return PTP_OK;
 }
 
 PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
+    PTP_TRACE_F("PTPControl_Connect 0x04%x", version);
     ////////////////////////////////////////////
     // Open Session (if not done by transport layer implicitly)
     ////////////////////////////////////////////
@@ -2003,6 +2011,7 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
     // Build controls list
     size_t numControls = MArraySize(self->supportedControls);
+    PTP_INFO_F("Connected to device (protocol: %d).", self->protocolVersion);
     if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
         for (int i = 0; i < numControls; i++) {
             u16 controlCode = self->supportedControls[i];
@@ -2053,6 +2062,8 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 }
 
 PTPResult PTPControl_Cleanup(PTPControl* self) {
+    PTP_TRACE("PTPControl_Cleanup");
+
     ////////////////////////////////////////////
     // Close session (if not done by transport layer implicitly)
     ////////////////////////////////////////////
@@ -2155,6 +2166,7 @@ PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode) {
 }
 
 PTPResult PTPControl_UpdateProperties(PTPControl* self) {
+    PTP_TRACE("PTPControl_UpdateProperties");
     return SDIO_GetAllExtDevicePropInfo(self, TRUE, TRUE);
 }
 

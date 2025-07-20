@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "ptp-log.h"
 #include "mlib/mlib.h"
 #include "ptp/ptp-const.h"
 
@@ -22,6 +23,7 @@ extern "C" {
  */
 typedef struct {
     PTPDeviceTransport* deviceTransport;
+    PTPLog logger;
 
     u16 protocolVersion;
     MStr manufacturer;
@@ -63,8 +65,8 @@ typedef struct {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Initialize PTPControl struct with the specified device transport.
- * Follow up with a PTPControl_Connect() to start communicating over the device transport.
+ * Initialize PTPControl struct with the specified device.
+ * Follow up with a PTPControl_Connect() to start communicating over the device's transport.
  *
  * List available devices and connect to the first one:
  *
@@ -85,7 +87,7 @@ typedef struct {
  *        PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
  *        PTPControl ptp{};
  *        // Init control structure
- *        PTPControl_Init(&ptp, &device->transport);
+ *        PTPControl_Init(&ptp, device);
  *        // Connect to device with given mode
  *        PTPControl_Connect(&ptp, SDI_EXTENSION_VERSION_300);
  *    }
@@ -93,7 +95,7 @@ typedef struct {
  *
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTPResult PTPControl_Init(PTPControl* self, PTPDeviceTransport* deviceTransport);
+PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device);
 
 /**
  * Establishes a connection with a Sony device over PTP (Picture Transfer Protocol), on the previously setup transport.

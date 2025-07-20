@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "mlib/mlib.h"
+#include "ptp/ptp-log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -286,8 +287,8 @@ typedef enum {
     DPC_SHUTTER = 0xD2C2,
     DPC_AE_LOCK = 0xD2C3,
     DPC_AFL_BUTTON = 0xD2C4,
-    DPC_RELEASE_LOCK = 0xD2C5,
-    DPC_REQUEST_ONE_SHOOTING = 0xD2C7,
+    DPC_SHUTTER_ONE_RESET = 0xD2C5,
+    DPC_SHUTTER_ONE = 0xD2C7,
     DPC_MOVIE_RECORD = 0xD2C8,
     DPC_FEL_BUTTON = 0xD2C9,
     DPC_MEDIA_FORMAT = 0xD2CA,
@@ -554,6 +555,46 @@ typedef struct {
     size_t size;
 } PTPCapturedImageInfo;
 
+typedef enum {
+    PTP_StoreAdded = 0x4004,
+    PTP_StoreRemoved = 0x4005,
+    PTP_ObjectAdded = 0xC201,
+    PTP_ObjectRemoved = 0xC202,
+    PTP_DevicePropChanged = 0xC203,
+    PTP_DateTimeSettingResult = 0xC205,
+    PTP_CapturedEvent = 0xC206,
+    PTP_CWBCapturedResult = 0xC208,
+    PTP_CameraSettingReadResult = 0xC209,
+    PTP_FTPSettingReadResult = 0xC20A,
+    PTP_MediaFormatResult = 0xC20B,
+    PTP_FTPDisplayNameListChanged = 0xC20C,
+    PTP_ContentsTransferEvent = 0xC20D,
+    PTP_ZoomAndFocusPositionEvent = 0xC20E,
+    PTP_DisplayListChangedEvent = 0xC20F,
+    PTP_MediaProfileChanged = 0xC210,
+    PTP_ControlJobListEvent = 0xC211,
+    PTP_ControlUploadDataResult = 0xC214,
+    PTP_FocusPositionResult = 0xC218,
+    PTP_LensInformationChanged = 0xC21B,
+    PTP_OperationResults = 0xC222,
+    PTP_AFStatus = 0xC223,
+    PTP_MovieRecOperationResults = 0xC224,
+} PTPEventCode;
+
+typedef struct {
+    PTPEventCode code;
+    union {
+        struct {
+            u32 param1;
+            u32 param2;
+            u32 param3;
+        };
+        struct {
+            u32 objectHandle;
+        };
+    };
+} PTPEvent;
+
 #define PTP_MAX_PARAMS 5
 
 typedef struct {
@@ -611,6 +652,7 @@ typedef struct {
 
 typedef struct {
     PTPDeviceTransport transport;
+    PTPLog logger;
     PTPBackendType backendType;
     b32 disconnected;
     void* device;
@@ -631,6 +673,7 @@ typedef struct PTPBackend {
     PTPBackend_OpenDevice_Func openDevice;
     PTPBackend_CloseDevice_Func closeDevice;
     PTPBackendType type;
+    PTPLog logger;
     void* self;
 } PTPBackend;
 
