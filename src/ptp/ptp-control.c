@@ -826,9 +826,9 @@ b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue valu
         case PTP_DT_UINT64:
             return value1.u64 == value2.u64;
         case PTP_DT_INT128:
-            return value1.i128 == value2.i128;
+            return MStrCmp(value1.i128, value2.i128) == 0;
         case PTP_DT_UINT128:
-            return value1.u128 == value2.u128;
+            return MStrCmp(value1.i128, value2.i128) == 0;
         case PTP_DT_AINT8:
             break;
         case PTP_DT_AUINT8:
@@ -963,38 +963,6 @@ void PTP_FreePropValueEnums(PTPPropValueEnums* outEnums) {
     MArrayFree(outEnums->values);
 }
 
-i32 MMemReadI128LE(MMemIO* memIO, i128* val) {
-    if (memIO->pos + 16 > memIO->mem + memIO->size) {
-        return -1;
-    }
-
-#ifdef MBIGENDIAN
-    i128 v;
-    memmove(&v, memIO->pos, 16);
-    *(val) = MLITTLEENDIAN64(v);
-#else
-    memmove(val, memIO->pos, 16);
-#endif
-    memIO->pos += 16;
-    return 0;
-}
-
-i32 MMemReadU128LE(MMemIO* memIO, u128* val) {
-    if (memIO->pos + 16 > memIO->mem + memIO->size) {
-        return -1;
-    }
-
-#ifdef MBIGENDIAN
-    u128 v;
-    memmove(&v, memIO->pos, 16);
-    *(val) = MLITTLEENDIAN64(v);
-#else
-    memmove(val, memIO->pos, 16);
-#endif
-    memIO->pos += 16;
-    return 0;
-}
-
 static MStr ReadPtpString8(MMemIO* memIo) {
     MStr r = {};
     u8 len = 0;
@@ -1058,10 +1026,8 @@ static i32 ReadPropertyValue(MMemIO* memIo, u16 dataType, PTPPropValue* value) {
             r = MMemReadU64LE(memIo, &value->u64);
             break;
         case PTP_DT_INT128:
-            r = MMemReadI128LE(memIo, &value->i128);
             break;
         case PTP_DT_UINT128:
-            r = MMemReadU128LE(memIo, &value->u128);
             break;
         case PTP_DT_AINT8:
             break;

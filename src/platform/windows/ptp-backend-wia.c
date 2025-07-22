@@ -338,6 +338,8 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         deviceInfo->backendType = PTP_BACKEND_WIA;
         deviceInfo->device = wiaDeviceInfo;
 
+        PTP_INFO_F("Found device: %s (%s)", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
+
         for (int j = 0; j < PROP_NUM; j++) {
             PropVariantClear(propVar + j);
         }

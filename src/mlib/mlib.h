@@ -111,16 +111,16 @@ b32 MMemDebugListAll();
 #define MDEBUG_SOURCE_MACRO
 #endif
 
-void* _MMalloc(MDEBUG_SOURCE_DEFINE size_t size);
-void* _MMallocZ(MDEBUG_SOURCE_DEFINE size_t size);
-void* _MRealloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize);
-void* _MReallocZ(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize);
-void _MFree(MDEBUG_SOURCE_DEFINE void* p, size_t size);
+void* M_Malloc(MDEBUG_SOURCE_DEFINE size_t size);
+void* M_MallocZ(MDEBUG_SOURCE_DEFINE size_t size);
+void* M_Realloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize);
+void* M_ReallocZ(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize);
+void M_Free(MDEBUG_SOURCE_DEFINE void* p, size_t size);
 
-#define MMalloc(size) _MMalloc(MDEBUG_SOURCE_MACRO size)
-#define MMallocZ(size) _MMallocZ(MDEBUG_SOURCE_MACRO size)
-#define MRealloc(p, oldSize, newSize) (_MRealloc(MDEBUG_SOURCE_MACRO (p), oldSize, newSize))
-#define MFree(p, size) (_MFree(MDEBUG_SOURCE_MACRO (p), size), (p) = NULL)
+#define MMalloc(size) M_Malloc(MDEBUG_SOURCE_MACRO size)
+#define MMallocZ(size) M_MallocZ(MDEBUG_SOURCE_MACRO size)
+#define MRealloc(p, oldSize, newSize) (M_Realloc(MDEBUG_SOURCE_MACRO (p), oldSize, newSize))
+#define MFree(p, size) (M_Free(MDEBUG_SOURCE_MACRO (p), size), (p) = NULL)
 
 /////////////////////////////////////////////////////////
 // Math
@@ -209,6 +209,11 @@ void MLogBytes(const u8* mem, u32 len);
 #define MAssert(cond, str) { if (!(cond)) { MLog(str); } }
 #define MAssertf(cond, str, ...)  { if (!(cond)) { MLogf(str, __VA_ARGS__); } }
 #endif
+#elif defined(_MSC_VER)
+#define MBreakpoint(str) { MLog(str); __debugbreak(); }
+#define MBreakpointf(str, ...) { MLogf(str, __VA_ARGS__); __debugbreak(); }
+#define MAssert(cond, str) { if (!(cond)) { MLog(str); __debugbreak(); } }
+#define MAssertf(cond, str, ...)  { if (!(cond)) { MLogf(str, __VA_ARGS__); __debugbreak(); } }
 #endif
 #else
 #define MBreakpoint(str)
@@ -350,12 +355,6 @@ MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
 
 #define MStaticArraySize(arr) (sizeof(arr) / sizeof(arr[0]))
 
-typedef struct sMArena {
-    void* mem;
-    void* pos;
-    size_t capacity;
-} MArena;
-
 /////////////////////////////////////////////////////////
 // Dynamic Array
 // Pretty much the stb lib array type, but integrates with heap debug functionality above.
@@ -407,7 +406,13 @@ typedef struct {
 
 #define MArrayEach(a, i) for (size_t i = 0; (i) < MArraySize(a); ++(i))
 
-#define MArrayEachPtr(a, it) for (struct {typeof (a) p; size_t i;} (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), (it).p = (a) + (it.i))
+#ifdef _MSC_VER
+#define M_TYPEOF(a) __typeof__(a)
+#else
+#define M_TYPEOF(a) typeof(a)
+#endif
+
+#define MArrayEachPtr(a, it) for (struct {M_TYPEOF(a) p; size_t i;} (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), (it).p = (a) + ((it).i))
 
 #define M_ArrayHeader(a) ((MArrayHeader*)(a) - 1)
 
@@ -524,8 +529,8 @@ typedef struct {
     u32 size;
 } MStr;
 
-#define MStrInit(s, len) ((s).str = (char*)_MMalloc(MDEBUG_SOURCE_MACRO (len)), ((s).str) ? (s).size = (len) : 0)
-#define MStrFree(s) ((s).str ? (_MFree(MDEBUG_SOURCE_MACRO (s).str, (s).size), (s).str = 0, (s).size = 0) : 0)
+#define MStrInit(s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (len)), ((s).str) ? (s).size = (len) : 0)
+#define MStrFree(s) ((s).str ? (M_Free(MDEBUG_SOURCE_MACRO (s).str, (s).size), (s).str = 0, (s).size = 0) : 0)
 
 enum MParse {
     MParse_SUCCESS = 0,
@@ -560,6 +565,13 @@ MINLINE MStr MStrMake(const char* c) {
 
 i32 MStringAppend(MMemIO* memIo, const char* str);
 i32 MStringAppendf(MMemIO* memIo, const char* format, ...);
+
+
+/////////////////////////////////////////////////////////
+// Backtrace
+#ifdef M_BACKTRACE
+void MLogStacktrace();
+#endif
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop

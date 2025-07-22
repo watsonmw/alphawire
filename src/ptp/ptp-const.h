@@ -7,9 +7,6 @@
 extern "C" {
 #endif
 
-typedef __int128 i128;
-typedef unsigned __int128 u128;
-
 typedef enum {
     PTP_DT_UNDEF = 0x0000,
     PTP_DT_INT8 = 0x0001,
@@ -50,8 +47,8 @@ typedef union {
     i32 i32;
     u64 u64;
     i64 i64;
-    u128 u128;
-    i128 i128;
+    char u128[16];
+    char i128[16];
     MStr str;
 } PTPPropValue;
 

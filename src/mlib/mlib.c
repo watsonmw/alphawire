@@ -118,7 +118,7 @@ void MMemDebugInit() {
     }
 }
 
-void MMemDebugDeinit() {
+void MMemDebugDeinit(void) {
     if (!sMemDebugContext.sMemDebugInitialized) {
         return;
     }
@@ -284,18 +284,8 @@ b32 MMemDebugListAll() {
 
 #endif
 
-void* _MMalloc(MDEBUG_SOURCE_DEFINE size_t size) {
-#ifndef M_CLIB_DISABLE
-    if (!sAllocator) {
-        sAllocator = &sClibMAllocator;
-    }
-#endif
-
+static void* M_MallocInternal(MDEBUG_SOURCE_DEFINE size_t size) {
 #ifdef M_MEM_DEBUG
-#ifdef M_LOG_ALLOCATIONS
-    MLogf("malloc %s:%d %d", file, line, size);
-#endif
-
     if (!sMemDebugContext.sMemDebugInitialized) {
         MMemDebugInit();
 #ifndef M_CLIB_DISABLE
@@ -335,8 +325,28 @@ void* _MMalloc(MDEBUG_SOURCE_DEFINE size_t size) {
     MLogf("-> 0x%p", memAlloc->mem);
 #endif
     return memAlloc->mem;
+#endif
+}
+
+void* M_Malloc(MDEBUG_SOURCE_DEFINE size_t size) {
+#ifndef M_CLIB_DISABLE
+    if (!sAllocator) {
+        sAllocator = &sClibMAllocator;
+    }
+#endif
+
+#ifdef M_MEM_DEBUG
+#ifdef M_LOG_ALLOCATIONS
+#ifdef M_BACKTRACE
+    MLogf("malloc(%d):", size);
+    MLogStacktrace();
 #else
-    #ifdef M_LOG_ALLOCATIONS
+    MLogf("malloc(%d) %s:%d", size, file, line);
+#endif
+#endif
+    return M_MallocInternal(MDEBUG_SOURCE_PASS size);
+#else
+#ifdef M_LOG_ALLOCATIONS
     MLogf("malloc %d", size);
     void* mem = sAllocator->mallocFunc(sAllocator, size);
     MLogf("-> 0x%p", mem);
@@ -347,15 +357,15 @@ void* _MMalloc(MDEBUG_SOURCE_DEFINE size_t size) {
 #endif
 }
 
-void* _MMallocZ(MDEBUG_SOURCE_DEFINE size_t size) {
-    void* r = _MMalloc(MDEBUG_SOURCE_PASS size);
+void* M_MallocZ(MDEBUG_SOURCE_DEFINE size_t size) {
+    void* r = M_Malloc(MDEBUG_SOURCE_PASS size);
     if (r) {
         memset(r, 0, size);
     }
     return r;
 }
 
-void _MFree(MDEBUG_SOURCE_DEFINE void* p, size_t size) {
+void M_Free(MDEBUG_SOURCE_DEFINE void* p, size_t size) {
 #ifndef M_CLIB_DISABLE
     if (!sAllocator) {
         sAllocator = &sClibMAllocator;
@@ -371,16 +381,25 @@ void _MFree(MDEBUG_SOURCE_DEFINE void* p, size_t size) {
         if (p == memAlloc->mem) {
             MMemDebugCheckMemAlloc(memAlloc);
             if (size != memAlloc->size) {
-                MLogf("MFree %s:%d 0x%p called with size: %d - should be: %d", file, line, p, size,
+#ifdef M_BACKTRACE
+                MLogf("MFree 0x%p called with wrong size: %d - should be: %d", p, size, memAlloc->size);
+                MLogStacktrace();
+#else
+                MLogf("MFree %s:%d 0x%p called with wrong size: %d - should be: %d", file, line, p, size,
                       memAlloc->size);
+#endif
             }
             sAllocator->freeFunc(sAllocator, memAlloc->start, SENTINEL_BEFORE + memAlloc->size + SENTINEL_AFTER);
             sMemDebugContext.curAllocatedBytes -= memAlloc->size;
-            memAlloc->start = 0;
-            memAlloc->mem = 0;
+            memAlloc->start = NULL;
+            memAlloc->mem = NULL;
 #ifdef M_LOG_ALLOCATIONS
-            MLogf("free %s:%d 0x%p %d   allocated @ %s:%d", file, line, p, memAlloc->size,
-                  memAlloc->file, memAlloc->line);
+#ifdef M_BACKTRACE
+            MLogf("free(0x%p) size: %d [allocated @ %s:%d]", p, memAlloc->size, memAlloc->file, memAlloc->line);
+            MLogStacktrace();
+#else
+            MLogf("free(0x%p) size: %d %s:%d [allocated @ %s:%d]", p, memAlloc->size, file, line, memAlloc->file, memAlloc->line);
+#endif
 #endif
             *(MMemDebugArrayAddPtr(sMemDebugContext.freeSlots)) = i;
             return;
@@ -389,14 +408,14 @@ void _MFree(MDEBUG_SOURCE_DEFINE void* p, size_t size) {
 
     MLogf("MFree %s:%d called on invalid ptr: 0x%p", file, line, p);
 #else
-    #ifdef M_LOG_ALLOCATIONS
-    MLogf("free 0x%p", p);
+#ifdef M_LOG_ALLOCATIONS
+    MLogf("free(0x%p)", p);
 #endif
     sAllocator->freeFunc(sAllocator, p, size);
 #endif
 }
 
-void* _MRealloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
+void* M_Realloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
 #ifndef M_CLIB_DISABLE
     if (!sAllocator) {
         sAllocator = &sClibMAllocator;
@@ -405,10 +424,15 @@ void* _MRealloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
 
 #ifdef M_MEM_DEBUG
 #ifdef M_LOG_ALLOCATIONS
-    MLogf("realloc %s:%d 0x%p %d %d", file, line, p, oldSize, newSize);
+#ifdef M_BACKTRACE
+    MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
+    MLogStacktrace();
+#else
+    MLogf("realloc(0x%p, %d, %d) [%s:%d]", p, oldSize, newSize, file, line);
+#endif
 #endif
     if (p == NULL) {
-        return _MMalloc(MDEBUG_SOURCE_PASS newSize);
+        return M_MallocInternal(MDEBUG_SOURCE_PASS newSize);
     }
 
     MMemAllocInfo* memAllocFound = NULL;
@@ -454,8 +478,8 @@ void* _MRealloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
 #endif
     return memAllocFound->mem;
 #else
-    #ifdef M_LOG_ALLOCATIONS
-    MLogf("realloc 0x%p %d", p, newSize);
+#ifdef M_LOG_ALLOCATIONS
+    MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
     void* mem = sAllocator->reallocFunc(sAllocator, p, oldSize, newSize);
     MLogf("-> 0x%p (resized)", mem);
     return mem;
@@ -465,8 +489,8 @@ void* _MRealloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
 #endif
 }
 
-void* _MReallocZ(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
-    void* r = _MRealloc(MDEBUG_SOURCE_PASS p, oldSize, newSize);
+void* M_ReallocZ(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
+    void* r = M_Realloc(MDEBUG_SOURCE_PASS p, oldSize, newSize);
     if (r) {
         memset(r, 0, newSize);
     }
@@ -474,10 +498,11 @@ void* _MReallocZ(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize) {
 }
 
 static const char* sHexChars = "0123456789abcdef";
+#define M_LOG_BYTES_PERLINE 64
 
 void MLogBytes(const u8* mem, u32 len) {
-    const int bytesPerLine = 64; // must be power of two - see AND (&) below
-    char buff[bytesPerLine + 1];
+    const int bytesPerLine = M_LOG_BYTES_PERLINE; // must be power of two - see AND (&) below
+    char buff[M_LOG_BYTES_PERLINE + 1];
     int buffPos = 0;
 
     for (int j  = 0; j < len; ++j) {
@@ -511,7 +536,7 @@ void* M_ArrayInit(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize, size_t minNe
             capacity = minNeeded;
         }
         size_t newSize =  elementSize * capacity + sizeof(MArrayHeader);
-        void* mem = _MMalloc(MDEBUG_SOURCE_PASS newSize);
+        void* mem = M_Malloc(MDEBUG_SOURCE_PASS newSize);
         if (mem == NULL)  {
             MLogf("M_ArrayInit malloc returned NULL");
             return NULL;
@@ -519,7 +544,9 @@ void* M_ArrayInit(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize, size_t minNe
 
         MArrayHeader* p = mem;
         void* b = (u8*)mem + sizeof(MArrayHeader);
-        p->size = 0;
+        if (a == NULL) {
+            p->size = 0;
+        }
         p->capacity = capacity;
         return b;
     }
@@ -547,7 +574,7 @@ void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE void* a, MArrayHeader* p, size_t elementS
     }
 
     size_t newSize =  elementSize * newCapacity + sizeof(MArrayHeader);
-    void* mem = _MRealloc(MDEBUG_SOURCE_PASS p, oldSize, newSize);
+    void* mem = M_Realloc(MDEBUG_SOURCE_PASS p, oldSize, newSize);
     if (mem == NULL)  {
         MLogf("M_ArrayGrow realloc failed for %p", a);
         return 0;
@@ -564,7 +591,7 @@ void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE void* a, MArrayHeader* p, size_t elementS
 
 void M_ArrayFree(MDEBUG_SOURCE_DEFINE void* a, size_t itemSize) {
     MArrayHeader* p = M_ArrayHeader(a);
-    _MFree(MDEBUG_SOURCE_PASS p, itemSize * p->capacity + sizeof(MArrayHeader));
+    M_Free(MDEBUG_SOURCE_PASS p, itemSize * p->capacity + sizeof(MArrayHeader));
 }
 
 /////////////////////////////////////////////////////////
@@ -1267,4 +1294,216 @@ i32 MFileWriteDataFully(const char* filePath, u8* data, u32 size) {
     return -1;
 }
 
+#if defined(M_BACKTRACE)
 
+#if defined(M_LIBBACKTRACE)
+#include <backtrace.h>
+#include <stdio.h>
+
+struct backtrace_state* sBacktraceState;
+
+static int MLogStacktrace_PrintBacktraceCallback(void *data, uintptr_t pc, const char *filename, int lineno, const char *function) {
+    (void)data; // Avoid unused variable warning
+    if (function) {
+        MLogf("  %s() %s:%d", function, filename, lineno);
+    } else if (filename != NULL && lineno != 0) {
+        MLogf("  %?%?%?() %s:%d", filename, lineno);
+    }
+    return 0;
+}
+
+static void MLogStacktrace_ErrorCallback(void *data, const char *msg, int errnum) {
+    (void)data;
+    MLogf("   Backtrace error: %s (%d)", msg, errnum);
+}
+
+void MLogStacktrace() {
+    if (!sBacktraceState) {
+        sBacktraceState = backtrace_create_state(NULL, 1, MLogStacktrace_ErrorCallback, NULL);
+        if (sBacktraceState == NULL) {
+            MLog("Failed to create backtrace state");
+            return;
+        }
+    }
+    backtrace_full(sBacktraceState, 1, MLogStacktrace_PrintBacktraceCallback, MLogStacktrace_ErrorCallback, NULL);
+}
+
+typedef struct MStacktraceLine {
+    char name[248];
+    char file[256];
+    int lineno;
+    uintptr_t pc;
+} MStacktraceLine;
+
+typedef struct MStacktrace {
+    MStacktraceLine lines[100]; // [100]
+    int lineCount;
+    u32 hash;
+} MStacktrace;
+
+// TODO: Add location hash to every allocation.
+// TODO: maintain a map of pc & full pc stacktrace hashes to stacktraces
+// TODO: Garbage collection cleanup function called to make room for new hashes
+// TODO: Print stacktrace for allocation when reporting errors for stacktrace
+static int GetStacktrace_PrintBacktraceCallback(void* data, uintptr_t pc, const char* filename, int lineno, const char* function) {
+    MStacktrace* stacktrace = (MStacktrace*)data;
+    MStacktraceLine* stacktraceLine = &(stacktrace->lines[stacktrace->lineCount]);
+    if (function) {
+        stacktraceLine->lineno = lineno;
+        strcpy(stacktraceLine->name, function);
+        strcpy(stacktraceLine->file, filename);
+        stacktraceLine->pc = pc;
+        stacktrace->lineCount++;
+    } else if (filename != NULL && lineno != 0) {
+        stacktraceLine->lineno = lineno;
+        strcpy("???", function);
+        strcpy(stacktraceLine->file, filename);
+        stacktraceLine->pc = pc;
+        stacktrace->lineCount++;
+    }
+    return 0;
+}
+
+static void GetStacktrace_ErrorCallback(void* data, const char* msg, int errnum) {
+    (void)data;
+    MLogf("MGetStacktrace error: %s (%d)", msg, errnum);
+}
+
+void MGetStacktrace(MStacktrace* stacktrace) {
+    if (!sBacktraceState) {
+        sBacktraceState = backtrace_create_state(NULL, 1, MLogStacktrace_ErrorCallback, NULL);
+        if (sBacktraceState == NULL) {
+            MLog("Failed to create backtrace state");
+            return;
+        }
+    }
+    backtrace_full(sBacktraceState, 1, GetStacktrace_PrintBacktraceCallback, GetStacktrace_ErrorCallback, stacktrace);
+}
+
+static int GetStacktraceHash_SimpleCallback(void* data, uintptr_t pc) {
+    u32 hash = (*(u32*)data);
+    hash = hash * 31 + pc;
+    (*(u32*)data) = hash;
+    return 0;
+}
+
+static void GetStacktraceHash_ErrorCallback(void* data, const char* msg, int errnum) {
+    (void)data;
+    MLogf("MGetStacktrace error: %s (%d)", msg, errnum);
+}
+
+typedef struct MStacktraceHash {
+    u64 hash; // Hash of full stacktrace
+    u64 pc; // Head PC of stacktrace
+} MStacktraceHash;
+
+u32 MGetStacktraceHash() {
+    u32 hash = 0;
+    if (!sBacktraceState) {
+        sBacktraceState = backtrace_create_state(NULL, 1, MLogStacktrace_ErrorCallback, NULL);
+        if (sBacktraceState == NULL) {
+            MLog("Failed to create backtrace state");
+            return 0;
+        }
+    }
+    backtrace_simple(sBacktraceState, 1, GetStacktraceHash_SimpleCallback, GetStacktraceHash_ErrorCallback, &hash);
+    return hash;
+}
+
+#elif defined(WIN32)
+
+#include <windows.h>
+#include <dbghelp.h>
+#include <stdio.h>
+
+void MLogStacktrace() {
+    // This will only work if you generate PDB files, MinGW GCC will only generate
+    // DWARF debug info.
+    HANDLE process = GetCurrentProcess();
+    SymInitialize(process, NULL, TRUE);
+
+    CONTEXT context = {};
+    RtlCaptureContext(&context);
+
+    STACKFRAME64 stackFrame = {};
+    stackFrame.AddrPC.Offset = context.Rip;
+    stackFrame.AddrPC.Mode = AddrModeFlat;
+    stackFrame.AddrStack.Offset = context.Rsp;
+    stackFrame.AddrStack.Mode = AddrModeFlat;
+    stackFrame.AddrFrame.Offset = context.Rbp;
+    stackFrame.AddrFrame.Mode = AddrModeFlat;
+
+    int skipFrames = 1;
+
+    while (StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, GetCurrentThread(),
+                       &stackFrame, &context, NULL, SymFunctionTableAccess64,
+                       SymGetModuleBase64, NULL)) {
+        if (skipFrames) {
+            skipFrames--;
+            continue;
+        }
+        char buffer[sizeof(SYMBOL_INFO) + 256];
+        PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = 255;
+        DWORD64 address = stackFrame.AddrPC.Offset;
+        DWORD64 displacement64;
+        char* funcName = NULL;
+        char* fileName = NULL;
+        int lineNo = 0;
+
+        if (SymFromAddr(process, address, &displacement64, symbol)) {
+            funcName = symbol->Name;
+        }
+
+        // Source file and line number
+        IMAGEHLP_LINE64 line = {};
+        line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+        DWORD displacement32;
+        if (SymGetLineFromAddr64(process, address, &displacement32, &line)) {
+            fileName = line.FileName;
+            lineNo = line.LineNumber;
+        }
+
+        if (funcName == NULL) {
+            funcName = "???";
+        }
+
+        if (fileName != NULL && lineNo != 0) {
+            MLogf("  %s() %s:%d", funcName, fileName, lineNo);
+        } else {
+            MLogf("  %s()", funcName);
+        }
+
+        if (MStrCmp("main", funcName) == 0) {
+            break;
+        }
+    }
+
+    SymCleanup(process);
+}
+
+#else
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <execinfo.h>
+
+void MLogStacktrace() {
+    void *array[10];
+    size_t size;
+    char **strings;
+    size_t i;
+
+    size = backtrace(array, 10);
+    strings = backtrace_symbols(array, size);
+
+    for (i = 0; i < size; i++) {
+        MLogf("  %s()", strings[i]);
+    }
+
+    free(strings);
+}
+#endif
+
+#endif

@@ -10,6 +10,9 @@
 #endif
 
 #include <stdlib.h>
+#ifdef _MSC_VER
+#include <malloc.h>
+#endif
 
 #include "mlib/mlib.h"
 
@@ -69,7 +72,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHa
                             0, 0,
                             (PUCHAR) &configDesc,
                             sizeof(USB_CONFIGURATION_DESCRIPTOR),
-                            &overlapped)) {
+                            &transferred)) {
         if (GetLastError() != ERROR_IO_PENDING) {
             CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger, "Error getting configuration descriptor");
@@ -103,7 +106,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHa
                             0, 0,
                             configBuffer,
                             descriptorLength,
-                            &overlapped)) {
+                            &transferred)) {
         if (GetLastError() != ERROR_IO_PENDING) {
             MFree(configBuffer, descriptorLength);
             CloseHandle(overlapped.hEvent);
@@ -258,13 +261,6 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                     return FALSE;
                 }
 
-                UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->devices);
-                PTPDeviceInfo* device = MArrayAddPtr(*devices);
-                usbkDevice->deviceId = deviceInfo;
-                device->manufacturer = MStrMake(deviceInfo->Mfg);
-                device->backendType = PTP_BACKEND_LIBUSBK;
-                device->device = usbkDevice;
-
                 char productString[256];
                 if (deviceDescriptor.iProduct > 0) {  // Check if product string exists
                     UINT transferLength = 0;
@@ -288,7 +284,15 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                         WideCharToMultiByte(CP_UTF8, 0, wideString, -1, productString,
                             sizeof(productString), NULL, NULL);
 
+                        UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->devices);
+                        PTPDeviceInfo* device = MArrayAddPtr(*devices);
+                        usbkDevice->deviceId = deviceInfo;
+                        device->manufacturer = MStrMake(deviceInfo->Mfg);
+                        device->backendType = PTP_BACKEND_LIBUSBK;
+                        device->device = usbkDevice;
                         device->deviceName = MStrMake(productString);
+
+                        PTP_INFO_F("Found device: %s (%s)", device->deviceName.str, device->manufacturer.str);
                     } else {
                         PTP_ERROR("Error getting product string descriptor");
                     }
@@ -544,7 +548,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle
                             0, 0,
                             (PUCHAR)&configDesc,
                             sizeof(USB_CONFIGURATION_DESCRIPTOR),
-                            &overlapped)) {
+                            &transferred)) {
         if (GetLastError() != ERROR_IO_PENDING) {
             CloseHandle(overlapped.hEvent);
             return FALSE;
@@ -574,7 +578,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle
                             0, 0,
                             buffer,
                             configDesc.wTotalLength,
-                            &overlapped)) {
+                            &transferred)) {
         if (GetLastError() != ERROR_IO_PENDING) {
             MFree(buffer, configDesc.wTotalLength);
             CloseHandle(overlapped.hEvent);
