@@ -144,6 +144,7 @@ b32 PTPControl_SetPropertyU32(PTPControl* self, u16 propertyCode, u32 value);
 b32 PTPControl_SetPropertyU64(PTPControl* self, u16 propertyCode, u64 value);
 b32 PTPControl_SetPropertyStr(PTPControl* self, u16 propertyCode, MStr value);
 b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value);
+b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +157,7 @@ b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValu
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-// File function functions
+// File download / upload functions
 //////////////////////////////////////////////////////////////////////////////////////////////
 int PTPControl_GetPendingFiles(PTPControl* self);
 PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);

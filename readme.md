@@ -6,16 +6,19 @@ A C library for controlling Sony Alpha cameras via USB connection, with a focus 
 
 ## Overview
 
-AlphaWire provides both low-level and high-level APIs for controlling Sony Alpha cameras. It's particularly useful for:
-- Controlling Alpha cameras with minimal dependencies
-- Supporting cameras not covered by official Sony Camera Remote SDK
-- Debugging PTP (Picture Transfer Protocol) implementation
+AlphaWire provides both low-level and high-level APIs for controlling Sony Alpha cameras.
 
-> **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks of Sony Corporation.
+It has some advantages over the official SDK:
+- Minimal dependencies
+- Fast
+- Supports older cameras not covered by official Sony Camera Remote SDK
+- Easily debugging of camera PTP (Picture Transfer Protocol) support
+
+> **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks or registered
+> trademarks of Sony Corporation.
 
 ## Current Status
-
-- **Platform Support**: Currently Windows-only (MinGW compiler required)
+- **Platform Support**: Currently Windows-only (Visual Studio 2018 or MinGW)
 - **Architecture**: Designed for easy cross-platform expansion
 
 ## Library Features
@@ -33,7 +36,6 @@ AlphaWire provides both low-level and high-level APIs for controlling Sony Alpha
 - libusbk
 
 ## Demo Application
-
 A GUI application is included for camera control and PTP protocol debugging.
 
 ### Features
@@ -45,7 +47,6 @@ A GUI application is included for camera control and PTP protocol debugging.
 - Fast download of images
 
 ## Roadmap
-
 - [ ] Build System Improvements
    - CMake/Makefile targets for library
    - Packaged releases for UI application
@@ -54,5 +55,6 @@ A GUI application is included for camera control and PTP protocol debugging.
    - macOS support
    - TCP backend implementation
 - [ ] API Development
+   - Threading - support separate thread per device
    - Python bindings (cffi/ctypes)
    - Enhanced high-level API

@@ -261,7 +261,6 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                     return FALSE;
                 }
 
-                char productString[256];
                 if (deviceDescriptor.iProduct > 0) {  // Check if product string exists
                     UINT transferLength = 0;
                     UCHAR stringDescriptor[256];
@@ -277,12 +276,6 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                         // First byte is the length, second byte is the descriptor type,
                         // actual string starts at offset 2
                         WCHAR* wideString = (WCHAR*)(&stringDescriptor[2]);
-                        int stringLength = (transferLength - 2) / 2;  // Convert bytes to WCHAR count
-                        wideString[stringLength] = 0;  // Null terminate
-
-                        // Convert to narrow string for printing
-                        WideCharToMultiByte(CP_UTF8, 0, wideString, -1, productString,
-                            sizeof(productString), NULL, NULL);
 
                         UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->devices);
                         PTPDeviceInfo* device = MArrayAddPtr(*devices);
@@ -290,7 +283,7 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                         device->manufacturer = MStrMake(deviceInfo->Mfg);
                         device->backendType = PTP_BACKEND_LIBUSBK;
                         device->device = usbkDevice;
-                        device->deviceName = MStrMake(productString);
+                        device->deviceName = WinUtils_BSTRToUTF8(wideString);
 
                         PTP_INFO_F("Found device: %s (%s)", device->deviceName.str, device->manufacturer.str);
                     } else {
@@ -392,7 +385,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
     if (waitResult != WAIT_OBJECT_0) {
         UsbK_AbortPipe(usbHandle, self->usbBulkOut);
         CloseHandle(overlapped.hEvent);
-        MLog("Timeout or error while sending PTP request");
+        PTP_ERROR("Timeout or error while sending PTP request");
         return PTP_GENERAL_ERROR;
     }
 

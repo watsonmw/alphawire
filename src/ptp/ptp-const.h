@@ -88,11 +88,12 @@ typedef struct {
 typedef struct {
     u16 propCode;
     u16 dataType;
-    u8 getSet;
-    u8 isEnabled;
     PTPPropValue defaultValue;
     PTPPropValue value;
+    u8 getSet;
+    u8 isEnabled;
     u8 formFlag;
+    u8 isNotch; // Property can only be changed by 'notching' - needed for some properties
 
     union {
         PTPRange range;

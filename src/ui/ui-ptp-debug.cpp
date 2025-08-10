@@ -278,6 +278,16 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
 
     ImGui::Separator();
 
+    if (property->isNotch) {
+        if (ImGui::Button("Notch Next")) {
+            PTPControl_SetPropertyNotch(&c.ptp, property->propCode, 1);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Notch Prev")) {
+            PTPControl_SetPropertyNotch(&c.ptp, property->propCode, -1);
+        }
+    }
+
     if (property->formFlag == PTP_FORM_FLAG_ENUM) {
         ImGuiTableFlags flags =
                 ImGuiTableFlags_Resizable |
@@ -645,6 +655,17 @@ void ShowDebugPropertyListTab(AppContext& c) {
     }
 }
 
+static void ImGuiControlButton(AppContext &c, const char* buttonName, u16 propertyCode) {
+    if (ImGui::Button(buttonName)) {
+        PTPControl_SetControlToggle(&c.ptp, propertyCode, true);
+    }
+    if (ImGui::IsItemHovered()) {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            PTPControl_SetControlToggle(&c.ptp, propertyCode, false);
+        }
+    }
+}
+
 void ShowCameraControlsWindow(AppContext& c) {
     ImGui::SetNextWindowPos(ImVec2(910, 660), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(990, 305), ImGuiCond_FirstUseEver);
@@ -671,7 +692,7 @@ void ShowCameraControlsWindow(AppContext& c) {
     }
 
     ImGui::Spacing();
-    if (ImGui::CollapsingHeader("Auto-Focus", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Focus", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
         MStr afStatus = {};
         PTPControl_GetPropertyAsStr(&c.ptp, DPC_AUTO_FOCUS_STATUS, &afStatus);
@@ -745,6 +766,48 @@ void ShowCameraControlsWindow(AppContext& c) {
                 }
             }
         }
+    }
+
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Magnifier", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Spacing();
+
+        ImGuiControlButton(c, "Zoom", DPC_FOCUS_MAGNIFIER);
+        ImGui::SameLine();
+        ImGuiControlButton(c, "Exit", DPC_FOCUS_MAGNIFIER_CANCEL);
+        ImGui::SameLine();
+        MStr magScale = {};
+        if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_SCALE, &magScale)) {
+            ImGui::Text("%s", magScale.str);
+            MStrFree(magScale);
+        }
+
+        MStr magPosition = {};
+        if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_POS, &magPosition)) {
+            ImGui::Text("%s", magPosition.str);
+            MStrFree(magPosition);
+        }
+
+        ImGui::Dummy(ImVec2(43.0f, 10)); // Horizontal padding
+        ImGui::SameLine();
+        ImGuiControlButton(c, "Up", DPC_REMOTE_KEY_UP);
+
+        // Left + Right buttons
+        ImGuiControlButton(c, "Left", DPC_REMOTE_KEY_LEFT);
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(35.0f, 0)); // Space between Left and Right
+        ImGui::SameLine();
+        ImGuiControlButton(c, "Right", DPC_REMOTE_KEY_RIGHT);
+
+        // Center "Down" button
+        ImGui::Dummy(ImVec2(36.0f, 0)); // Horizontal padding
+        ImGui::SameLine();
+        ImGuiControlButton(c, "Down", DPC_REMOTE_KEY_DOWN);
+    }
+
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Settings")) {
+        ImGui::Spacing();
     }
 
     ImGui::Spacing();

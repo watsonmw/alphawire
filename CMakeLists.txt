@@ -88,14 +88,18 @@ if(WIN32)
     target_include_directories(alphawire PRIVATE libs/libusbk)
     target_link_libraries(alphawire ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib)
 
-    # Configure WIA
-    target_link_libraries(alphawire wiaguid.lib)
-
     # MinGW specific
     if (MINGW)
+        # MinGW 13 headers are missing IWiaItemExtras, use our own copies of the MinGW 12 versions:
+        target_include_directories(alphawire PRIVATE libs/mingw)
+        target_link_libraries(alphawire mingw32 ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw/libuuid.a)
+
         target_compile_options(alphawire PRIVATE -ggdb -Wall -mconsole)
         target_link_libraries(alphawire mingw32 -static-libgcc -static-libstdc++)
     else()
+        # Configure WIA
+        target_link_libraries(alphawire wiaguid.lib)
+
         target_link_options(alphawire PRIVATE /SUBSYSTEM:CONSOLE)
     endif()
 

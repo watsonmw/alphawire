@@ -573,6 +573,7 @@ char* PTP_GetEventStr(u16 eventCode) {
     return NULL;
 }
 
+
 typedef struct {
     u16 code;
     char* name;
@@ -1345,131 +1346,74 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     return r.result;
 }
 
-static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
-    PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
-    if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
-        req.Params[0] = incremental ? 0x1 : 0x0;
-        req.Params[1] = addExtended ? 0x1 : 0x0;
-        req.NumParams = 2;
-    } else {
-        req.NumParams = 0;
+static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
+    if (!incremental) {
+        MArrayInit(self->properties, 0);
+        MArrayInit(self->controls, 0);
     }
 
-    PTPResponse r = SendReq(self, &req);
-    RETURN_IF_FAIL(r);
+    for (int i = 0; i < numProperties; i++) {
+        u16 propCode = 0;
+        MMemReadU16LE(&r.memIo, &propCode);
 
-    u64 numProperties = 0;
-    MMemReadU64LE(&r.memIo, &numProperties);
+        if (PTPControl_SupportsControl(self, propCode)) {
+            // Handle control
+            PtpControl *control = NULL;
+            if (incremental) {
+                control = PTPControl_GetControl(self, propCode);
+            }
+            if (!control) {
+                control = MArrayAddPtr(self->controls);
+                memset(control, 0, sizeof(PtpControl));
+                control->controlCode = propCode;
 
-    if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
-        if (!incremental) {
-            MArrayInit(self->properties, 0);
-            MArrayInit(self->controls, 0);
-        }
-
-        for (int i = 0; i < numProperties; i++) {
-            u16 propCode = 0;
-            MMemReadU16LE(&r.memIo, &propCode);
-
-            if ((propCode >= 0xD2C0 && propCode < 0xD400) || propCode >= 0xF000) {
-                PtpControl *control = NULL;
-                if (incremental) {
-                    control = PTPControl_GetControl(self, propCode);
-                }
-                if (!control) {
-                    control = MArrayAddPtr(self->controls);
-                    memset(control, 0, sizeof(PtpControl));
-                    control->controlCode = propCode;
-
-                    size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
-                    for (int j = 0; j < numControlsMeta; j++) {
-                        PtpControl* controlDesc = sPtpControlsMetadata + j;
-                        if (controlDesc->controlCode == propCode) {
-                            control->name = controlDesc->name;
-                            break;
-                        }
+                size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+                for (int j = 0; j < numControlsMeta; j++) {
+                    PtpControl* controlDesc = sPtpControlsMetadata + j;
+                    if (controlDesc->controlCode == propCode) {
+                        control->name = controlDesc->name;
+                        break;
                     }
-                }
-
-                MMemReadU16LE(&r.memIo, &control->dataType);
-                u8 getSet = 0;
-                MMemReadU8(&r.memIo, &getSet);
-                u8 isEnabled = 0;
-                MMemReadU8(&r.memIo, &isEnabled);
-
-                PTPPropValue dummy;
-                ReadPropertyValue(&r.memIo, control->dataType, &dummy);
-                ReadPropertyValue(&r.memIo, control->dataType, &dummy);
-
-                MMemReadU8(&r.memIo, &control->formFlag);
-
-                if (control->formFlag == PTP_FORM_FLAG_ENUM) {
-                    u16 numEnumSet = 0;
-                    MMemReadU16LE(&r.memIo, &numEnumSet);
-                    MArrayInit(control->form.enums.values, numEnumSet);
-                    memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
-                    for (int j = 0; j < numEnumSet; j++) {
-                        PTPPropValueEnum *value = MArrayAddPtr(control->form.enums.values);
-                        ReadPropertyValue(&r.memIo, control->dataType, &value->propValue);
-                    }
-                    control->form.enums.size = numEnumSet;
-                    control->form.enums.owned = TRUE;
-                } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
-                    ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.min);
-                    ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.max);
-                    ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.step);
-                }
-            } else {
-                PTPProperty *property = NULL;
-                if (incremental) {
-                    property = PTPControl_GetProperty(self, propCode);
-                }
-                if (!property) {
-                    property = MArrayAddPtr(self->properties);
-                    memset(property, 0, sizeof(PTPProperty));
-                    property->propCode = propCode;
-                }
-
-                MMemReadU16LE(&r.memIo, &property->dataType);
-                MMemReadU8(&r.memIo, &property->getSet);
-                MMemReadU8(&r.memIo, &property->isEnabled);
-
-                ReadPropertyValue(&r.memIo, property->dataType, &property->defaultValue);
-                ReadPropertyValue(&r.memIo, property->dataType, &property->value);
-
-                MMemReadU8(&r.memIo, &property->formFlag);
-
-                if (property->formFlag == PTP_FORM_FLAG_ENUM) {
-                    u16 numEnumSet = 0;
-                    MMemReadU16LE(&r.memIo, &numEnumSet);
-                    MArrayInit(property->form.enums.set, numEnumSet);
-                    for (int j = 0; j < numEnumSet; j++) {
-                        PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
-                        ReadPropertyValue(&r.memIo, property->dataType, value);
-                    }
-                } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-                    ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.min);
-                    ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.max);
-                    ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.step);
                 }
             }
-        }
-    } else {
-        if (!incremental) {
-            MArrayInit(self->properties, numProperties);
-            memset(self->properties, 0, numProperties * sizeof(PTPProperty));
-        }
 
-        for (int i = 0; i < numProperties; i++) {
-            u16 propCode = 0;
-            MMemReadU16LE(&r.memIo, &propCode);
+            MMemReadU16LE(&r.memIo, &control->dataType);
+            u8 getSet = 0;
+            MMemReadU8(&r.memIo, &getSet);
+            u8 isEnabled = 0;
+            MMemReadU8(&r.memIo, &isEnabled);
 
+            PTPPropValue dummy;
+            ReadPropertyValue(&r.memIo, control->dataType, &dummy);
+            ReadPropertyValue(&r.memIo, control->dataType, &dummy);
+
+            MMemReadU8(&r.memIo, &control->formFlag);
+
+            if (control->formFlag == PTP_FORM_FLAG_ENUM) {
+                u16 numEnumSet = 0;
+                MMemReadU16LE(&r.memIo, &numEnumSet);
+                MArrayInit(control->form.enums.values, numEnumSet);
+                memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
+                for (int j = 0; j < numEnumSet; j++) {
+                    PTPPropValueEnum *value = MArrayAddPtr(control->form.enums.values);
+                    ReadPropertyValue(&r.memIo, control->dataType, &value->propValue);
+                }
+                control->form.enums.size = numEnumSet;
+                control->form.enums.owned = TRUE;
+            } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
+                ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.min);
+                ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.max);
+                ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.step);
+            }
+        } else {
+            // Handle property
             PTPProperty *property = NULL;
             if (incremental) {
                 property = PTPControl_GetProperty(self, propCode);
             }
             if (!property) {
                 property = MArrayAddPtr(self->properties);
+                memset(property, 0, sizeof(PTPProperty));
                 property->propCode = propCode;
             }
 
@@ -1490,19 +1434,101 @@ static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental,
                     PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
                     ReadPropertyValue(&r.memIo, property->dataType, value);
                 }
-                u16 numEnumGetSet = 0;
-                MMemReadU16LE(&r.memIo, &numEnumGetSet);
-                MArrayInit(property->form.enums.getSet, numEnumGetSet);
-                for (int j = 0; j < numEnumGetSet; j++) {
-                    PTPPropValue* value = MArrayAddPtr(property->form.enums.getSet);
-                    ReadPropertyValue(&r.memIo, property->dataType, value);
-                }
             } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
                 ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.min);
                 ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.max);
                 ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.step);
             }
+
+            // On older pre-2020 cameras, some properties can only be adjusted up or down, mark them as such with
+            // 'isNotch', client code can change these properties with PTPControl_SetPropertyNotch()
+            switch (propCode) {
+                case DPC_F_NUMBER:
+                case DPC_EXPOSURE_COMPENSATION:
+                case DPC_FLASH_COMPENSATION:
+                case DPC_SHUTTER_SPEED:
+                case DPC_ISO:
+                    property->isNotch = TRUE;
+                    break;
+                default:
+                    property->isNotch = FALSE;
+                    break;
+            }
         }
+    }
+}
+
+static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
+    if (!incremental) {
+        MArrayInit(self->properties, numProperties);
+        memset(self->properties, 0, numProperties * sizeof(PTPProperty));
+    }
+
+    for (int i = 0; i < numProperties; i++) {
+        u16 propCode = 0;
+        MMemReadU16LE(&r.memIo, &propCode);
+
+        PTPProperty *property = NULL;
+        if (incremental) {
+            property = PTPControl_GetProperty(self, propCode);
+        }
+        if (!property) {
+            property = MArrayAddPtr(self->properties);
+            property->propCode = propCode;
+        }
+
+        MMemReadU16LE(&r.memIo, &property->dataType);
+        MMemReadU8(&r.memIo, &property->getSet);
+        MMemReadU8(&r.memIo, &property->isEnabled);
+
+        ReadPropertyValue(&r.memIo, property->dataType, &property->defaultValue);
+        ReadPropertyValue(&r.memIo, property->dataType, &property->value);
+
+        MMemReadU8(&r.memIo, &property->formFlag);
+
+        if (property->formFlag == PTP_FORM_FLAG_ENUM) {
+            u16 numEnumSet = 0;
+            MMemReadU16LE(&r.memIo, &numEnumSet);
+            MArrayInit(property->form.enums.set, numEnumSet);
+            for (int j = 0; j < numEnumSet; j++) {
+                PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
+                ReadPropertyValue(&r.memIo, property->dataType, value);
+            }
+            u16 numEnumGetSet = 0;
+            MMemReadU16LE(&r.memIo, &numEnumGetSet);
+            MArrayInit(property->form.enums.getSet, numEnumGetSet);
+            for (int j = 0; j < numEnumGetSet; j++) {
+                PTPPropValue* value = MArrayAddPtr(property->form.enums.getSet);
+                ReadPropertyValue(&r.memIo, property->dataType, value);
+            }
+        } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
+            ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.min);
+            ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.max);
+            ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.step);
+        }
+    }
+}
+
+static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
+    PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
+    if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
+        req.Params[0] = incremental ? 0x1 : 0x0;
+        req.Params[1] = addExtended ? 0x1 : 0x0;
+        req.NumParams = 2;
+    } else {
+        req.NumParams = 0;
+    }
+
+    PTPResponse r = SendReq(self, &req);
+    RETURN_IF_FAIL(r);
+
+    u64 numProperties = 0;
+    MMemReadU64LE(&r.memIo, &numProperties);
+
+    if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
+        SDIO_ProcessDeviceProperties200(self, incremental, r, numProperties);
+    } else {
+        SDIO_ProcessDeviceProperties300(self, incremental, r, numProperties);
     }
 
     return r.result;
@@ -1866,19 +1892,23 @@ PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
 }
 
 PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
-    PTP_INFO("PTPControl_GetCapturedImage");
+    PTP_TRACE("PTPControl_GetCapturedImage");
     PTPObjectInfo objectInfo = {};
     PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
     if (r != PTP_OK) {
         return r;
     }
+    PTP_DEBUG_F("Downloading image... (%s format: %s size: %d)", objectInfo.filename.str,
+        PTP_GetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
     ciiOut->filename = objectInfo.filename;
     ciiOut->objectFormat = objectInfo.objectFormat;
     ciiOut->size = objectInfo.objectCompressedSize;
-    objectInfo.filename.str = NULL;
+    objectInfo.filename.str = NULL; // Pass filename ownership to ciiOut
     objectInfo.filename.size = 0;
-    Ptp_FreeObjectInfo(&objectInfo);
-    return PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
+    Ptp_FreeObjectInfo(&objectInfo); // Free any other strings
+    r = PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
+    PTP_DEBUG_F("Downloaded image size: %d", fileOut->size);
+    return r;
 }
 
 PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
@@ -1919,6 +1949,54 @@ PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device) {
     self->deviceTransport = &device->transport;
     self->logger = device->logger;
     return PTP_OK;
+}
+
+static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
+    for (int i = 0; i < numControls; i++) {
+        u16 controlCode = self->supportedControls[i];
+        PtpControl* control = PTPControl_GetControl(self, controlCode);
+        if (!control) {
+            control = MArrayAddPtr(self->controls);
+
+            b32 found = FALSE;
+            size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+            for (int j = 0; j < numControlsMeta; j++) {
+                PtpControl *meta = sPtpControlsMetadata + j;
+                if (meta->controlCode == controlCode) {
+                    memcpy(control, meta, sizeof(PtpControl));
+                    found = TRUE;
+                    break;
+                }
+            }
+            if (!found) {
+                memset(control, 0, sizeof(PtpControl));
+                control->controlCode = controlCode;
+            }
+        }
+    }
+}
+
+static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
+    MArrayInit(self->controls, numControls);
+    for (int i = 0; i < numControls; i++) {
+        u16 controlCode = self->supportedControls[i];
+
+        PtpControl* control = MArrayAddPtr(self->controls);
+        b32 found = FALSE;
+        size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+        for (int j = 0; j < numControlsMeta; j++) {
+            PtpControl* meta = sPtpControlsMetadata + j;
+            if (meta->controlCode == controlCode) {
+                memcpy(control, meta, sizeof(PtpControl));
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found) {
+            memset(control, 0, sizeof(PtpControl));
+            control->controlCode = controlCode;
+        }
+    }
 }
 
 PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
@@ -1979,49 +2057,9 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     size_t numControls = MArraySize(self->supportedControls);
     PTP_INFO_F("Connected to device (protocol: %d).", self->protocolVersion);
     if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
-        for (int i = 0; i < numControls; i++) {
-            u16 controlCode = self->supportedControls[i];
-            PtpControl* control = PTPControl_GetControl(self, controlCode);
-            if (!control) {
-                control = MArrayAddPtr(self->controls);
-
-                b32 found = FALSE;
-                size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
-                for (int j = 0; j < numControlsMeta; j++) {
-                    PtpControl *meta = sPtpControlsMetadata + j;
-                    if (meta->controlCode == controlCode) {
-                        memcpy(control, meta, sizeof(PtpControl));
-                        found = TRUE;
-                        break;
-                    }
-                }
-                if (!found) {
-                    memset(control, 0, sizeof(PtpControl));
-                    control->controlCode = controlCode;
-                }
-            }
-        }
+        SDIO_InitControlsMetadata200(self, numControls);
     } else {
-        MArrayInit(self->controls, numControls);
-        for (int i = 0; i < numControls; i++) {
-            u16 controlCode = self->supportedControls[i];
-
-            PtpControl* control = MArrayAddPtr(self->controls);
-            b32 found = FALSE;
-            size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
-            for (int j = 0; j < numControlsMeta; j++) {
-                PtpControl* meta = sPtpControlsMetadata + j;
-                if (meta->controlCode == controlCode) {
-                    memcpy(control, meta, sizeof(PtpControl));
-                    found = TRUE;
-                    break;
-                }
-            }
-            if (!found) {
-                memset(control, 0, sizeof(PtpControl));
-                control->controlCode = controlCode;
-            }
-        }
+        SDIO_InitControlsMetadata300(self, numControls);
     }
 
     return PTP_OK;
@@ -4103,6 +4141,9 @@ b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PTPPropVa
 
 b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MStr* strOut) {
     PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+    if (property == NULL) {
+        return FALSE;
+    }
     char* str = NULL;
     for (int i = 0; i < MStaticArraySize(sPropertyMetadata); i++) {
         PropertyMetadata* meta = sPropertyMetadata + i;
@@ -4142,7 +4183,7 @@ PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PTPPropValu
     }
     PTPResult r = SDIO_SetExtDevicePropValue(self, propertyCode, property->dataType, value);
     if (r == PTP_OK) {
-        property->value = value; // TODO : Copy func so we dont steal string
+        property->value = value; // TODO : Copy func so we dont steal string ptr
     }
     return r;
 }
@@ -4160,11 +4201,26 @@ b32 PTPControl_SetPropertyU64(PTPControl* self, u16 propertyCode, u64 value) {
 }
 
 b32 PTPControl_SetPropertyStr(PTPControl* self, u16 propertyCode, MStr value) {
+    // Set from string directly
     return FALSE;
 }
 
 b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value) {
+    // Parse string
     return FALSE;
+}
+
+b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch) {
+    PTP_TRACE_F("PTPControl_SetPropertyNotch(%x, %d)", propertyCode, notch);
+    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+    if (!property) {
+        return PTP_GENERAL_ERROR;
+    }
+    if (!property->isNotch) {
+        PTP_ERROR_F("Property %d is not a notch property", propertyCode);
+        return PTP_GENERAL_ERROR;
+    }
+    return SDIO_ControlDevice(self, propertyCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
 }
 
 PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode) {

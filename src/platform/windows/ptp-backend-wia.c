@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <wia.h>
 
+#include "win-utils.h"
+
 typedef MSTRUCTPACKED(struct sWiaPtpRequest {
     u16 OpCode;
     u32 SessionId;
@@ -33,57 +35,11 @@ typedef MSTRUCTPACKED(struct sWiaPtpResponse {
 #define ESCAPE_PTP_VENDOR_COMMAND 0x0100
 #define ESCAPE_PTP_CLEAR_STALLS   0x0200
 
-// Helper function to convert BSTR to UTF-8
-static MStr BSTRToUTF8(BSTR bstr) {
-    MStr r = {};
-    if (!bstr) {
-        return r;
-    }
-
-    // Get required buffer size
-    int len = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, NULL, 0, NULL, NULL);
-    if (len == 0) {
-        return r;
-    }
-
-    // Allocate buffer and convert
-    MStrInit(r, len);
-    if (!r.str) {
-        return r;
-    }
-
-    int bytesWritten = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, r.str, len, NULL, NULL);
-    if (bytesWritten == 0) {
-        DWORD err = GetLastError();
-        switch (err) {
-            case ERROR_INSUFFICIENT_BUFFER:
-                MLogf("WideCharToMultiByte: ERROR_INSUFFICIENT_BUFFER");
-                break;
-            case ERROR_INVALID_FLAGS:
-                MLogf("WideCharToMultiByte: ERROR_INVALID_FLAGS");
-                break;
-            case ERROR_INVALID_PARAMETER:
-                MLogf("WideCharToMultiByte: ERROR_INVALID_PARAMETER");
-                break;
-            case ERROR_NO_UNICODE_TRANSLATION:
-                MLogf("WideCharToMultiByte: ERROR_NO_UNICODE_TRANSLATION");
-                break;
-            default:
-                MLogf("WideCharToMultiByte: %x", err);
-                break;
-        }
-        MStrFree(r);
-        return r;
-    }
-
-    return r;
-}
-
 static void PrintComPropertyValue(PROPVARIANT* pValue) {
     MStr utf8Str;
     switch (pValue->vt) {
         case VT_BSTR:
-            utf8Str = BSTRToUTF8(pValue->bstrVal);
+            utf8Str = WinUtils_BSTRToUTF8(pValue->bstrVal);
             if (utf8Str.str) {
                 MLogf("String: %s\n", utf8Str.str);
                 MStrFree(utf8Str);
@@ -333,8 +289,8 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         WiaDeviceInfo* wiaDeviceInfo = MArrayAddPtr(self->devices);
         PTPDeviceInfo* deviceInfo = MArrayAddPtr(*deviceList);
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
-        deviceInfo->manufacturer = BSTRToUTF8(propVar[1].bstrVal);
-        deviceInfo->deviceName = BSTRToUTF8(propVar[2].bstrVal);
+        deviceInfo->manufacturer = WinUtils_BSTRToUTF8(propVar[1].bstrVal);
+        deviceInfo->deviceName = WinUtils_BSTRToUTF8(propVar[2].bstrVal);
         deviceInfo->backendType = PTP_BACKEND_WIA;
         deviceInfo->device = wiaDeviceInfo;
 

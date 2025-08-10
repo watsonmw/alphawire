@@ -24,9 +24,9 @@ void default_free(void* alloc, void* mem, size_t size) {
 }
 
 static MAllocator sClibMAllocator = {
-        default_malloc,
-        default_realloc,
-        default_free
+    default_malloc,
+    default_realloc,
+    default_free
 };
 
 void MMemUseClibAllocator() {

@@ -9,8 +9,8 @@
 // - memory/file reading / writing framework
 // - ini reading
 //
-// You might want check out STB libs and GCC heap debug options before using this, this is just my personal version that
-// integrates custom heap debugging/tracking with a custom stb style array.
+// You might want to check out STB libs and GCC heap debug options before using this, this is just my personal version
+// that integrates custom heap debugging/tracking with a custom stb style array.
 //
 #include <stdio.h>
 #include <string.h>
@@ -45,10 +45,10 @@ typedef unsigned long long u64;
 #define FALSE 0
 #endif
 
-// Mark function as internal (used to distinguish between variables that are static)
+// Mark a function as internal (used to distinguish between variables that are static)
 #define MINTERNAL static
 
-// Mark function as internal and hint to compiler to make it inline (typically gcc will already once marked
+// Mark a function as internal and hint to compiler to make it inline (typically gcc will already once marked
 // internal, if appropriate, without having to add 'inline')
 #define MINLINE static inline
 
@@ -61,6 +61,12 @@ extern "C" {
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
+#ifdef _MSC_VER
+#define M_TYPEOF(a) __typeof__(a)
+#else
+#define M_TYPEOF(a) typeof(a)
+#endif
+
 //////////////////////////////////////////////////////////
 // Memory allocation
 // As an alternative GCC has good compile time options for similar checks
@@ -69,7 +75,7 @@ typedef void* (*M_malloc_t)(void* alloc, size_t size);
 typedef void* (*M_realloc_t)(void* alloc, void* mem, size_t oldSize, size_t newSize);
 typedef void (*M_free_t)(void* alloc, void* mem, size_t size);
 
-typedef struct sMAllocator {
+typedef struct {
     M_malloc_t mallocFunc;
     M_realloc_t reallocFunc;
     M_free_t freeFunc;
@@ -131,60 +137,60 @@ void M_Free(MDEBUG_SOURCE_DEFINE void* p, size_t size);
 // 16 flip: ((t & 0xff) << 8) + ((t >> 8) & 0xff)
 // 32 flip: ((t & 0xff) << 24) + ((t >> 24) & 0xff) + ((t >> 16 & 0xff) << 8) + (((t >> 8) & 0xff) << 16);
 #ifdef __GNUC__
-#define MSTRUCTPACKED(...) __VA_ARGS__ __attribute__((packed))
-#ifdef AMIGA
-#define MBIGENDIAN 1
-#define MBIGENDIAN16(x) x
-#define MBIGENDIAN32(x) x
-#define MBIGENDIAN64(x) x
-#define MLITTLEENDIAN16(x) __builtin_bswap16(x)
-#define MLITTLEENDIAN32(x) __builtin_bswap32(x)
-#define MLITTLEENDIAN64(x) __builtin_bswap64(x)
-#define MENDIANSWAP16(x) __builtin_bswap16(x)
-#define MENDIANSWAP32(x) __builtin_bswap32(x)
-#define MENDIANSWAP64(x) __builtin_bswap64(x)
-#else
-#define MLITTLEENDIAN 1
-#define MBIGENDIAN16(x) __builtin_bswap16(x)
-#define MBIGENDIAN32(x) __builtin_bswap32(x)
-#define MBIGENDIAN64(x) __builtin_bswap64(x)
-#define MLITTLEENDIAN16(x) x
-#define MLITTLEENDIAN32(x) x
-#define MLITTLEENDIAN64(x) x
-#define MENDIANSWAP16(x) __builtin_bswap16(x)
-#define MENDIANSWAP32(x) __builtin_bswap32(x)
-#define MENDIANSWAP64(x) __builtin_bswap64(x)
-#endif
+    #define MSTRUCTPACKED(...) __VA_ARGS__ __attribute__((packed))
+    #ifdef AMIGA
+        #define MBIGENDIAN 1
+        #define MBIGENDIAN16(x) x
+        #define MBIGENDIAN32(x) x
+        #define MBIGENDIAN64(x) x
+        #define MLITTLEENDIAN16(x) __builtin_bswap16(x)
+        #define MLITTLEENDIAN32(x) __builtin_bswap32(x)
+        #define MLITTLEENDIAN64(x) __builtin_bswap64(x)
+        #define MENDIANSWAP16(x) __builtin_bswap16(x)
+        #define MENDIANSWAP32(x) __builtin_bswap32(x)
+        #define MENDIANSWAP64(x) __builtin_bswap64(x)
+    #else
+        #define MLITTLEENDIAN 1
+        #define MBIGENDIAN16(x) __builtin_bswap16(x)
+        #define MBIGENDIAN32(x) __builtin_bswap32(x)
+        #define MBIGENDIAN64(x) __builtin_bswap64(x)
+        #define MLITTLEENDIAN16(x) x
+        #define MLITTLEENDIAN32(x) x
+        #define MLITTLEENDIAN64(x) x
+        #define MENDIANSWAP16(x) __builtin_bswap16(x)
+        #define MENDIANSWAP32(x) __builtin_bswap32(x)
+        #define MENDIANSWAP64(x) __builtin_bswap64(x)
+    #endif
 #elif defined(_MSC_VER)
-#define MLITTLEENDIAN 1
-#define MSTRUCTPACKED(...) \
-    __pragma(pack(push, 1)) \
-    __VA_ARGS__ \
-    __pragma(pack(pop))
-#define MBIGENDIAN16(x) _byteswap_ushort(x)
-#define MBIGENDIAN32(x) _byteswap_ulong(x)
-#define MBIGENDIAN64(x) _byteswap_uint64(x)
-#define MLITTLEENDIAN16(x) x
-#define MLITTLEENDIAN32(x) x
-#define MLITTLEENDIAN64(x) x
-#define MENDIANSWAP16(x) _byteswap_ushort(x)
-#define MENDIANSWAP32(x) _byteswap_ulong(x)
-#define MENDIANSWAP64(x) _byteswap_uint64(x)
+    #define MLITTLEENDIAN 1
+    #define MSTRUCTPACKED(...) \
+        __pragma(pack(push, 1)) \
+        __VA_ARGS__ \
+        __pragma(pack(pop))
+    #define MBIGENDIAN16(x) _byteswap_ushort(x)
+    #define MBIGENDIAN32(x) _byteswap_ulong(x)
+    #define MBIGENDIAN64(x) _byteswap_uint64(x)
+    #define MLITTLEENDIAN16(x) x
+    #define MLITTLEENDIAN32(x) x
+    #define MLITTLEENDIAN64(x) x
+    #define MENDIANSWAP16(x) _byteswap_ushort(x)
+    #define MENDIANSWAP32(x) _byteswap_ulong(x)
+    #define MENDIANSWAP64(x) _byteswap_uint64(x)
 #else
-#define MBIGENDIAN 1
-#define MSTRUCTPACKED(...) __VA_ARGS__
-#define MBIGENDIAN16(x) x
-#define MBIGENDIAN32(x) x
-#define MBIGENDIAN64(x) x
-#define MENDIANSWAP16(t) (((t & 0xff) << 8) + ((t >> 8) & 0xff))
-#define MENDIANSWAP32(t) (((t & 0xff) << 24) + ((t >> 24) & 0xff) + ((t >> 16 & 0xff) << 8) + (((t >> 8) & 0xff) << 16))
-#define MENDIANSWAP64(t) (((t & 0xff) << 56) + ((t >> 8 & 0xff) << 48) + \
-    (((t >> 16) & 0xff) << 40) + (((t >> 24) & 0xff) << 32) + \
-    (((t >> 32) & 0xff) << 24) + (((t >> 40) & 0xff) << 16) + \
-    ((t >> 56) & 0xff))
-#define MLITTLEENDIAN16(t) MENDIANSWAP16(t)
-#define MLITTLEENDIAN32(t) MENDIANSWAP32(t)
-#define MLITTLEENDIAN64(t) MENDIANSWAP64(t)
+    #define MBIGENDIAN 1
+    #define MSTRUCTPACKED(...) __VA_ARGS__
+    #define MBIGENDIAN16(x) x
+    #define MBIGENDIAN32(x) x
+    #define MBIGENDIAN64(x) x
+    #define MENDIANSWAP16(t) (((t & 0xff) << 8) + ((t >> 8) & 0xff))
+    #define MENDIANSWAP32(t) (((t & 0xff) << 24) + ((t >> 24) & 0xff) + ((t >> 16 & 0xff) << 8) + (((t >> 8) & 0xff) << 16))
+    #define MENDIANSWAP64(t) (((t & 0xff) << 56) + ((t >> 8 & 0xff) << 48) + \
+        (((t >> 16) & 0xff) << 40) + (((t >> 24) & 0xff) << 32) + \
+        (((t >> 32) & 0xff) << 24) + (((t >> 40) & 0xff) << 16) + \
+        ((t >> 56) & 0xff))
+    #define MLITTLEENDIAN16(t) MENDIANSWAP16(t)
+    #define MLITTLEENDIAN32(t) MENDIANSWAP32(t)
+    #define MLITTLEENDIAN64(t) MENDIANSWAP64(t)
 #endif
 
 /////////////////////////////////////////////////////////
@@ -195,31 +201,33 @@ void MLogfNoNewLine(const char *format, ...);
 void MLog(const char *str);
 void MLogBytes(const u8* mem, u32 len);
 
-// Log / trigger debugger
+// Log & trigger debugger
 #ifdef M_ASSERT
-#ifdef __GNUC__
-#if defined(__i386__) || defined(__x86_64)
-#define MBreakpoint(str) { MLog(str); asm("int $3"); }
-#define MBreakpointf(str, ...) { MLogf(str, __VA_ARGS__); asm("int $3"); }
-#define MAssert(cond, str) { if (!(cond)) { MLog(str); asm("int $3"); } }
-#define MAssertf(cond, str, ...)  { if (!(cond)) { MLogf(str, __VA_ARGS__); asm("int $3"); } }
+    #if defined(__GNUC__)
+        #if defined(__clang__)
+            #define M_DEBUGGER_TRAP() __builtin_debugtrap()
+        #else
+            #if defined(__i386__) || defined(__x86_64)
+                #define M_DEBUGGER_TRAP() __asm__ volatile("int $3")
+            #elif defined(__arm__) || defined(__aarch64__)
+                #define M_DEBUGGER_TRAP() __asm__ volatile("bkpt #0")
+            #endif
+        #endif
+    #elif defined(_MSC_VER)
+        #define M_DEBUGGER_TRAP() __debugbreak()
+    #endif
+    #ifndef M_DEBUGGER_TRAP
+        #define M_DEBUGGER_TRAP() ((void)0)
+    #endif
+    #define MBreakpoint(str) { MLog(str); M_DEBUGGER_TRAP(); }
+    #define MBreakpointf(str, ...) { MLogf(str, __VA_ARGS__); M_DEBUGGER_TRAP(); }
+    #define MAssert(cond, str) { if (!(cond)) { MLog(str); M_DEBUGGER_TRAP(); } }
+    #define MAssertf(cond, str, ...) { if (!(cond)) { MLogf(str, __VA_ARGS__); M_DEBUGGER_TRAP(); } }
 #else
-#define MBreakpoint(str) MLog(str)
-#define MBreakpointf(str, ...) MLogf(str, __VA_ARGS__)
-#define MAssert(cond, str) { if (!(cond)) { MLog(str); } }
-#define MAssertf(cond, str, ...)  { if (!(cond)) { MLogf(str, __VA_ARGS__); } }
-#endif
-#elif defined(_MSC_VER)
-#define MBreakpoint(str) { MLog(str); __debugbreak(); }
-#define MBreakpointf(str, ...) { MLogf(str, __VA_ARGS__); __debugbreak(); }
-#define MAssert(cond, str) { if (!(cond)) { MLog(str); __debugbreak(); } }
-#define MAssertf(cond, str, ...)  { if (!(cond)) { MLogf(str, __VA_ARGS__); __debugbreak(); } }
-#endif
-#else
-#define MBreakpoint(str)
-#define MBreakpointf(str, ...)
-#define MAssert(cond, str)
-#define MAssertf(cond, str, ...)
+    #define MBreakpoint(str)
+    #define MBreakpointf(str, ...)
+    #define MAssert(cond, str)
+    #define MAssertf(cond, str, ...)
 #endif
 
 // Quote the given #define contents, this is useful to print out the contents of a macro / #define.
@@ -406,12 +414,6 @@ typedef struct {
 
 #define MArrayEach(a, i) for (size_t i = 0; (i) < MArraySize(a); ++(i))
 
-#ifdef _MSC_VER
-#define M_TYPEOF(a) __typeof__(a)
-#else
-#define M_TYPEOF(a) typeof(a)
-#endif
-
 #define MArrayEachPtr(a, it) for (struct {M_TYPEOF(a) p; size_t i;} (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), (it).p = (a) + ((it).i))
 
 #define M_ArrayHeader(a) ((MArrayHeader*)(a) - 1)
@@ -420,7 +422,7 @@ typedef struct {
 #define M_ArrayUnpack(a) (a), sizeof *(a)
 
 // Grow array to have enough space for at least minNeeded elements
-// If it fails (OOM), the array will be deleted, a.p will be NULL and the functions returns 0;
+// If it fails (OOM), the array will be deleted, a.p will be NULL and the function returns 0
 // else (on success) it returns 1
 void* M_ArrayInit(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize, size_t minNeeded);
 void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE void* a, MArrayHeader* p, size_t elementSize, size_t minNeeded);
