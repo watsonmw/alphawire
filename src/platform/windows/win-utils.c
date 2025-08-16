@@ -38,7 +38,7 @@ b32 WinUtils_GetLastErrorAsStr(char* buffer, size_t bufferSize)
     }
 }
 
-void sWinUtils_LogLastError(PTPLog* logger, const char* mesg) {
+void WinUtils_LogLastError(PTPLog* logger, const char* mesg) {
     if (WinUtils_GetLastErrorAsStr(logger->msgBuffer, sizeof(logger->msgBuffer))) {
         PTP_LOG_ERROR_F(logger, "%s: %s (0x%08x)", mesg, logger->msgBuffer, GetLastError());
     } else {
@@ -48,25 +48,30 @@ void sWinUtils_LogLastError(PTPLog* logger, const char* mesg) {
 
 
 // Helper function to convert BSTR to UTF-8
-MStr WinUtils_BSTRToUTF8(BSTR bstr) {
+MStr WinUtils_BSTRToUTF8(MAllocator* allocator, BSTR bstr) {
+    return WinUtils_BSTRWithSizeToUTF8(allocator, bstr, -1);
+}
+
+// Helper function to convert BSTR to UTF-8
+MStr WinUtils_BSTRWithSizeToUTF8(MAllocator* allocator, BSTR bstr, i32 size) {
     MStr r = {};
     if (!bstr) {
         return r;
     }
 
     // Get required buffer size
-    int len = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, NULL, 0, NULL, NULL);
+    int len = WideCharToMultiByte(CP_UTF8, 0, bstr, size, NULL, 0, NULL, NULL);
     if (len == 0) {
         return r;
     }
 
     // Allocate buffer and convert
-    MStrInit(r, len);
+    MStrInit(allocator, r, len);
     if (!r.str) {
         return r;
     }
 
-    int bytesWritten = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, r.str, len, NULL, NULL);
+    int bytesWritten = WideCharToMultiByte(CP_UTF8, 0, bstr, size, r.str, len, NULL, NULL);
     if (bytesWritten == 0) {
         DWORD err = GetLastError();
         switch (err) {
@@ -86,8 +91,12 @@ MStr WinUtils_BSTRToUTF8(BSTR bstr) {
                 MLogf("WideCharToMultiByte: %x", err);
                 break;
         }
-        MStrFree(r);
+        MStrFree(allocator, r);
         return r;
+    }
+
+    if (size >= 0) {
+        r.str[len-1] = '\0';
     }
 
     return r;

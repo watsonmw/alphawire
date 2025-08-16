@@ -2,10 +2,8 @@
 
 #include <stdio.h>
 
-MReadFileRet MFileReadWithOffset(const char* filePath, u32 offset, u32 readSize) {
-    MReadFileRet ret;
-    ret.size = 0;
-    ret.data = NULL;
+MReadFileRet MFileReadWithOffset(MAllocator* allocator, const char* filePath, u32 offset, u32 readSize) {
+    MReadFileRet ret = {};
 
     FILE *file = fopen(filePath, "rb");
     if (file == NULL) {
@@ -19,11 +17,7 @@ MReadFileRet MFileReadWithOffset(const char* filePath, u32 offset, u32 readSize)
         fseek(file, 0L, SEEK_SET);
     }
 
-    if (size == 0) {
-        return ret;
-    }
-
-    ret.data = (u8*)MMalloc(size);
+    ret.data = (u8*)MMalloc(allocator, size);
 
     if (offset) {
         fseek(file, offset, SEEK_SET);
@@ -38,7 +32,7 @@ MReadFileRet MFileReadWithOffset(const char* filePath, u32 offset, u32 readSize)
 }
 
 MFile MFileWriteOpen(const char* filePath) {
-    MFile fileData;
+    MFile fileData = {};
 
     FILE *file = fopen(filePath, "wb");
     if (file == NULL) {

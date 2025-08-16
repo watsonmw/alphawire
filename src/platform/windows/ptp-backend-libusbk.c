@@ -50,7 +50,7 @@ b32 PTPUsbkDeviceList_Close(PTPUsbkDeviceList* self) {
     PTP_TRACE("PTPUsbkDeviceList_Close");
     PTPUsbkDeviceList_ReleaseList(self);
     if (self->openDevices) {
-        MArrayFree(self->openDevices);
+        MArrayFree(self->allocator, self->openDevices);
     }
     return TRUE;
 }
@@ -90,7 +90,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHa
     // Allocate buffer for the entire configuration descriptor
     UCHAR *configBuffer = NULL;
     UINT descriptorLength = configDesc.wTotalLength;
-    configBuffer = (UCHAR *) MMalloc(descriptorLength);
+    configBuffer = (UCHAR *) MMalloc(self->allocator, descriptorLength);
     if (!configBuffer) {
         CloseHandle(overlapped.hEvent);
         PTP_ERROR("Memory allocation failed");
@@ -108,7 +108,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHa
                             descriptorLength,
                             &transferred)) {
         if (GetLastError() != ERROR_IO_PENDING) {
-            MFree(configBuffer, descriptorLength);
+            MFree(self->allocator, configBuffer, descriptorLength);
             CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger, "Error getting full configuration descriptor");
             return FALSE;
@@ -116,7 +116,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHa
 
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
             !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
-            MFree(configBuffer, descriptorLength);
+            MFree(self->allocator, configBuffer, descriptorLength);
             CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger, "Overlapped I/O failed for full configuration");
             return FALSE;
@@ -146,7 +146,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHa
     }
 
     CloseHandle(overlapped.hEvent);
-    MFree(configBuffer, descriptorLength);
+    MFree(self->allocator, configBuffer, descriptorLength);
     return hasPTP;
 }
 
@@ -208,7 +208,7 @@ b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMi
             if (event->length > headerSize) {
                 size_t payloadSize = event->length - headerSize;
                 MMemIO memIO;
-                MMemReadInit(&memIO, eventBuffer + headerSize, payloadSize);
+                MMemInitRead(&memIO, eventBuffer + headerSize, payloadSize);
                 memset(outEvent, 0, sizeof(PTPEvent));
                 outEvent->code = event->code;
                 MMemReadU32BE(&memIO, &outEvent->param1);
@@ -263,7 +263,7 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
 
                 if (deviceDescriptor.iProduct > 0) {  // Check if product string exists
                     UINT transferLength = 0;
-                    UCHAR stringDescriptor[256];
+                    UCHAR stringDescriptor[256] = {};
                     if (UsbK_GetDescriptor(usbHandle,
                                            USB_DESCRIPTOR_TYPE_STRING,
                                            deviceDescriptor.iProduct,  // Index from device descriptor
@@ -273,17 +273,17 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                                            &transferLength) && transferLength >= 2) {
 
                         // Convert the USB string descriptor to a printable string, USB string descriptors are UTF-16LE
-                        // First byte is the length, second byte is the descriptor type,
-                        // actual string starts at offset 2
+                        // First byte is the length, second byte is the descriptor type, actual string starts at offset 2
+                        i32 length = *((u8*)&stringDescriptor);
                         WCHAR* wideString = (WCHAR*)(&stringDescriptor[2]);
 
-                        UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->devices);
-                        PTPDeviceInfo* device = MArrayAddPtr(*devices);
+                        UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->allocator, self->devices);
+                        PTPDeviceInfo* device = MArrayAddPtr(self->allocator, *devices);
                         usbkDevice->deviceId = deviceInfo;
-                        device->manufacturer = MStrMake(deviceInfo->Mfg);
+                        device->manufacturer = MStrMake(self->allocator, deviceInfo->Mfg);
                         device->backendType = PTP_BACKEND_LIBUSBK;
                         device->device = usbkDevice;
-                        device->deviceName = WinUtils_BSTRToUTF8(wideString);
+                        device->deviceName = WinUtils_BSTRWithSizeToUTF8(self->allocator, wideString, length/2);
 
                         PTP_INFO_F("Found device: %s (%s)", device->deviceName.str, device->manufacturer.str);
                     } else {
@@ -316,37 +316,39 @@ void PTPUsbkDeviceList_ReleaseList(PTPUsbkDeviceList* self) {
             UsbkDeviceInfo* deviceInfo = self->devices + i;
             deviceInfo->deviceId = NULL;
         }
-        MArrayFree(self->devices);
+        MArrayFree(self->allocator, self->devices);
     }
 }
 
-void* PTPDeviceUsbk_ReallocBuffer(void* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+void* PTPDeviceUsbk_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+    PTPDevice* self = (PTPDevice*)deviceSelf;
     size_t headerSize = sizeof(PTPContainerHeader);
-
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
         u8* mem = ((u8*)dataMem)-headerSize;
-        MFree(mem, dataOldSize + headerSize); dataMem = NULL;
+        MFree(self->transport.allocator, mem, dataOldSize + headerSize); dataMem = NULL;
     }
-    dataMem = MMalloc(dataSize);
+    dataMem = MMalloc(self->transport.allocator, dataSize);
     memset(dataMem, 0, dataSize);
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceUsbk_FreeBuffer(void* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
+void PTPDeviceUsbk_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize) {
+    PTPDevice* self = (PTPDevice*)deviceSelf;
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
         u8* mem = ((u8*)dataMem)-headerSize;
-        MFree(mem, dataSize); dataMem = NULL;
+        MFree(self->transport.allocator, mem, dataSize); dataMem = NULL;
     }
 }
 
 PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
                                     PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                     size_t* actualDataOutSize) {
-    PTPDeviceUsbk* self = (PTPDeviceUsbk*)((PTPDevice*)deviceSelf)->device;
-    KUSB_HANDLE usbHandle = self->usbHandle;
+    PTPDevice* self = (PTPDevice*)deviceSelf;
+    PTPDeviceUsbk* deviceUsbk = self->device;
+    KUSB_HANDLE usbHandle = deviceUsbk->usbHandle;
     OVERLAPPED overlapped = {0};
     BOOL result;
     DWORD waitResult;
@@ -373,17 +375,17 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
 
     // 1. Send request header packet (with params)
     u32 transferred = 0;
-    result = UsbK_WritePipe(usbHandle, self->usbBulkOut, (PUCHAR)requestData, requestSize,
+    result = UsbK_WritePipe(usbHandle, deviceUsbk->usbBulkOut, (PUCHAR)requestData, requestSize,
                             &transferred, &overlapped);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
         CloseHandle(overlapped.hEvent);
-        WinUtils_LogLastError(&self->logger, "Failed to send PTP request");
+        WinUtils_LogLastError(&deviceUsbk->logger, "Failed to send PTP request");
         return PTP_GENERAL_ERROR;
     }
 
-    waitResult = WaitForSingleObject(overlapped.hEvent, self->timeoutMilliseconds);
+    waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
     if (waitResult != WAIT_OBJECT_0) {
-        UsbK_AbortPipe(usbHandle, self->usbBulkOut);
+        UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
         CloseHandle(overlapped.hEvent);
         PTP_ERROR("Timeout or error while sending PTP request");
         return PTP_GENERAL_ERROR;
@@ -399,7 +401,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
         requestData->code = request->OpCode;
         requestData->transactionId = request->TransactionId;
 
-        result = UsbK_WritePipe(usbHandle, self->usbBulkOut, (PUCHAR)requestData, requestSize,
+        result = UsbK_WritePipe(usbHandle, deviceUsbk->usbBulkOut, (PUCHAR)requestData, requestSize,
                                 &transferred, &overlapped);
         if (!result && GetLastError() != ERROR_IO_PENDING) {
             CloseHandle(overlapped.hEvent);
@@ -407,9 +409,9 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
             return PTP_GENERAL_ERROR;
         }
 
-        waitResult = WaitForSingleObject(overlapped.hEvent, self->timeoutMilliseconds);
+        waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
         if (waitResult != WAIT_OBJECT_0) {
-            UsbK_AbortPipe(usbHandle, self->usbBulkOut);
+            UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
             CloseHandle(overlapped.hEvent);
             PTP_ERROR("Timeout or error while sending PTP data");
             return PTP_GENERAL_ERROR;
@@ -420,7 +422,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
     ResetEvent(overlapped.hEvent);
     u32 actual = 0;
     PTPContainerHeader* responseHeader = (PTPContainerHeader*)(((u8*)dataOut) - sizeof(PTPContainerHeader));
-    result = UsbK_ReadPipe(usbHandle, self->usbBulkIn, (PUCHAR)responseHeader,
+    result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
                           sizeof(PTPContainerHeader) + dataOutSize, &actual, &overlapped);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
         CloseHandle(overlapped.hEvent);
@@ -428,9 +430,9 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
         return PTP_GENERAL_ERROR;
     }
 
-    waitResult = WaitForSingleObject(overlapped.hEvent, self->timeoutMilliseconds);
+    waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
     if (waitResult != WAIT_OBJECT_0) {
-        UsbK_AbortPipe(usbHandle, self->usbBulkIn);
+        UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
         CloseHandle(overlapped.hEvent);
         PTP_ERROR("Timeout or error while reading PTP response");
         return PTP_GENERAL_ERROR;
@@ -450,7 +452,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
         while (actual < payloadLength) {
             ResetEvent(overlapped.hEvent);
             u32 dataTransfer = 0;
-            result = UsbK_ReadPipe(usbHandle, self->usbBulkIn, (PUCHAR)cp, payloadLength - actual,
+            result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)cp, payloadLength - actual,
                 &dataTransfer, &overlapped);
             if (!result && GetLastError() != ERROR_IO_PENDING) {
                 CloseHandle(overlapped.hEvent);
@@ -458,9 +460,9 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
                 return PTP_GENERAL_ERROR;
             }
 
-            waitResult = WaitForSingleObject(overlapped.hEvent, self->timeoutMilliseconds);
+            waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
             if (waitResult != WAIT_OBJECT_0) {
-                UsbK_AbortPipe(usbHandle, self->usbBulkIn);
+                UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
                 CloseHandle(overlapped.hEvent);
                 PTP_ERROR("Timeout or error while reading PTP response data");
                 return PTP_GENERAL_ERROR;
@@ -482,7 +484,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
         size_t responseSize = sizeof(PTPContainerHeader) + (PTP_MAX_PARAMS * sizeof(u32));
         responseHeader = alloca(responseSize);
 
-        result = UsbK_ReadPipe(usbHandle, self->usbBulkIn, (PUCHAR)responseHeader,
+        result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
                               responseSize, &actual, &overlapped);
         if (!result && GetLastError() != ERROR_IO_PENDING) {
             CloseHandle(overlapped.hEvent);
@@ -490,9 +492,9 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
             return PTP_GENERAL_ERROR;
         }
 
-        waitResult = WaitForSingleObject(overlapped.hEvent, self->timeoutMilliseconds);
+        waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
         if (waitResult != WAIT_OBJECT_0) {
-            UsbK_AbortPipe(usbHandle, self->usbBulkIn);
+            UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
             CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger,"Timeout or error while reading final PTP response");
             return PTP_GENERAL_ERROR;
@@ -513,7 +515,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
     response->TransactionId = responseHeader->transactionId;
     MMemIO memIo;
     int paramsSize = responseHeader->length - sizeof(PTPContainerHeader);
-    MMemInit(&memIo, ((u8*)responseHeader) + sizeof(PTPContainerHeader), paramsSize);
+    MMemInit(&memIo, self->transport.allocator, ((u8*)responseHeader) + sizeof(PTPContainerHeader), paramsSize);
     response->NumParams = paramsSize / sizeof(u32);
     for (int i = 0; i < response->NumParams; i++) {
         MMemReadU32BE(&memIo, response->Params + i);
@@ -556,7 +558,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle
     }
 
     // Allocate buffer for full descriptor
-    UCHAR* buffer = (UCHAR*)MMalloc(configDesc.wTotalLength);
+    UCHAR* buffer = (UCHAR*)MMalloc(self->allocator, configDesc.wTotalLength);
     if (!buffer) {
         CloseHandle(overlapped.hEvent);
         return FALSE;
@@ -573,7 +575,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle
                             configDesc.wTotalLength,
                             &transferred)) {
         if (GetLastError() != ERROR_IO_PENDING) {
-            MFree(buffer, configDesc.wTotalLength);
+            MFree(self->allocator, buffer, configDesc.wTotalLength);
             CloseHandle(overlapped.hEvent);
             return FALSE;
         }
@@ -581,7 +583,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle
         // Wait for completion or timeout
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
               !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
-            MFree(buffer, configDesc.wTotalLength);
+            MFree(self->allocator, buffer, configDesc.wTotalLength);
             CloseHandle(overlapped.hEvent);
             return FALSE;
         }
@@ -618,7 +620,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle
         ptr += common->bLength;
     }
 
-    MFree(buffer, configDesc.wTotalLength);
+    MFree(self->allocator, buffer, configDesc.wTotalLength);
     CloseHandle(overlapped.hEvent);
     return found;
 }
@@ -639,7 +641,7 @@ b32 PTPUsbkDeviceList_ConnectDevice(PTPUsbkDeviceList* self, PTPDeviceInfo* devi
         }
 
         // Store the interface pointer
-        PTPDeviceUsbk *usbkDevice = MArrayAddPtr(self->openDevices);
+        PTPDeviceUsbk *usbkDevice = MArrayAddPtr(self->allocator, self->openDevices);
         usbkDevice->deviceId = device->deviceId;
         usbkDevice->usbHandle = usbHandle;
         usbkDevice->usbBulkIn = bulkIn;
@@ -686,7 +688,7 @@ b32 PTPUsbkDeviceList_DisconnectDevice(PTPUsbkDeviceList* self, PTPDevice* devic
 b32 PTPUsbkDeviceList_Close_(PTPBackend* backend) {
     PTPUsbkDeviceList* self = backend->self;
     b32 r = PTPUsbkDeviceList_Close(self);
-    MFree(self, sizeof(PTPUsbkDeviceList));
+    MFree(self->allocator, self, sizeof(PTPUsbkDeviceList));
     return r;
 }
 
@@ -717,7 +719,7 @@ b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) 
         timeoutMilliseconds = 20000;
     }
 
-    PTPUsbkDeviceList* deviceList = MMallocZ(sizeof(PTPUsbkDeviceList));
+    PTPUsbkDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(PTPUsbkDeviceList));
     backend->self = deviceList;
     backend->close = PTPUsbkDeviceList_Close_;
     backend->refreshList = PTPUsbkDeviceList_RefreshList_;
@@ -725,6 +727,7 @@ b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) 
     backend->openDevice = PTPUsbkDeviceList_ConnectDevice_;
     backend->closeDevice = PTPUsbkDeviceList_DisconnectDevice_;
     deviceList->timeoutMilliseconds = timeoutMilliseconds;
+    deviceList->allocator = backend->allocator;
     deviceList->logger = backend->logger;
     return PTPUsbkDeviceList_Open(deviceList);
 }

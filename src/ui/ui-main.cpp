@@ -25,8 +25,10 @@
 
 // Main code
 int main(int argc, char** argv) {
+    MAllocator allocator{};
+    MAllocatorMakeClibHeap(&allocator);
 #ifdef M_MEM_DEBUG
-    MMemDebugInit();
+    MMemDebugInit(&allocator);
 #endif
 
     // Setup SDL
@@ -37,7 +39,8 @@ int main(int argc, char** argv) {
     }
 
     AppContext c;
-    PTPDeviceList_Open(&c.ptpDeviceList);
+    c.allocator = &allocator;
+    PTPDeviceList_Open(&c.ptpDeviceList, &allocator);
     PTPDeviceList_RefreshList(&c.ptpDeviceList);
 
     // Decide GL+GLSL versions
@@ -187,7 +190,7 @@ int main(int argc, char** argv) {
     c.CleanupAll();
 
 #ifdef M_MEM_DEBUG
-    MMemDebugDeinit();
+    MMemDebugDeinit(&allocator);
 #endif
 
     return 0;

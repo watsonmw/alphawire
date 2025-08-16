@@ -1,5 +1,6 @@
 ﻿#include <stddef.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include "ptp/ptp-control.h"
 #include "ptp/utf.h"
@@ -910,12 +911,12 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
     return 0;
 }
 
-void PropValueFree(PTPDataType dataType, PTPPropValue* value) {
+void PropValueFree(MAllocator* mem, PTPDataType dataType, PTPPropValue* value) {
     if (value == NULL) {
         return;
     }
     if (dataType == PTP_DT_STR) {
-        MStrFree(value->str);
+        MStrFree(mem, value->str);
     }
 }
 
@@ -942,29 +943,29 @@ typedef struct {
     MStr keywords;
 } PTPObjectInfo;
 
-void Ptp_FreeObjectInfo(PTPObjectInfo *objectInfo) {
-    MStrFree(objectInfo->filename);
-    MStrFree(objectInfo->captureDateTime);
-    MStrFree(objectInfo->modDateTime);
-    MStrFree(objectInfo->keywords);
+static void PTP_FreeObjectInfo(MAllocator* mem, PTPObjectInfo *objectInfo) {
+    MStrFree(mem, objectInfo->filename);
+    MStrFree(mem, objectInfo->captureDateTime);
+    MStrFree(mem, objectInfo->modDateTime);
+    MStrFree(mem, objectInfo->keywords);
 }
 
-void PTP_FreeLiveViewFrames(LiveViewFrames* liveViewFrames) {
-    MArrayFree(liveViewFrames->focus.frames);
-    MArrayFree(liveViewFrames->face.frames);
-    MArrayFree(liveViewFrames->tracking.frames);
+void PTP_FreeLiveViewFrames(MAllocator* mem, LiveViewFrames* liveViewFrames) {
+    MArrayFree(mem, liveViewFrames->focus.frames);
+    MArrayFree(mem, liveViewFrames->face.frames);
+    MArrayFree(mem, liveViewFrames->tracking.frames);
 }
 
-void PTP_FreePropValueEnums(PTPPropValueEnums* outEnums) {
+void PTP_FreePropValueEnums(MAllocator* mem, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(outEnums->values); ++i) {
         if (outEnums->values[i].str.size) {
-            MStrFree(outEnums->values[i].str);
+            MStrFree(mem, outEnums->values[i].str);
         }
     }
-    MArrayFree(outEnums->values);
+    MArrayFree(mem, outEnums->values);
 }
 
-static MStr ReadPtpString8(MMemIO* memIo) {
+static MStr ReadPtpString8(MAllocator* allocator, MMemIO* memIo) {
     MStr r = {};
     u8 len = 0;
     u16 buffer[256];
@@ -978,9 +979,9 @@ static MStr ReadPtpString8(MMemIO* memIo) {
 
         size_t utf8Len = UTF8_GetConvertUTF16Len(buffer, len);
         if (utf8Len) {
-            MStrInit(r, utf8Len);
+            MStrInit(allocator, r, utf8Len);
             if (UTF8_ConvertFromUTF16(buffer, len, r.str, r.size) == 0) {
-                MStrFree(r);
+                MStrFree(allocator, r);
                 return r;
             }
         }
@@ -988,18 +989,18 @@ static MStr ReadPtpString8(MMemIO* memIo) {
     return r;
 }
 
-static char* ReadPtpString16(MMemIO* memIo) {
+static char* ReadPtpString16(MAllocator* allocator, MMemIO* memIo) {
     u16 utf8Len = 0;
     MMemReadU16(memIo, &utf8Len);
     if (utf8Len) {
-        char* utf8 = MMalloc(utf8Len);
+        char* utf8 = MMalloc(memIo->allocator, utf8Len);
         MMemReadCharCopyN(memIo, utf8, utf8Len);
         return utf8;
     }
     return NULL;
 }
 
-static i32 ReadPropertyValue(MMemIO* memIo, u16 dataType, PTPPropValue* value) {
+static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, PTPPropValue* value) {
     i32 r = 0;
     switch (dataType) {
         case PTP_DT_INT8:
@@ -1051,7 +1052,7 @@ static i32 ReadPropertyValue(MMemIO* memIo, u16 dataType, PTPPropValue* value) {
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR:
-            value->str = ReadPtpString8(memIo);
+            value->str = ReadPtpString8(allocator, memIo);
             break;
         default:
             break;
@@ -1164,17 +1165,17 @@ static void PrintProperties(PTPControl* self) {
 
 void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t dataOutSize) {
     if (dataInSize > self->dataInCapacity || self->dataInMem == NULL) {
-        void* mem = self->deviceTransport->reallocBuffer(self->deviceTransport, PTP_BUFFER_IN,
-                                                         self->dataInMem, self->dataInCapacity,
-                                                         dataInSize);
+        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_IN,
+                                                          self->dataInMem, self->dataInCapacity,
+                                                          dataInSize);
         self->dataInCapacity = dataInSize;
         self->dataInMem = mem;
     }
 
     if (dataOutSize > self->dataOutCapacity || self->dataOutMem == NULL) {
-        void* mem = self->deviceTransport->reallocBuffer(self->deviceTransport, PTP_BUFFER_OUT,
-                                                         self->dataOutMem, self->dataOutCapacity,
-                                                         dataOutSize);
+        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_OUT,
+                                                          self->dataOutMem, self->dataOutCapacity,
+                                                          dataOutSize);
         self->dataOutCapacity = dataOutSize;
         self->dataOutMem = mem;
     }
@@ -1188,10 +1189,10 @@ void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t data
 }
 
 void PTPControl_FreeDataBuffers(PTPControl* self) {
-    self->deviceTransport->freeBuffer(self, PTP_BUFFER_IN, self->dataInMem, self->dataInCapacity);
+    self->device->transport.freeBuffer(self->device, PTP_BUFFER_IN, self->dataInMem, self->dataInCapacity);
     self->dataInMem = NULL;
     self->dataInCapacity = 0;
-    self->deviceTransport->freeBuffer(self, PTP_BUFFER_OUT, self->dataOutMem, self->dataOutCapacity);
+    self->device->transport.freeBuffer(self->device, PTP_BUFFER_OUT, self->dataOutMem, self->dataOutCapacity);
     self->dataOutMem = NULL;
     self->dataOutCapacity = 0;
 }
@@ -1216,11 +1217,11 @@ typedef struct {
 } PTPResponse;
 
 #define OK(a) ((a) == PTP_OK)
-#define RETURN_IF_FAIL(r) if ((r).result != PTP_OK || (r).memIo.mem == NULL || (r).memIo.size == 0) { return (r).result; }
+#define RETURN_IF_FAIL(r) if ((r).result != PTP_OK || (r).memIo.mem == NULL) { return (r).result; }
 
 static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
     size_t actualDataOutSize = 0;
-    PTPResult r = self->deviceTransport->sendAndRecvEx(self->deviceTransport,
+    PTPResult r = self->device->transport.sendAndRecvEx(self->device,
         request, self->dataInMem, self->dataInSize,
         &self->ptpResponse, self->dataOutMem, self->dataOutSize,
         &actualDataOutSize);
@@ -1233,10 +1234,9 @@ static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
     response.dataOut = &self->ptpResponse;
     response.result = response.dataOut->ResponseCode;
     if (actualDataOutSize > sizeof(PTPResponseHeader)) {
-        MMemReadInit(&response.memIo, self->dataOutMem, actualDataOutSize);
+        MMemInitRead(&response.memIo, self->dataOutMem, actualDataOutSize);
     } else {
         response.memIo.mem = NULL;
-        response.memIo.pos = NULL;
         response.memIo.size = 0;
         response.memIo.capacity = 0;
     }
@@ -1293,7 +1293,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     MMemReadU16LE(&r.memIo, &vendorExtensionVersion);
     self->vendorExtensionVersion = vendorExtensionVersion;
 
-    self->vendorExtension = ReadPtpString8(&r.memIo);
+    self->vendorExtension = ReadPtpString8(self->allocator, &r.memIo);
 
     u16 functionalMode = 0;
     MMemReadU16LE(&r.memIo, &functionalMode);
@@ -1303,7 +1303,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     for (int i = 0; i < operationsLen; i++) {
         u16 operation = 0;
         MMemReadU16LE(&r.memIo, &operation);
-        MArrayAdd(self->supportedOperations, operation);
+        MArrayAdd(self->allocator, self->supportedOperations, operation);
     }
 
     u32 eventsLen = 0;
@@ -1311,7 +1311,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     for (int i = 0; i < eventsLen; i++) {
         u16 event = 0;
         MMemReadU16LE(&r.memIo, &event);
-        MArrayAdd(self->supportedEvents, event);
+        MArrayAdd(self->allocator, self->supportedEvents, event);
     }
 
     u32 propertiesSupportedLen = 0;
@@ -1319,7 +1319,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     for (int i = 0; i < propertiesSupportedLen; i++) {
         u16 devicePropertyCode = 0;
         MMemReadU16LE(&r.memIo, &devicePropertyCode);
-        MArrayAdd(self->supportedProperties, devicePropertyCode);
+        MArrayAdd(self->allocator, self->supportedProperties, devicePropertyCode);
     }
 
     u32 captureFormatsLen = 0;
@@ -1327,7 +1327,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     for (int i = 0; i < captureFormatsLen; i++) {
         u16 captureFormat = 0;
         MMemReadU16LE(&r.memIo, &captureFormat);
-        MArrayAdd(self->captureFormats, captureFormat);
+        MArrayAdd(self->allocator, self->captureFormats, captureFormat);
     }
 
     u32 imageFormatsLen = 0;
@@ -1335,21 +1335,21 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     for (int i = 0; i < imageFormatsLen; i++) {
         u16 imageFormat = 0;
         MMemReadU16LE(&r.memIo, &imageFormat);
-        MArrayAdd(self->imageFormats, imageFormat);
+        MArrayAdd(self->allocator, self->imageFormats, imageFormat);
     }
 
-    self->manufacturer = ReadPtpString8(&r.memIo);
-    self->model = ReadPtpString8(&r.memIo);
-    self->deviceVersion = ReadPtpString8(&r.memIo);
-    self->serialNumber = ReadPtpString8(&r.memIo);
+    self->manufacturer = ReadPtpString8(self->allocator, &r.memIo);
+    self->model = ReadPtpString8(self->allocator, &r.memIo);
+    self->deviceVersion = ReadPtpString8(self->allocator, &r.memIo);
+    self->serialNumber = ReadPtpString8(self->allocator, &r.memIo);
 
     return r.result;
 }
 
 static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
     if (!incremental) {
-        MArrayInit(self->properties, 0);
-        MArrayInit(self->controls, 0);
+        MArrayInit(self->allocator, self->properties, 0);
+        MArrayInit(self->allocator, self->controls, 0);
     }
 
     for (int i = 0; i < numProperties; i++) {
@@ -1363,7 +1363,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
                 control = PTPControl_GetControl(self, propCode);
             }
             if (!control) {
-                control = MArrayAddPtr(self->controls);
+                control = MArrayAddPtr(self->allocator, self->controls);
                 memset(control, 0, sizeof(PtpControl));
                 control->controlCode = propCode;
 
@@ -1384,26 +1384,26 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
             MMemReadU8(&r.memIo, &isEnabled);
 
             PTPPropValue dummy;
-            ReadPropertyValue(&r.memIo, control->dataType, &dummy);
-            ReadPropertyValue(&r.memIo, control->dataType, &dummy);
+            ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
+            ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
 
             MMemReadU8(&r.memIo, &control->formFlag);
 
             if (control->formFlag == PTP_FORM_FLAG_ENUM) {
                 u16 numEnumSet = 0;
                 MMemReadU16LE(&r.memIo, &numEnumSet);
-                MArrayInit(control->form.enums.values, numEnumSet);
+                MArrayInit(self->allocator, control->form.enums.values, numEnumSet);
                 memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
                 for (int j = 0; j < numEnumSet; j++) {
-                    PTPPropValueEnum *value = MArrayAddPtr(control->form.enums.values);
-                    ReadPropertyValue(&r.memIo, control->dataType, &value->propValue);
+                    PTPPropValueEnum *value = MArrayAddPtr(self->allocator, control->form.enums.values);
+                    ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &value->propValue);
                 }
                 control->form.enums.size = numEnumSet;
                 control->form.enums.owned = TRUE;
             } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
-                ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.min);
-                ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.max);
-                ReadPropertyValue(&r.memIo, control->dataType, &control->form.range.step);
+                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.min);
+                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.max);
+                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.step);
             }
         } else {
             // Handle property
@@ -1412,7 +1412,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
                 property = PTPControl_GetProperty(self, propCode);
             }
             if (!property) {
-                property = MArrayAddPtr(self->properties);
+                property = MArrayAddPtr(self->allocator, self->properties);
                 memset(property, 0, sizeof(PTPProperty));
                 property->propCode = propCode;
             }
@@ -1421,23 +1421,23 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
             MMemReadU8(&r.memIo, &property->getSet);
             MMemReadU8(&r.memIo, &property->isEnabled);
 
-            ReadPropertyValue(&r.memIo, property->dataType, &property->defaultValue);
-            ReadPropertyValue(&r.memIo, property->dataType, &property->value);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->defaultValue);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->value);
 
             MMemReadU8(&r.memIo, &property->formFlag);
 
             if (property->formFlag == PTP_FORM_FLAG_ENUM) {
                 u16 numEnumSet = 0;
                 MMemReadU16LE(&r.memIo, &numEnumSet);
-                MArrayInit(property->form.enums.set, numEnumSet);
+                MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
                 for (int j = 0; j < numEnumSet; j++) {
-                    PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
-                    ReadPropertyValue(&r.memIo, property->dataType, value);
+                    PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
+                    ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
                 }
             } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-                ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.min);
-                ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.max);
-                ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.step);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.min);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.max);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.step);
             }
 
             // On older pre-2020 cameras, some properties can only be adjusted up or down, mark them as such with
@@ -1460,7 +1460,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
 
 static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
     if (!incremental) {
-        MArrayInit(self->properties, numProperties);
+        MArrayInit(self->allocator, self->properties, numProperties);
         memset(self->properties, 0, numProperties * sizeof(PTPProperty));
     }
 
@@ -1473,7 +1473,7 @@ static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, P
             property = PTPControl_GetProperty(self, propCode);
         }
         if (!property) {
-            property = MArrayAddPtr(self->properties);
+            property = MArrayAddPtr(self->allocator, self->properties);
             property->propCode = propCode;
         }
 
@@ -1481,30 +1481,30 @@ static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, P
         MMemReadU8(&r.memIo, &property->getSet);
         MMemReadU8(&r.memIo, &property->isEnabled);
 
-        ReadPropertyValue(&r.memIo, property->dataType, &property->defaultValue);
-        ReadPropertyValue(&r.memIo, property->dataType, &property->value);
+        ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->defaultValue);
+        ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->value);
 
         MMemReadU8(&r.memIo, &property->formFlag);
 
         if (property->formFlag == PTP_FORM_FLAG_ENUM) {
             u16 numEnumSet = 0;
             MMemReadU16LE(&r.memIo, &numEnumSet);
-            MArrayInit(property->form.enums.set, numEnumSet);
+            MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
             for (int j = 0; j < numEnumSet; j++) {
-                PTPPropValue* value = MArrayAddPtr(property->form.enums.set);
-                ReadPropertyValue(&r.memIo, property->dataType, value);
+                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
             }
             u16 numEnumGetSet = 0;
             MMemReadU16LE(&r.memIo, &numEnumGetSet);
-            MArrayInit(property->form.enums.getSet, numEnumGetSet);
+            MArrayInit(self->allocator, property->form.enums.getSet, numEnumGetSet);
             for (int j = 0; j < numEnumGetSet; j++) {
-                PTPPropValue* value = MArrayAddPtr(property->form.enums.getSet);
-                ReadPropertyValue(&r.memIo, property->dataType, value);
+                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.getSet);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
             }
         } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-            ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.min);
-            ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.max);
-            ReadPropertyValue(&r.memIo, property->dataType, &property->form.range.step);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.min);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.max);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.step);
         }
     }
 }
@@ -1543,7 +1543,7 @@ static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 
     req.NumParams = 1;
 
     MMemIO memIo;
-    MMemInit(&memIo, self->dataInMem, size);
+    MMemInit(&memIo, self->allocator, self->dataInMem, size);
     switch (dataType) {
         case PTP_DT_UINT8:
             MMemWriteU8(&memIo, value.u8);
@@ -1584,7 +1584,7 @@ static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType
     req.NumParams = 1;
 
     MMemIO memIo;
-    MMemInit(&memIo, self->dataInMem, size);
+    MMemInit(&memIo, self->allocator, self->dataInMem, size);
     switch (dataType) {
         case PTP_DT_UINT8:
             MMemWriteU8(&memIo, value.u8);
@@ -1633,12 +1633,12 @@ static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayLis
     MMemReadU32(&r.memIo, &size);
 
     // Skip to display lists
-    r.memIo.pos = r.memIo.mem + offset;
+    r.memIo.size += offset;
 
     for (int i = 0; i < size; i++) {
         u16 listTypeNum = 0;
         MMemReadU16(&r.memIo, &listTypeNum);
-        r.memIo.pos += 2;
+        r.memIo.size += 2;
         for (int j = 0; j < listTypeNum; j++) {
             u32 listType = 0;
             MMemReadU32(&r.memIo, &listType);
@@ -1649,8 +1649,8 @@ static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayLis
             MLogf("Display String List: %04x Data: %04x Num: %d", listType, dataType, displayStringNum);
             for (int k = 0; k < displayStringNum; k++) {
                 PTPPropValue value;
-                ReadPropertyValue(&r.memIo, dataType, &value);
-                char* str = ReadPtpString16(&r.memIo);
+                ReadPropertyValue(self->allocator, &r.memIo, dataType, &value);
+                char* str = ReadPtpString16(self->allocator, &r.memIo);
                 MLogf(" -- %s", str);
             }
         }
@@ -1676,7 +1676,7 @@ static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUn
     MMemReadU32(&r.memIo, &size);
 
     // Skip to display lists
-    r.memIo.pos = r.memIo.mem + offset;
+    r.memIo.size = offset;
 
     u16 dataVersion = 0;
     MMemReadU16(&r.memIo, &dataVersion);
@@ -1687,7 +1687,7 @@ static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUn
     for (int i = 0; i < numTables; i++) {
         u16 listNums = 0;
         MMemReadU16(&r.memIo, &listNums);
-        r.memIo.pos += 2;
+        r.memIo.size += 2;
         for (int j = 0; j < listNums; j++) {
             u32 normalizedValue = 0;
             MMemReadU32(&r.memIo, &normalizedValue);
@@ -1721,7 +1721,7 @@ static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b3
     for (int i = 0; i < numProperties; i++) {
         u16 propCode = 0;
         MMemReadU16LE(&r.memIo, &propCode);
-        MArrayAdd(self->supportedProperties, propCode);
+        MArrayAdd(self->allocator, self->supportedProperties, propCode);
     }
 
     u32 numControls = 0;
@@ -1729,7 +1729,7 @@ static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b3
     for (int i = 0; i < numControls; i++) {
         u16 controlCode = 0;
         MMemReadU16LE(&r.memIo, &controlCode);
-        MArrayAdd(self->supportedControls, controlCode);
+        MArrayAdd(self->allocator, self->supportedControls, controlCode);
     }
 
     return r.result;
@@ -1761,16 +1761,15 @@ static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObject
     MMemReadU32LE(&r.memIo, &objectInfo->associationDesc);
     MMemReadU32LE(&r.memIo, &objectInfo->sequenceNumber);
 
-    objectInfo->filename = ReadPtpString8(&r.memIo);
-    objectInfo->captureDateTime = ReadPtpString8(&r.memIo);
-    objectInfo->modDateTime = ReadPtpString8(&r.memIo);
-    objectInfo->keywords = ReadPtpString8(&r.memIo);
+    objectInfo->filename = ReadPtpString8(self->allocator, &r.memIo);
+    objectInfo->captureDateTime = ReadPtpString8(self->allocator, &r.memIo);
+    objectInfo->modDateTime = ReadPtpString8(self->allocator, &r.memIo);
+    objectInfo->keywords = ReadPtpString8(self->allocator, &r.memIo);
 
     return r.result;
 }
 
 static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
-    fileOut->pos = fileOut->mem;
     fileOut->size = 0;
 
     PTPResponse r = DoRequest(self,
@@ -1801,7 +1800,7 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
         MMemReadU32LE(&r.memIo, &focalFrameSize);
 
         if (focalFrameSize) {
-            r.memIo.pos = r.memIo.mem + focalFrameOffset;
+            r.memIo.size = focalFrameOffset;
 
             MMemReadU16LE(&r.memIo, &liveViewFrames->version);
             MMemReadSkipBytes(&r.memIo, 6 + 40);
@@ -1823,7 +1822,7 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
             MMemReadSkipBytes(&r.memIo, 6);
 
             if (frameNum) {
-                MArrayInit(focusFrames->frames, frameNum);
+                MArrayInit(self->allocator, focusFrames->frames, frameNum);
 
                 for (int i = 0; i < frameNum; ++i) {
                     FocusFrame* focusFrame = focusFrames->frames + i;
@@ -1841,8 +1840,8 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
         }
     }
 
-    fileOut->pos = fileOut->mem;
     fileOut->size = 0;
+    fileOut->allocator = self->allocator;
     MMemWriteU8CopyN(fileOut, r.memIo.mem + offsetImage, imageSize);
 
     return r.result;
@@ -1850,8 +1849,8 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
 
 PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
     PTP_TRACE("PTP_GetObject");
-    fileOut->pos = fileOut->mem;
     fileOut->size = 0;
+    fileOut->allocator = self->allocator;
 
     PTPResponse r = DoRequest(self,
                               PTP_OC_GetObject,
@@ -1887,7 +1886,7 @@ PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
     if (r != PTP_OK) {
         return r;
     }
-    Ptp_FreeObjectInfo(&objectInfo);
+    PTP_FreeObjectInfo(self->allocator, &objectInfo);
     return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
 }
 
@@ -1905,7 +1904,7 @@ PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapt
     ciiOut->size = objectInfo.objectCompressedSize;
     objectInfo.filename.str = NULL; // Pass filename ownership to ciiOut
     objectInfo.filename.size = 0;
-    Ptp_FreeObjectInfo(&objectInfo); // Free any other strings
+    PTP_FreeObjectInfo(self->allocator, &objectInfo); // Free any other strings
     r = PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
     PTP_DEBUG_F("Downloaded image size: %d", fileOut->size);
     return r;
@@ -1918,7 +1917,7 @@ PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
     if (r != PTP_OK) {
         return r;
     }
-    Ptp_FreeObjectInfo(&objectInfo);
+    PTP_FreeObjectInfo(self->allocator, &objectInfo);
     return PTP_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
 }
 
@@ -1929,7 +1928,7 @@ PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
 
     MMemIO memIo;
-    MMemInit(&memIo, self->dataInMem, fileIn->size);
+    MMemInit(&memIo, self->allocator, self->dataInMem, fileIn->size);
     MMemReadCopy(fileIn, &memIo, fileIn->size);
 
     PTPResponse r = SendReq(self, &req);
@@ -1941,13 +1940,15 @@ PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
     return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
 }
 
-PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device) {
+PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator) {
     if (!self || !device) {
         return PTP_GENERAL_ERROR;
     }
 
-    self->deviceTransport = &device->transport;
+    self->device = device;
+    self->device->transport.allocator = allocator;
     self->logger = device->logger;
+    self->allocator = allocator;
     return PTP_OK;
 }
 
@@ -1956,7 +1957,7 @@ static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
         u16 controlCode = self->supportedControls[i];
         PtpControl* control = PTPControl_GetControl(self, controlCode);
         if (!control) {
-            control = MArrayAddPtr(self->controls);
+            control = MArrayAddPtr(self->allocator, self->controls);
 
             b32 found = FALSE;
             size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
@@ -1977,11 +1978,11 @@ static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
 }
 
 static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
-    MArrayInit(self->controls, numControls);
+    MArrayInit(self->allocator, self->controls, numControls);
     for (int i = 0; i < numControls; i++) {
         u16 controlCode = self->supportedControls[i];
 
-        PtpControl* control = MArrayAddPtr(self->controls);
+        PtpControl* control = MArrayAddPtr(self->allocator, self->controls);
         b32 found = FALSE;
         size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
         for (int j = 0; j < numControlsMeta; j++) {
@@ -2004,7 +2005,7 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     ////////////////////////////////////////////
     // Open Session (if not done by transport layer implicitly)
     ////////////////////////////////////////////
-    if (self->deviceTransport->requiresSessionOpenClose) {
+    if (self->device->transport.requiresSessionOpenClose) {
         self->sessionId = 0;
         self->transactionId = 0;
         u32 sessionId = 0x1;
@@ -2055,7 +2056,7 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
     // Build controls list
     size_t numControls = MArraySize(self->supportedControls);
-    PTP_INFO_F("Connected to device (protocol: %d).", self->protocolVersion);
+    PTP_INFO_F("Connected to device (protocol: %d)", self->protocolVersion);
     if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
         SDIO_InitControlsMetadata200(self, numControls);
     } else {
@@ -2071,7 +2072,7 @@ PTPResult PTPControl_Cleanup(PTPControl* self) {
     ////////////////////////////////////////////
     // Close session (if not done by transport layer implicitly)
     ////////////////////////////////////////////
-    if (self->deviceTransport->requiresSessionOpenClose) {
+    if (self->device->transport.requiresSessionOpenClose) {
         CloseSession(self);
         self->sessionId = 0;
         self->transactionId = 0;
@@ -2082,42 +2083,42 @@ PTPResult PTPControl_Cleanup(PTPControl* self) {
     self->protocolVersion = 0;
     self->standardVersion = 0;
 
-    MArrayFree(self->supportedProperties);
-    MArrayFree(self->supportedControls);
-    MArrayFree(self->supportedEvents);
-    MArrayFree(self->supportedOperations);
-    MArrayFree(self->captureFormats);
-    MArrayFree(self->imageFormats);
+    MArrayFree(self->allocator, self->supportedProperties);
+    MArrayFree(self->allocator, self->supportedControls);
+    MArrayFree(self->allocator, self->supportedEvents);
+    MArrayFree(self->allocator, self->supportedOperations);
+    MArrayFree(self->allocator, self->captureFormats);
+    MArrayFree(self->allocator, self->imageFormats);
     for (int i = 0; i < MArraySize(self->properties); ++i) {
         PTPProperty* property = self->properties + i;
-        PropValueFree(property->dataType, &property->value);
-        PropValueFree(property->dataType, &property->defaultValue);
+        PropValueFree(self->allocator, property->dataType, &property->value);
+        PropValueFree(self->allocator, property->dataType, &property->defaultValue);
         if (property->formFlag == PTP_FORM_FLAG_ENUM) {
-            MArrayFree(property->form.enums.set);
-            MArrayFree(property->form.enums.getSet);
+            MArrayFree(self->allocator, property->form.enums.set);
+            MArrayFree(self->allocator, property->form.enums.getSet);
         } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-            PropValueFree(property->dataType, &property->form.range.min);
-            PropValueFree(property->dataType, &property->form.range.max);
-            PropValueFree(property->dataType, &property->form.range.step);
+            PropValueFree(self->allocator, property->dataType, &property->form.range.min);
+            PropValueFree(self->allocator, property->dataType, &property->form.range.max);
+            PropValueFree(self->allocator, property->dataType, &property->form.range.step);
         }
     }
-    MArrayFree(self->properties);
+    MArrayFree(self->allocator, self->properties);
 
     for (int i = 0; i < MArraySize(self->controls); ++i) {
         PtpControl* control = self->controls + i;
         if (control->formFlag == PTP_FORM_FLAG_ENUM) {
             if (control->form.enums.owned) {
-                MArrayFree(control->form.enums.values);
+                MArrayFree(self->allocator, control->form.enums.values);
             }
         }
     }
-    MArrayFree(self->controls);
+    MArrayFree(self->allocator, self->controls);
 
-    MStrFree(self->manufacturer);
-    MStrFree(self->model);
-    MStrFree(self->deviceVersion);
-    MStrFree(self->serialNumber);
-    MStrFree(self->vendorExtension);
+    MStrFree(self->allocator, self->manufacturer);
+    MStrFree(self->allocator, self->model);
+    MStrFree(self->allocator, self->deviceVersion);
+    MStrFree(self->allocator, self->serialNumber);
+    MStrFree(self->allocator, self->vendorExtension);
 
     return PTP_OK;
 }
@@ -2203,7 +2204,7 @@ static b32 BuildEnumsFromListU8(PTPControl* self, PTPProperty* property, EnumVal
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u8 lookupValue = property->form.enums.getSet[i].u8;
         char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u8 = lookupValue;
         propEnum->str.str = str;
@@ -2230,7 +2231,7 @@ static b32 BuildEnumsFromListU8(PTPControl* self, PTPProperty* property, EnumVal
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u8 = lookupValue;
                 propEnum->str.str = str;
@@ -2256,7 +2257,7 @@ static b32 BuildEnumsFromListU16(PTPControl* self, PTPProperty* property, EnumVa
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u16 lookupValue = property->form.enums.getSet[i].u16;
         char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u16 = lookupValue;
         propEnum->str.str = str;
@@ -2283,7 +2284,7 @@ static b32 BuildEnumsFromListU16(PTPControl* self, PTPProperty* property, EnumVa
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u16 = lookupValue;
                 propEnum->str.str = str;
@@ -2309,7 +2310,7 @@ static b32 BuildEnumsFromListU32(PTPControl* self, PTPProperty* property, EnumVa
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u32 lookupValue = property->form.enums.getSet[i].u32;
         char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u32 = lookupValue;
         propEnum->str.str = str;
@@ -2336,7 +2337,7 @@ static b32 BuildEnumsFromListU32(PTPControl* self, PTPProperty* property, EnumVa
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u32 = lookupValue;
                 propEnum->str.str = str;
@@ -2372,7 +2373,7 @@ static MStr GetFNumberAsString(PTPControl* self, PTPProperty* property, PTPPropV
     }
     if (len > 0) {
         len++;
-        r.str = MMalloc(len);
+        r.str = MMalloc(self->allocator, len);
         memcpy(r.str, text, len);
         r.size = len;
     }
@@ -2403,7 +2404,7 @@ static MStr GetShutterSpeedAsString(PTPControl* self, PTPProperty* property, PTP
             len = snprintf(text, sizeof(text), "%d/%d", top, bottom);
         }
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2424,7 +2425,7 @@ static MStr GetWhiteBalanceGMAsString(PTPControl* self, PTPProperty* property, P
     }
 
     int len = 6;
-    r.str = MMalloc(len);
+    r.str = MMalloc(self->allocator, len);
     r.size = len;
 
     if (value > 0) {
@@ -2470,7 +2471,7 @@ static MStr GetWhiteBalanceABAsString(PTPControl* self, PTPProperty* property, P
     }
 
     int len = 6;
-    r.str = MMalloc(len);
+    r.str = MMalloc(self->allocator, len);
     r.size = len;
 
     if (value > 0) {
@@ -2512,7 +2513,7 @@ static MStr GetPendingFileInfoAsString(PTPControl* self, PTPProperty* property, 
         char text[32];
         int len = snprintf(text, sizeof(text), "Files (%d)", value);
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2521,7 +2522,7 @@ static MStr GetPendingFileInfoAsString(PTPControl* self, PTPProperty* property, 
         value &= 0x7fff;
         int len = snprintf(text, sizeof(text), "Files (%d)", value);
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2540,7 +2541,7 @@ static MStr GetPixelShootingNumberAsString(PTPControl* self, PTPProperty* proper
         char text[32];
         int len = snprintf(text, sizeof(text), "%d Sheets", value);
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2558,7 +2559,7 @@ static MStr GetPixelShootingIntervalAsString(PTPControl* self, PTPProperty* prop
         value &= 0x7fff;
         int len = snprintf(text, sizeof(text), "%d sec", value);
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2573,7 +2574,7 @@ static MStr GetPixelShootingProgressAsString(PTPControl* self, PTPProperty* prop
     value &= 0x7fff;
     int len = snprintf(text, sizeof(text), "Shot %d", value);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -2589,7 +2590,7 @@ static MStr GetBatteryRemainingAsString(PTPControl* self, PTPProperty* property,
         char text[32];
         int len = snprintf(text, sizeof(text), "%d%%", value);
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2603,7 +2604,7 @@ static MStr GetPredictedMaxFileSizeAsString(PTPControl* self, PTPProperty* prope
     char text[32];
     int len = snprintf(text, sizeof(text), "%d bytes", value);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -2621,7 +2622,7 @@ static MStr GetTemperatureAsString(PTPControl* self, PTPProperty* property, PTPP
         char text[32];
         int len = snprintf(text, sizeof(text), "%dK", value);
         if (len > 0) {
-            r.str = MMalloc(len+1);
+            r.str = MMalloc(self->allocator, len+1);
             memcpy(r.str, text, len+1);
             r.size = len + 1;
         }
@@ -2641,7 +2642,7 @@ static MStr GetIsoAsString(PTPControl* self, PTPProperty* property, PTPPropValue
             char text[32];
             int len = snprintf(text, sizeof(text), "%d", iso);
             if (len > 0) {
-                r.str = MMalloc(len+1);
+                r.str = MMalloc(self->allocator, len+1);
                 memcpy(r.str, text, len+1);
                 r.size = len + 1;
             }
@@ -2653,7 +2654,7 @@ static MStr GetIsoAsString(PTPControl* self, PTPProperty* property, PTPPropValue
             char text[32];
             int len = snprintf(text, sizeof(text), "Multi-Frame NR %d", iso);
             if (len > 0) {
-                r.str = MMalloc(len+1);
+                r.str = MMalloc(self->allocator, len+1);
                 memcpy(r.str, text, len+1);
                 r.size = len + 1;
             }
@@ -2665,7 +2666,7 @@ static MStr GetIsoAsString(PTPControl* self, PTPProperty* property, PTPPropValue
             char text[32];
             int len = snprintf(text, sizeof(text), "Multi-Frame NR High %d", iso);
             if (len > 0) {
-                r.str = MMalloc(len+1);
+                r.str = MMalloc(self->allocator, len+1);
                 memcpy(r.str, text, len+1);
                 r.size = len + 1;
             }
@@ -2685,7 +2686,7 @@ static MStr GetExposureBiasAsString(PTPControl* self, PTPProperty* property, PTP
     char text[32];
     int len = snprintf(text, sizeof(text), "%d.%dEV", whole, decimals);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -2703,7 +2704,7 @@ static MStr GetFlashCompAsString(PTPControl* self, PTPProperty* property, PTPPro
     char text[32];
     int len = snprintf(text, sizeof(text), "%d.%dEV", whole, decimal);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -2722,7 +2723,7 @@ static MStr GetZoomScale(PTPControl* self, PTPProperty* property, PTPPropValue p
         len = snprintf(text, sizeof(text), "%d", whole);
     }
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -2738,7 +2739,7 @@ static MStr GetZoomBarInfo(PTPControl* self, PTPProperty* property, PTPPropValue
     char text[32];
     int len = snprintf(text, sizeof(text), "%d, %d, %d", totalBox, currentBox, zoomPosition);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -3878,7 +3879,7 @@ static MStr GetFocusMagnifyScale(PTPControl* self, PTPProperty* property, PTPPro
     }
     if (len > 0) {
         len++;
-        r.str = MMalloc(len);
+        r.str = MMalloc(self->allocator, len);
         memcpy(r.str, text, len);
         r.size = len;
     }
@@ -3893,7 +3894,7 @@ static MStr GetFocusMagnifyPos(PTPControl* self, PTPProperty* property, PTPPropV
     char text[32];
     int len = snprintf(text, sizeof(text), "%d, %d", x, y);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -3908,7 +3909,7 @@ static MStr GetFocusSpotPos(PTPControl* self, PTPProperty* property, PTPPropValu
     char text[32];
     int len = snprintf(text, sizeof(text), "%d, %d", x, y);
     if (len > 0) {
-        r.str = MMalloc(len+1);
+        r.str = MMalloc(self->allocator, len+1);
         memcpy(r.str, text, len+1);
         r.size = len + 1;
     }
@@ -4066,7 +4067,7 @@ static PropertyMetadata sPropertyMetadata[] = {
 
 b32 BuildEnumsFromGetFunc(PTPControl* self, PTPProperty* property, PropertyMetadata* meta, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        PTPPropValueEnum *propEnum = MArrayAddPtr(outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         PTPPropValue propValue = property->form.enums.getSet[i];
         propEnum->propValue = propValue;
         propEnum->str = meta->valueAsStringFunc(self, property, propValue);
@@ -4096,7 +4097,7 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, PTPProperty* property, PropertyMetad
             }
 
             if (!prop) {
-                prop = MArrayAddPtr(outEnums->values);
+                prop = MArrayAddPtr(self->allocator, outEnums->values);
                 prop->propValue = lookupValue;
                 prop->str = meta->valueAsStringFunc(self, property, lookupValue);
             }

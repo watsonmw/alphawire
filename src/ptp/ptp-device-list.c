@@ -12,7 +12,9 @@ static PTPBackendType sBackends[] = {
 #endif
 };
 
-b32 PTPDeviceList_Open(PTPDeviceList* self) {
+b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
+    self->allocator = allocator;
+
     b32 backendsOpened = FALSE;
     if (self->logger.logFunc == NULL) {
         self->logger.logFunc = PTPLog_LogDefault;
@@ -24,18 +26,20 @@ b32 PTPDeviceList_Open(PTPDeviceList* self) {
         PTPBackendType backendType = sBackends[i];
         switch (backendType) {
             case PTP_BACKEND_LIBUSBK: {
-                PTPBackend* backend = MArrayAddPtr(self->backends);
+                PTPBackend* backend = MArrayAddPtr(self->allocator, self->backends);
                 backend->type = backendType;
                 backend->logger = self->logger;
+                backend->allocator = self->allocator;
                 if (PTPUsbkDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
                     backendsOpened = TRUE;
                 }
                 break;
             }
             case PTP_BACKEND_WIA: {
-                PTPBackend* backend = MArrayAddPtr(self->backends);
+                PTPBackend* backend = MArrayAddPtr(self->allocator, self->backends);
                 backend->type = backendType;
                 backend->logger = self->logger;
+                backend->allocator = self->allocator;
                 if (PTPWiaDeviceList_OpenBackend(backend)) {
                     backendsOpened = TRUE;
                 }
@@ -60,13 +64,13 @@ void PTPDeviceList_ReleaseList(PTPDeviceList* self, b32 free) {
     if (self->devices) {
         for (int i = 0; i < MArraySize(self->devices); i++) {
             PTPDeviceInfo* deviceInfo = self->devices + i;
-            MStrFree(deviceInfo->manufacturer);
-            MStrFree(deviceInfo->deviceName);
+            MStrFree(self->allocator, deviceInfo->manufacturer);
+            MStrFree(self->allocator, deviceInfo->deviceName);
         }
         if (free) {
-            MArrayFree(self->devices);
+            MArrayFree(self->allocator, self->devices);
         } else {
-            MArrayInit(self->devices, 0);
+            MArrayInit(self->allocator, self->devices, 0);
         }
     }
 
@@ -81,8 +85,8 @@ b32 PTPDeviceList_Close(PTPDeviceList* self) {
     MArrayEachPtr(self->backends, backend) {
         backend.p->close(backend.p);
     }
-    MArrayFree(self->backends);
-    MArrayFree(self->openDevices);
+    MArrayFree(self->allocator, self->backends);
+    MArrayFree(self->allocator, self->openDevices);
     return TRUE;
 }
 
@@ -99,12 +103,12 @@ b32 PTPDeviceList_RefreshList(PTPDeviceList* self) {
     return TRUE;
 }
 
-b32 PTPDeviceList_ConnectDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTP_TRACE("PTPDeviceList_ConnectDevice");
-    PTP_INFO_F("Connecting to device %s (%s)...", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
+b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+    PTP_TRACE("PTPDeviceList_OpenDevice");
+    PTP_INFO_F("Opening device %s (%s)...", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
 
     PTPBackend* backend = PTPDeviceList_GetBackend(self, deviceInfo->backendType);
-    PTPDevice* device = MArrayAddPtr(self->openDevices);
+    PTPDevice* device = MArrayAddPtr(self->allocator, self->openDevices);
     b32 r = backend->openDevice(backend, deviceInfo, &device);
     if (r) {
         *deviceOut = device;
@@ -114,8 +118,8 @@ b32 PTPDeviceList_ConnectDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, 
     return r;
 }
 
-b32 PTPDeviceList_DisconnectDevice(PTPDeviceList* self, PTPDevice* device) {
-    PTP_TRACE_F("PTPDeviceList_DisconnectDevice: %p", device->device);
+b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device) {
+    PTP_TRACE_F("PTPDeviceList_CloseDevice: %p", device->device);
     PTPBackend* backend = PTPDeviceList_GetBackend(self, device->backendType);
 
     MArrayEach(self->openDevices, i) {

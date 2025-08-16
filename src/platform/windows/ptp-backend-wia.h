@@ -26,6 +26,7 @@ typedef struct {
     IUnknown** eventListeners;
     b32 deviceListUpToDate;
     PTPDeviceWia* openDevices;
+    MAllocator* allocator;
     PTPLog logger;
 } PTPWiaDeviceList;
 

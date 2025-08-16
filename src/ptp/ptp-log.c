@@ -2,7 +2,7 @@
 #include "mlib/mlib.h"
 
 #include <stdarg.h>
-
+#include <stdio.h>
 
 void PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *format, ...) {
     if (!logger || !logger->logFunc) {

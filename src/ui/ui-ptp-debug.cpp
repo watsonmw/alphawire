@@ -268,7 +268,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
     if (PTPControl_GetPropertyAsStr(&c.ptp, property->propCode, &propAsString)) {
         ImGui::Text("Value: %s", propAsString.str);
         if (propAsString.size) {
-            MStrFree(propAsString);
+            MStrFree(c.ptp.allocator, propAsString);
         }
     } else {
         char text[32];
@@ -352,7 +352,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
             }
         }
 
-        PTP_FreePropValueEnums(&outEnums);
+        PTP_FreePropValueEnums(c.ptp.allocator, &outEnums);
     }
     else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
         if (ImGuiSlider(property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
@@ -640,7 +640,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 if (PTPControl_GetPropertyAsStr(&c.ptp, property->propCode, &propAsString)) {
                     ImGui::Text("%s", propAsString.str);
                     if (propAsString.size) {
-                        MStrFree(propAsString);
+                        MStrFree(c.ptp.allocator, propAsString);
                     }
                 }
 
@@ -754,7 +754,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                 c.fileDownloadTotalBytes = fileContents.size;
                 c.fileDownloadPath = cii.filename.str;
                 MMemFree(&fileContents);
-                MStrFree(cii.filename);
+                MStrFree(c.ptp.allocator, cii.filename);
             }
         }
 
@@ -779,13 +779,13 @@ void ShowCameraControlsWindow(AppContext& c) {
         MStr magScale = {};
         if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_SCALE, &magScale)) {
             ImGui::Text("%s", magScale.str);
-            MStrFree(magScale);
+            MStrFree(c.ptp.allocator, magScale);
         }
 
         MStr magPosition = {};
         if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_POS, &magPosition)) {
             ImGui::Text("%s", magPosition.str);
-            MStrFree(magPosition);
+            MStrFree(c.ptp.allocator, magPosition);
         }
 
         ImGui::Dummy(ImVec2(43.0f, 10)); // Horizontal padding
@@ -819,11 +819,10 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         if (c.cameraSettingsReadEnabled) {
             if (ImGui::Button("Load")) {
-                MReadFileRet file = MFileReadFully(c.cameraSettingsPathBuffer);
+                MReadFileRet file = MFileReadFully(c.ptp.allocator, c.cameraSettingsPathBuffer);
                 if (file.size > 0) {
                     MMemIO memIo{};
-                    MMemInit(&memIo, file.data, file.size);
-                    memIo.size = file.size;
+                    MMemInit(&memIo, c.ptp.allocator, file.data, file.size);
                     PTPResult r = PTPControl_PutCameraSettingsFile(&c.ptp, &memIo);
                     if (r != PTP_OK) {
                         MLogf("Error uploading file %s", c.cameraSettingsPathBuffer);

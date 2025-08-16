@@ -22,6 +22,7 @@ typedef struct {
     b32 disconnected;
     // Request timeout - can be adjust before requests
     u32 timeoutMilliseconds;
+    MAllocator* allocator;
     PTPLog logger;
 } PTPDeviceUsbk;
 
@@ -30,6 +31,7 @@ typedef struct {
     PTPDeviceUsbk* openDevices;
     void* deviceList;
     int timeoutMilliseconds;
+    MAllocator* allocator;
     PTPLog logger;
 } PTPUsbkDeviceList;
 

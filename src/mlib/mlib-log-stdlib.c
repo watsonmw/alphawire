@@ -30,16 +30,20 @@ void MLog(const char *str) {
 // contain the output.
 #define VSNPRINTF_MINUS_1_RETRY 1
 
-i32 MStringAppendf(MMemIO* memIo, const char* format, ...) {
+i32 MStrAppendf(MMemIO* memIo, const char* format, ...) {
     u32 writableLen = memIo->capacity - memIo->size;
 
     va_list vargs1;
-
     va_start(vargs1, format);
     va_list vargs2;
     va_copy(vargs2, vargs1);
 
     i32 size;
+
+    u32 offset = 0;
+    if (memIo->size) {
+        offset = memIo->size - 1;
+    }
 
     if (writableLen <= 1) {
         // No space to write any string - calc size of format string and add the space
@@ -47,16 +51,16 @@ i32 MStringAppendf(MMemIO* memIo, const char* format, ...) {
         if (size > 0) {
             u32 sizeAdded = size + 1;
             MMemGrowBytes(memIo, sizeAdded);
-            size = vsnprintf((char*)memIo->pos, sizeAdded, format, vargs2);
+            size = vsnprintf((char*)memIo->mem + offset, sizeAdded, format, vargs2);
         }
     } else {
         // Space to write some string, but it might not be enough
-        size = vsnprintf((char*)memIo->pos, writableLen, format, vargs1);
+        size = vsnprintf((char*)memIo->mem + offset, writableLen, format, vargs1);
         if ((size + 1) > writableLen) {
             // Not enough space to fit format string
             u32 sizeAdded = size + 1;
             MMemGrowBytes(memIo, sizeAdded);
-            size = vsnprintf((char*)memIo->pos, sizeAdded, format, vargs2);
+            size = vsnprintf((char*)memIo->mem + offset, sizeAdded, format, vargs2);
         }
 #if VSNPRINTF_MINUS_1_RETRY == 1
         else if (size < 0) {
@@ -65,7 +69,7 @@ i32 MStringAppendf(MMemIO* memIo, const char* format, ...) {
             if (size > 0) {
                 u32 sizeAdded = size + 1;
                 MMemGrowBytes(memIo, sizeAdded);
-                size = vsnprintf((char*)memIo->pos, sizeAdded, format, vargs2);
+                size = vsnprintf((char*)memIo->mem + offset, sizeAdded, format, vargs2);
             }
         }
 #endif
@@ -74,13 +78,16 @@ i32 MStringAppendf(MMemIO* memIo, const char* format, ...) {
 
     if (size < 0) {
         MLogf("Encoding error for sprintf format: %s", format);
-    } else {
-        memIo->pos += size;
-        memIo->size += size;
     }
 
     va_end(vargs1);
     va_end(vargs2);
+
+    if (memIo->size) {
+        memIo->size += size;
+    } else {
+        memIo->size = size + 1;
+    }
 
     return size;
 }

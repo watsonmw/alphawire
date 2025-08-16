@@ -5,14 +5,25 @@
 // Public domain c library for the following:
 //
 // - heap debugging
-// - c arrays
-// - memory/file reading / writing framework
-// - ini reading
+// - arrays
+// - memory block reader / writers
+// - strings
+// - logging
+// - threading
+// - stacktraces
 //
-// You might want to check out STB libs and GCC heap debug options before using this, this is just my personal version
-// that integrates custom heap debugging/tracking with a custom stb style array.
+// You might want to check out STB libs and GCC heap debug options before using this.
 //
-#include <stdio.h>
+// Feature defines:
+//
+//  * M_ASSERT           * Asserts & breakpoints
+//  * M_LOG_ALLOCATIONS  * Log allocations
+//  * M_MEM_DEBUG        * Heap checking
+//  * M_STACKTRACE       * Enable Stacktraces
+//   - M_LIBBACKTRACE     - Use libbacktrace
+//  * M_THREADING        * Enable threading / thread local / mutexes
+//   - M_PTHREADS         - Use pthreads
+//
 #include <string.h>
 
 typedef char i8;
@@ -56,11 +67,13 @@ typedef unsigned long long u64;
 extern "C" {
 #endif
 
+// Turn off some warnings that will get triggered if -Wall is on
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
+// Get type of variable. Useful in macros to get the type of a parameter
 #ifdef _MSC_VER
 #define M_TYPEOF(a) __typeof__(a)
 #else
@@ -69,23 +82,60 @@ extern "C" {
 
 //////////////////////////////////////////////////////////
 // Memory allocation
-// As an alternative GCC has good compile time options for similar checks
 
 typedef void* (*M_malloc_t)(void* alloc, size_t size);
 typedef void* (*M_realloc_t)(void* alloc, void* mem, size_t oldSize, size_t newSize);
 typedef void (*M_free_t)(void* alloc, void* mem, size_t size);
 
+#ifdef M_STACKTRACE
+typedef struct {
+    void* addresses[64];
+    u32 frames;
+    u32 hash;
+} MStacktrace;
+#endif
+
+#ifdef M_MEM_DEBUG
+typedef struct {
+    size_t size;
+    u8* start;
+    u8* mem;
+    const char* file;
+    int line;
+#ifdef M_STACKTRACE
+    u32 stacktraceHash;
+#endif
+} MMemAllocInfo;
+
+typedef struct {
+    MMemAllocInfo* allocSlots;
+#ifdef M_STACKTRACE
+    MStacktrace* stacktraces;
+#endif
+    u32* freeSlots;
+    b32 initialized;
+    u32 totalAllocations;
+    u32 totalAllocatedBytes;
+    u32 curAllocatedBytes;
+    u32 maxAllocatedBytes;
+} MMemDebugContext;
+#endif
+
 typedef struct {
     M_malloc_t mallocFunc;
     M_realloc_t reallocFunc;
     M_free_t freeFunc;
+    char* name;
+#ifdef M_MEM_DEBUG
+    MMemDebugContext debug;
+#endif
 } MAllocator;
 
 // Set the default allocator, if not set stdlib will be used
-void MMemAllocSet(MAllocator* allocator);
+void MMemAllocSet(MAllocator* alloc);
 
 #ifndef M_CLIB_DISABLE
-void MMemUseClibAllocator();
+void MAllocatorMakeClibHeap(MAllocator* alloc);
 #endif
 
 //////////////////////////////////////////////////////////
@@ -98,18 +148,18 @@ void MMemUseClibAllocator();
 #define MDEBUG_SOURCE_PASS file, line,
 #define MDEBUG_SOURCE_MACRO __FILE__, __LINE__,
 
-void MMemDebugInit();
-void MMemDebugDeinit();
+void MMemDebugInit(MAllocator* alloc);
+void MMemDebugDeinit(MAllocator* alloc);
 
 // Check if ptr is a valid memory allocation, returns false if there's a problem
-b32 MMemDebugCheck(void* p);
+b32 MMemDebugCheck(MAllocator* alloc, void* p);
 
 // Check if all memory allocations are okay - checks for write overruns / underruns using sentinel values
 // Prints any errors.  Returns false if there's a problem, true if okay.
-b32 MMemDebugCheckAll();
+b32 MMemDebugCheckAll(MAllocator* alloc);
 
 // Print all current memory allocations
-b32 MMemDebugListAll();
+b32 MMemDebugListAll(MAllocator* alloc);
 #else
 // Memory debug mode is off
 #define MDEBUG_SOURCE_DEFINE
@@ -117,16 +167,54 @@ b32 MMemDebugListAll();
 #define MDEBUG_SOURCE_MACRO
 #endif
 
-void* M_Malloc(MDEBUG_SOURCE_DEFINE size_t size);
-void* M_MallocZ(MDEBUG_SOURCE_DEFINE size_t size);
-void* M_Realloc(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize);
-void* M_ReallocZ(MDEBUG_SOURCE_DEFINE void* p, size_t oldSize, size_t newSize);
-void M_Free(MDEBUG_SOURCE_DEFINE void* p, size_t size);
+void* M_Malloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size);
+void* M_MallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size);
+void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize);
+void* M_ReallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize);
+void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size);
 
-#define MMalloc(size) M_Malloc(MDEBUG_SOURCE_MACRO size)
-#define MMallocZ(size) M_MallocZ(MDEBUG_SOURCE_MACRO size)
-#define MRealloc(p, oldSize, newSize) (M_Realloc(MDEBUG_SOURCE_MACRO (p), oldSize, newSize))
-#define MFree(p, size) (M_Free(MDEBUG_SOURCE_MACRO (p), size), (p) = NULL)
+#define MMalloc(alloc, size) M_Malloc(MDEBUG_SOURCE_MACRO (alloc), size)
+#define MMallocZ(alloc, size) M_MallocZ(MDEBUG_SOURCE_MACRO (alloc), size)
+#define MRealloc(alloc, p, oldSize, newSize) (M_Realloc(MDEBUG_SOURCE_MACRO (alloc), (p), oldSize, newSize))
+#define MFree(alloc, p, size) (M_Free(MDEBUG_SOURCE_MACRO (alloc), (p), size), (p) = NULL)
+
+/////////////////////////////////////////////////////////
+// Threading & locking
+#ifdef M_THREADING
+
+// Define variable as thread local.
+#if defined(__GNUC__)
+    #define MTHREAD_LOCAL __thread
+#elif defined(_MSC_VER)
+    #define MTHREAD_LOCAL __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+    #define thread_local _Thread_local
+#else
+    #define MTHREAD_LOCAL
+#endif
+
+#if defined(M_PTHREADS)
+    #define M_MUTEX_INIT {0}
+    typedef struct { int m; } MMutex;
+
+    #define M_ONCE_INIT 0
+    typedef int MOnce;
+#elif defined(_WIN32)
+    #define M_MUTEX_INIT {0}
+    typedef struct {void* m;} MMutex;
+
+    #define M_ONCE_INIT {0}
+    typedef struct {void* o;} MOnce;
+#endif
+
+void MMutexLock(MMutex* m);
+void MMutexUnlock(MMutex* m);
+#else
+
+#define M_ONCE_INIT 0
+typedef int MOnce;
+void MExecuteOnce(MOnce* once, void (*fn)(void));
+#endif
 
 /////////////////////////////////////////////////////////
 // Math
@@ -240,46 +328,50 @@ void MLogBytes(const u8* mem, u32 len);
 
 /////////////////////////////////////////////////////////
 // Memory reading / writing
-//
 typedef struct {
     u8* mem;  // pointer to start of memory buffer
-    u8* pos;  // current pos in memory buffer
-    u32 size; // current size read or written (redundant since: size == pos - mem)
+    u32 size; // current size in bytes written/read
     u32 capacity; // size of memory buffer allocated in bytes
+    MAllocator* allocator;
 } MMemIO;
 
 // Initialise MMemIO to write to existing memory
-// size is set to zero and pos set to 'mem'
-void MMemInit(MMemIO* memIO, u8* mem, u32 capacity);
+void MMemInit(MMemIO* memIO, MAllocator* alloc, u8* mem, u32 capacity);
 
-// Initialise MMemIO to read from existing memory
-// capacity and size are initialised to the same value
-// and pos is the start of memory
-void MMemReadInit(MMemIO* memIO, u8* mem, u32 size);
-
-// Allocate the given amount of memory and
-void MMemInitAlloc(MMemIO* memIO, u32 size);
-
-MINTERNAL void MMemReset(MMemIO* memIO) {
+// Initialise MMemIO for write - no initial allocation
+MINLINE void MMemInitEmpty(MMemIO* memIO, MAllocator* alloc) {
     memIO->size = 0;
-    memIO->pos = memIO->mem;
+    memIO->mem = NULL;
+    memIO->capacity = 0;
+    memIO->allocator = alloc;
 }
 
-MINTERNAL void MMemFree(MMemIO* memIO) {
-    MFree(memIO->mem, memIO->capacity);
-    memIO->pos = NULL;
+// Initialise MMemIO for write - allocate 'size' bytes for writing
+void MMemInitAlloc(MMemIO* memIO, MAllocator* alloc, u32 size);
+
+// Initialise MMemIO to read from existing memory
+void MMemInitRead(MMemIO* memIO, u8* mem, u32 size);
+
+MINLINE void MMemReset(MMemIO* memIO) {
+    memIO->size = 0;
+}
+
+MINLINE void MMemFree(MMemIO* memIO) {
+    MFree(memIO->allocator, memIO->mem, memIO->capacity);
+    memIO->size = 0;
     memIO->capacity = 0;
 }
 
-// Add space for bytes, but don't advance used space
-void MMemGrowBytes(MMemIO* memIO, u32 capacity);
+// Add capacity to write growByBytes after the current position (grow memory if the additional bytes don't fit in the
+// remaining space)
+void MMemGrowBytes(MMemIO* memIO, u32 growByBytes);
 
 // Add bytes, allocating new memory if necessary
-// Returns point to start of newly added space for given number of bytes
+// Returns pointer to start of newly added space for the given number of bytes
 u8* MMemAddBytes(MMemIO* memIO, u32 size);
 
 // Add bytes, allocating new memory if necessary, zero out bytes added
-// Returns point to start of newly added space for given number of bytes
+// Returns point to start of newly added space for the given number of bytes
 u8* MMemAddBytesZero(MMemIO* memIO, u32 size);
 
 // --- Writing ---
@@ -339,9 +431,8 @@ i32 MMemReadCopy(MMemIO* reader, MMemIO* out, u32 size);
 // Read a null terminated string
 char* MMemReadStr(MMemIO* reader);
 
-MINTERNAL b32 MMemReadDone(MMemIO* reader) {
-    u32 read = reader->pos - reader->mem;
-    if (read >= reader->size) {
+MINLINE b32 MMemReadDone(MMemIO* reader) {
+    if (reader->size >= reader->capacity) {
         return 1;
     } else {
         return 0;
@@ -349,7 +440,7 @@ MINTERNAL b32 MMemReadDone(MMemIO* reader) {
 }
 
 MINLINE i32 MMemReadSkipBytes(MMemIO* reader, u32 skipBytes) {
-    reader->pos += skipBytes;
+    reader->size += skipBytes;
     return MMemReadDone(reader);
 }
 
@@ -373,33 +464,33 @@ typedef struct {
 } MArrayHeader;
 
 // Init array of given size
-#define MArrayInit(a, s) ((a) = M_ArrayInit(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), s))
+#define MArrayInit(m, a, s) ((a) = M_ArrayInit(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s))
 
 // Use this to free the memory allocated
-#define MArrayFree(a) ((a) ? M_ArrayFree(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a)), (a) = NULL : 0)
+#define MArrayFree(m, a) ((a) ? M_ArrayFree(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a)), (a) = NULL : 0)
 
-// Add value to end of array
-#define MArrayAdd(a, v) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), 1), (a)[M_ArrayHeader(a)->size++] = (v))
+// Add value to the end of the array
+#define MArrayAdd(m, a, v) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), (a)[M_ArrayHeader(a)->size++] = (v))
 
-// Add space for item to end of array and return ptr to it
-#define MArrayAddPtr(a) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), 1), ((a) + M_ArrayHeader(a)->size++))
+// Add space for item to the end of the array and return ptr to it
+#define MArrayAddPtr(m, a) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), ((a) + M_ArrayHeader(a)->size++))
 
-// Grow the array, new elements are uninitialized, old elements remain set as before (i.e. they are memmove()d if the
-// backing memory needs to relocated to fit the new elements, and left alone if not).
-#define MArrayGrow(a, s) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), s))
+// Grow the array, adding new elements. New elements are uninitialized, old elements are unchanged but may be moved (they are
+// memmove()d if the backing memory needs to be relocated to fit the new elements, and left alone if not).
+#define MArrayGrow(m, a, s) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s))
 
-// Insert a value at given index to an array (may involve moving memory and/or reallocation)
-#define MArrayInsert(a, i, v) ((a) = M_ArrayInsertSpace(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), (i)), ((a)[(i)] = (v)), 0)
+// Insert a value at the given index to an array (may involve moving memory and/or reallocation)
+#define MArrayInsert(m, a, i, v) ((a) = M_ArrayInsertSpace(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i)), ((a)[(i)] = (v)), 0)
 
-// Set value in array, resize if necessary, gaps are initialized to zero.
-#define MArraySet(a, i, v) ((a) = M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), (i) + 1)), (((a)[(i)] = (v)), 0)
+// Set value in the array, resize if necessary, gaps are initialized to zero.
+#define MArraySet(m, a, i, v) ((a) = M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i) + 1)), (((a)[(i)] = (v)), 0)
 
 #define MArraySize(a) ((a) ? M_ArrayHeader(a)->size : 0)
 #define MArrayLen(a) (MArraySize(a))
 
 #define MArrayCapacity(a) ((a) ? M_ArrayHeader(a)->capacity : 0)
 
-// Pop array item from end of array, and return a copy of it
+// Pop an item from the end of the array and return a copy of it
 #define MArrayPop(a) ((a)[--(M_ArrayHeader(a)->size)])
 
 #define MArrayTop(a) ((a)[(M_ArrayHeader(a)->size) - 1])
@@ -408,7 +499,7 @@ typedef struct {
 
 #define MArrayClear(a) ((a) ? M_ArrayHeader(a)->size = 0 : 0)
 
-#define MArrayCopy(a, b) ((b) = M_ArrayCopy(MDEBUG_SOURCE_MACRO M_ArrayUnpack(a), M_ArrayUnpack(b)))
+#define MArrayCopy(m, a, b) ((b) = M_ArrayCopy(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), M_ArrayUnpack(b)))
 
 #define MArrayRemoveIndex(a, b) (memcpy((a)+(b), (a)+(b)+1, (MArraySize(a)-(b)-1)*(sizeof*(a))))
 
@@ -424,11 +515,11 @@ typedef struct {
 // Grow array to have enough space for at least minNeeded elements
 // If it fails (OOM), the array will be deleted, a.p will be NULL and the function returns 0
 // else (on success) it returns 1
-void* M_ArrayInit(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize, size_t minNeeded);
-void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE void* a, MArrayHeader* p, size_t elementSize, size_t minNeeded);
-void M_ArrayFree(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize);
+void* M_ArrayInit(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, size_t elementSize, size_t minNeeded);
+void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, MArrayHeader* p, size_t elementSize, size_t minNeeded);
+void M_ArrayFree(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, size_t elementSize);
 
-MINLINE void* M_ArrayMaybeGrow(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize, size_t numAdd) {
+MINLINE void* M_ArrayMaybeGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, size_t elementSize, size_t numAdd) {
     size_t needed;
     MArrayHeader* p;
     if (a) {
@@ -441,13 +532,13 @@ MINLINE void* M_ArrayMaybeGrow(MDEBUG_SOURCE_DEFINE void* a, size_t elementSize,
         p = NULL;
         needed = numAdd;
     }
-    return M_ArrayGrow(MDEBUG_SOURCE_PASS a, p, elementSize, needed);
+    return M_ArrayGrow(MDEBUG_SOURCE_PASS alloc, a, p, elementSize, needed);
 }
 
-MINLINE void* M_ArrayCopy(MDEBUG_SOURCE_DEFINE void* src, size_t srcElementSize, void* dest, size_t destElementSize) {
+MINLINE void* M_ArrayCopy(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* src, size_t srcElementSize, void* dest, size_t destElementSize) {
     if (src) {
         MArrayHeader* srcHeader = M_ArrayHeader(src);
-        dest = M_ArrayMaybeGrow(MDEBUG_SOURCE_PASS dest, destElementSize, srcHeader->size);
+        dest = M_ArrayMaybeGrow(MDEBUG_SOURCE_PASS alloc, dest, destElementSize, srcHeader->size);
         MArrayHeader* destHeader = M_ArrayHeader(dest);
         destHeader->size = srcHeader->size;
         memcpy(dest, src, srcElementSize * srcHeader->size);
@@ -457,7 +548,7 @@ MINLINE void* M_ArrayCopy(MDEBUG_SOURCE_DEFINE void* src, size_t srcElementSize,
     return dest;
 }
 
-MINLINE void* M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_DEFINE void* arr, size_t elementSize, size_t newSize) {
+MINLINE void* M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* arr, size_t elementSize, size_t newSize) {
     MArrayHeader* p = M_ArrayHeader(arr);
     if (p->size >= newSize) {
         return arr;
@@ -469,7 +560,7 @@ MINLINE void* M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_DEFINE void* arr, size_t
         return arr;
     } else {
         u32 oldSize = p->size;
-        void* b = M_ArrayGrow(MDEBUG_SOURCE_PASS arr, p, elementSize, newSize);
+        void* b = M_ArrayGrow(MDEBUG_SOURCE_PASS alloc, arr, p, elementSize, newSize);
         memset((u8*)b + (oldSize * elementSize), 0, (newSize - oldSize) * elementSize);
         p = M_ArrayHeader(arr);
         p->size = newSize;
@@ -477,8 +568,8 @@ MINLINE void* M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_DEFINE void* arr, size_t
     }
 }
 
-MINLINE void* M_ArrayInsertSpace(MDEBUG_SOURCE_DEFINE void* arr, size_t elementSize, size_t i) {
-    void* r = M_ArrayMaybeGrow(MDEBUG_SOURCE_PASS arr, elementSize, 1);
+MINLINE void* M_ArrayInsertSpace(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* arr, size_t elementSize, size_t i) {
+    void* r = M_ArrayMaybeGrow(MDEBUG_SOURCE_PASS alloc, arr, elementSize, 1);
     if (!r) {
         return r;
     }
@@ -503,12 +594,10 @@ typedef struct {
     u32 size;
 } MReadFileRet;
 
-#define MFileReadFully(filePath) (MFileReadWithOffset(filePath, 0, 0))
+#define MFileReadFully(alloc, filePath) (MFileReadWithOffset(alloc, filePath, 0, 0))
+#define MFileReadWithSize(alloc, filePath, readSize) (MFileReadWithOffset(alloc, filePath, 0, readSize))
 
-#define MFileReadWithSize(filePath, readSize) (MFileReadWithOffset(filePath, 0, readSize))
-
-MReadFileRet MFileReadWithOffset(const char* filePath, u32 offset, u32 readSize);
-
+MReadFileRet MFileReadWithOffset(MAllocator* alloc, const char* filePath, u32 offset, u32 readSize);
 i32 MFileWriteDataFully(const char* filePath, u8* data, u32 size);
 
 typedef struct {
@@ -519,60 +608,85 @@ typedef struct {
 MFile MFileWriteOpen(const char* filePath);
 i32 MFileWriteData(MFile* file, u8* data, u32 size);
 MINLINE i32 MFileWriteMem(MFile* file, MMemIO* mem) {
-    return MFileWriteData(file,  mem->mem, mem->pos - mem->mem);
+    return MFileWriteData(file, mem->mem, mem->size);
 }
 void MFileClose(MFile* file);
 
 /////////////////////////////////////////////////////////
 // String parsing / conversion functions
 
+// String type that includes size. String can be null terminated but doesn't have to be. When null terminated
+// size includes the null.
 typedef struct {
     char* str;
     u32 size;
 } MStr;
 
-#define MStrInit(s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (len)), ((s).str) ? (s).size = (len) : 0)
-#define MStrFree(s) ((s).str ? (M_Free(MDEBUG_SOURCE_MACRO (s).str, (s).size), (s).str = 0, (s).size = 0) : 0)
-
 enum MParse {
     MParse_SUCCESS = 0,
     MParse_NOT_A_NUMBER = -1,
+    MParse_NOT_A_BOOL = -2,
 };
 
 i32 MParseI32(const char* start, const char* end, i32* out);
 i32 MParseI32Hex(const char* start, const char* end, i32* out);
+i32 MParseBool(const char* pos, const char* end, b32* out);
+
+b32 MStrIsEmpty(MStr str);
+
 i32 MStrCmp(const char* str1, const char* str2);
-i32 MStrCmp3(const char* str1, const char* str2Start, const char* str2End);
+i32 MStrCmp2(const char* str1, MStr str2);
+i32 MStrCmp3(MStr str1, MStr str2);
+void MStrCopyN(char* dest, const char* src, size_t size);
 void MStrU32ToBinary(u32 val, i32 size, char* out);
 
-// Get pointer to end of str (scan for zero).  This is useful for functions that take a function end.
-const char* MStrEnd(const char* str);
+MINLINE int MCharIsWhitespace(char c) { return (c == '\n' || c == '\r' || c == '\t' || c == ' '); }
+MINLINE int MCharIsSpaceTab(char c) { return (c == '\t' || c == ' '); }
+MINLINE int MCharIsNewLine(char c) { return (c == '\n' || c == '\r'); }
 
-MINTERNAL u32 MStrLen(const char* str) {
-    if (str == NULL) {
-        return 0;
-    }
+// Get pointer to end of str (scan for null terminator)
+MINLINE const char* MStrEnd(const char* str) {
+    if (!str) {return NULL;}
+    while (*str) {str++;}
+    return str;
+}
+
+MINLINE u32 MStrLen(const char* str) {
+    if (str == NULL) {return 0;}
     u32 n = 0;
-    while (*str++) n++;
+    while (*str++) {n++;}
     return n;
 }
 
-MINLINE MStr MStrMake(const char* c) {
+// Heap alloc strings
+#define MStrInit(a, s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (a), (len)), ((s).str) ? (s).size = (len) : 0)
+#define MStrFree(a, s) ((s).str ? (M_Free(MDEBUG_SOURCE_MACRO (a), (s).str, (s).size), (s).str = 0, (s).size = 0) : 0)
+
+// Make a MStr copy from a C string - includes null terminator in size
+MINLINE MStr MStrMake(MAllocator* alloc, const char* c) {
     MStr r = {};
     u32 len = MStrLen(c) + 1;
-    MStrInit(r, len);
+    MStrInit(alloc, r, len);
     memcpy(r.str, c, len);
     return r;
 }
 
-i32 MStringAppend(MMemIO* memIo, const char* str);
-i32 MStringAppendf(MMemIO* memIo, const char* format, ...);
+// Make a MStr from a C string - includes null terminator in size
+MINLINE MStr MStrWrap(const char* c) {
+    const MStr r = {(char*)c, MStrLen(c) + 1};
+    return r;
+}
+
+i32 MStrAppend(MMemIO* memIo, const char* str);
+i32 MStrAppendf(MMemIO* memIo, const char* format, ...);
 
 
 /////////////////////////////////////////////////////////
-// Backtrace
-#ifdef M_BACKTRACE
-void MLogStacktrace();
+// Stacktraces
+#ifdef M_STACKTRACE
+b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames);
+void MLogStacktrace(MStacktrace* stacktrace);
+void MLogStacktraceCurrent(int skipFrames);
 #endif
 
 #ifdef __GNUC__

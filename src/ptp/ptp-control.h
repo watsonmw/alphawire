@@ -22,8 +22,7 @@ extern "C" {
  * - Managing data buffers for incoming and outgoing PTP operations.
  */
 typedef struct {
-    PTPDeviceTransport* deviceTransport;
-    PTPLog logger;
+    PTPDevice* device;
 
     u16 protocolVersion;
     MStr manufacturer;
@@ -58,6 +57,9 @@ typedef struct {
     u32 dataOutCapacity;
     PTPRequestHeader ptpRequest;
     PTPResponseHeader ptpResponse;
+
+    MAllocator* allocator;
+    PTPLog logger;
 } PTPControl;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +78,7 @@ typedef struct {
  *    ...
  *    PTPDeviceList ptpDeviceList{};
  *    // Open device list
- *    PTPDeviceList_Open(&ptpDeviceList);
+ *    PTPDeviceList_Open(&ptpDeviceList, &allocator);
  *    // Poll for devices
  *    PTPDeviceList_RefreshList(&ptpDeviceList);
  *    // If one or more devices
@@ -87,7 +89,7 @@ typedef struct {
  *        PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
  *        PTPControl ptp{};
  *        // Init control structure
- *        PTPControl_Init(&ptp, device);
+ *        PTPControl_Init(&ptp, device, &allocator);
  *        // Connect to device with given mode
  *        PTPControl_Connect(&ptp, SDI_EXTENSION_VERSION_300);
  *    }
@@ -95,7 +97,7 @@ typedef struct {
  *
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device);
+PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator);
 
 /**
  * Establishes a connection with a Sony device over PTP (Picture Transfer Protocol), on the previously setup transport.
@@ -104,7 +106,7 @@ PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device);
  * the device for control operations.
  *
  * @param version The Sony protocol version to connect with.  Year 2020+ cameras support SDI_EXTENSION_VERSION_300,
- *                which has more properties and controls, along with other API imrpovements over the
+ *                which has more properties and controls, along with other API improvements over the
  *                SDI_EXTENSION_VERSION_200 protocol.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
@@ -169,8 +171,8 @@ PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Release temporary data
 //////////////////////////////////////////////////////////////////////////////////////////////
-void PTP_FreeLiveViewFrames(LiveViewFrames* liveViewFrames);
-void PTP_FreePropValueEnums(PTPPropValueEnums* outEnums);
+void PTP_FreeLiveViewFrames(MAllocator* mem, LiveViewFrames* liveViewFrames);
+void PTP_FreePropValueEnums(MAllocator* mem, PTPPropValueEnums* outEnums);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////

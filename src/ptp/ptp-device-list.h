@@ -33,7 +33,7 @@ extern "C" {
  *        PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
  *        PTPControl ptp{};
  *        // Init control structure
- *        PTPControl_Init(&ptp, &device->transport);
+ *        PTPControl_Init(&ptp, device, &allocator);
  *        // Connect to device with given mode
  *        PTPControl_Connect(&ptp, SDI_EXTENSION_VERSION_300);
  *    }
@@ -48,6 +48,8 @@ typedef struct {
     b32 listUpToDate;
     // Set before calling When PTPDeviceList_Open().  When et to 0 will block during device enumeration.
     u32 timeoutMilliseconds;
+
+    MAllocator* allocator;
     PTPLog logger;
 } PTPDeviceList;
 
@@ -61,7 +63,7 @@ typedef struct {
  * @param self A pointer to the PTPDeviceList to be initialized.
  * @return TRUE if at least one backend was initialized
  */
-b32 PTPDeviceList_Open(PTPDeviceList* self);
+b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
 
 /**
  * Closes the PTPDeviceList and releases all associated resources.
@@ -97,7 +99,7 @@ b32 PTPDeviceList_RefreshList(PTPDeviceList* self);
  *                  instance if the connection is successful.
  * @return TRUE if the connection was successful.
  */
-b32 PTPDeviceList_ConnectDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 
 /**
  * Disconnects from the specified device's transport.
@@ -106,7 +108,7 @@ b32 PTPDeviceList_ConnectDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, 
  * @param device Pointer to the PTPDevice to be disconnected.
  * @return TRUE if the device was successfully disconnected.
  */
-b32 PTPDeviceList_DisconnectDevice(PTPDeviceList* self, PTPDevice* device);
+b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
 
 /**
  * Retrieves the backend of the specified type from the given PTPDeviceList.

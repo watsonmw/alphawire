@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <wia.h>
+#include <stdio.h>
 
 #include "win-utils.h"
 
@@ -35,14 +36,14 @@ typedef MSTRUCTPACKED(struct sWiaPtpResponse {
 #define ESCAPE_PTP_VENDOR_COMMAND 0x0100
 #define ESCAPE_PTP_CLEAR_STALLS   0x0200
 
-static void PrintComPropertyValue(PROPVARIANT* pValue) {
+static void PrintComPropertyValue(MAllocator* allocator, PROPVARIANT* pValue) {
     MStr utf8Str;
     switch (pValue->vt) {
         case VT_BSTR:
-            utf8Str = WinUtils_BSTRToUTF8(pValue->bstrVal);
+            utf8Str = WinUtils_BSTRToUTF8(allocator, pValue->bstrVal);
             if (utf8Str.str) {
                 MLogf("String: %s\n", utf8Str.str);
-                MStrFree(utf8Str);
+                MStrFree(allocator, utf8Str);
             }
             break;
         case VT_I4:
@@ -100,7 +101,7 @@ static ULONG STDMETHODCALLTYPE WiaEventCallback_Release(IWiaEventCallback* This)
     LONG count = InterlockedDecrement(&self->refCount);
 
     if (count == 0) {
-        MFree(self, sizeof(WiaEventCallback));
+        MFree(self->deviceList->allocator, self, sizeof(WiaEventCallback));
     }
 
     return count;
@@ -153,7 +154,7 @@ static HRESULT CreateEventCallback(PTPWiaDeviceList* self, IWiaEventCallback** p
 
     *ppCallback = NULL;
 
-    callback = (WiaEventCallback*)MMalloc(sizeof(WiaEventCallback));
+    callback = (WiaEventCallback*)MMalloc(self->allocator, sizeof(WiaEventCallback));
     if (!callback) {
         return E_OUTOFMEMORY;
     }
@@ -193,8 +194,8 @@ static HRESULT RegisterForDeviceConnectDisconnectEvents(PTPWiaDeviceList* self) 
     if (FAILED(hr)) {
         pEventObject1->lpVtbl->Release(pEventObject1);
     } else {
-        MArrayAdd(self->eventListeners, pEventObject1);
-        MArrayAdd(self->eventListeners, pEventObject2);
+        MArrayAdd(self->allocator, self->eventListeners, pEventObject1);
+        MArrayAdd(self->allocator, self->eventListeners, pEventObject2);
     }
 
 cleanup:
@@ -223,7 +224,7 @@ void PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self) {
                 SysFreeString(it.p->deviceId); it.p->deviceId = NULL;
             }
         }
-        MArrayInit(self->devices, 0);
+        MArrayInit(self->allocator, self->devices, 0);
     }
 }
 
@@ -238,13 +239,13 @@ b32 PTPWiaDeviceList_Close(PTPWiaDeviceList* self) {
             IUnknown* eventObject = *it.p;
             eventObject->lpVtbl->Release(eventObject);
         }
-        MArrayFree(self->eventListeners);
+        MArrayFree(self->allocator, self->eventListeners);
     }
     if (self->devices) {
-        MArrayFree(self->devices);
+        MArrayFree(self->allocator, self->devices);
     }
     if (self->openDevices) {
-        MArrayFree(self->openDevices);
+        MArrayFree(self->allocator, self->openDevices);
     }
     return TRUE;
 }
@@ -271,7 +272,7 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
     propSpec[2].ulKind = PRSPEC_PROPID;
     propSpec[2].propid = WIA_DIP_DEV_NAME;
 
-    MArrayInit(self->devices, countElements);
+    MArrayInit(self->allocator, self->devices, countElements);
     for (int i = 0; i < countElements; i++) {
         ULONG countFetched = 0;
         IWiaPropertyStorage* pWiaPropertyStorage = NULL;
@@ -286,11 +287,11 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
             goto next;
         }
 
-        WiaDeviceInfo* wiaDeviceInfo = MArrayAddPtr(self->devices);
-        PTPDeviceInfo* deviceInfo = MArrayAddPtr(*deviceList);
+        WiaDeviceInfo* wiaDeviceInfo = MArrayAddPtr(self->allocator, self->devices);
+        PTPDeviceInfo* deviceInfo = MArrayAddPtr(self->allocator, *deviceList);
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
-        deviceInfo->manufacturer = WinUtils_BSTRToUTF8(propVar[1].bstrVal);
-        deviceInfo->deviceName = WinUtils_BSTRToUTF8(propVar[2].bstrVal);
+        deviceInfo->manufacturer = WinUtils_BSTRToUTF8(self->allocator, propVar[1].bstrVal);
+        deviceInfo->deviceName = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
         deviceInfo->backendType = PTP_BACKEND_WIA;
         deviceInfo->device = wiaDeviceInfo;
 
@@ -412,7 +413,7 @@ b32 PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* device
     }
 
     // Store the interface pointer
-    PTPDeviceWia* wiaDevice = MArrayAddPtr(self->openDevices);
+    PTPDeviceWia* wiaDevice = MArrayAddPtr(self->allocator, self->openDevices);
     wiaDevice->device = pWiaItemExtras;
     wiaDevice->deviceId = wiaDeviceInfo->deviceId;
     wiaDevice->disconnected = FALSE;
@@ -479,13 +480,13 @@ b32 PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device) {
         CoTaskMemFree(memOut);
     }
 
-    return TRUE;
+    return SUCCEEDED(hr);
 }
 
 b32 PTPWiaDeviceList_Close_(PTPBackend* backend) {
     PTPWiaDeviceList* self = backend->self;
     b32 r = PTPWiaDeviceList_Close(self);
-    MFree(self, sizeof(PTPWiaDeviceList));
+    MFree(self->allocator, self, sizeof(PTPWiaDeviceList));
     return r;
 }
 
@@ -510,7 +511,7 @@ b32 PTPWiaDeviceList_DisconnectDevice_(PTPBackend* backend, PTPDevice* device) {
 }
 
 b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
-    PTPWiaDeviceList* deviceList = MMallocZ(sizeof(PTPWiaDeviceList));
+    PTPWiaDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(PTPWiaDeviceList));
     backend->self = deviceList;
     backend->close = PTPWiaDeviceList_Close_;
     backend->refreshList = PTPWiaDeviceList_RefreshList_;
@@ -518,6 +519,7 @@ b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
     backend->openDevice = PTPWiaDeviceList_ConnectDevice_;
     backend->closeDevice = PTPWiaDeviceList_DisconnectDevice_;
     deviceList->logger = backend->logger;
+    deviceList->allocator = backend->allocator;
     return PTPWiaDeviceList_Open(deviceList);
 }
 

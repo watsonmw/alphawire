@@ -629,11 +629,13 @@ typedef PTPResult (*PTP_Device_SendAndRecvEx_t)(void* deviceSelf, PTPRequestHead
                                                 PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                                 size_t* actualDataOutSize);
 
+// Device transport for communicating with a device
 typedef struct {
     PTP_Device_ReallocBuffer_t reallocBuffer;
     PTP_Device_FreeBuffer_t freeBuffer;
     PTP_Device_SendAndRecvEx_t sendAndRecvEx;
     b32 requiresSessionOpenClose;
+    MAllocator* allocator;
 } PTPDeviceTransport;
 
 typedef enum {
@@ -641,19 +643,21 @@ typedef enum {
     PTP_BACKEND_LIBUSBK,
 } PTPBackendType;
 
+// Generic device info - describing an available device
 typedef struct {
     PTPBackendType backendType;
     MStr manufacturer;
     MStr deviceName;
-    void* device;
+    void* device; // concrete backend device info
 } PTPDeviceInfo;
 
+// Generic device and transport for sending commands to
 typedef struct {
     PTPDeviceTransport transport;
     PTPLog logger;
     PTPBackendType backendType;
     b32 disconnected;
-    void* device;
+    void* device; // concrete backend device
 } PTPDevice;
 
 struct PTPBackend;
@@ -664,6 +668,7 @@ typedef void (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
 
+// Generic backend
 typedef struct PTPBackend {
     PTPBackend_Close_Func close;
     PTPBackend_RefreshList_Func refreshList;
@@ -672,7 +677,8 @@ typedef struct PTPBackend {
     PTPBackend_CloseDevice_Func closeDevice;
     PTPBackendType type;
     PTPLog logger;
-    void* self;
+    MAllocator* allocator;
+    void* self; // Pointer to concrete backend
 } PTPBackend;
 
 #ifdef __cplusplus

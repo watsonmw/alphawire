@@ -140,6 +140,8 @@ struct PropTable {
 };
 
 struct AppContext {
+    MAllocator* allocator = NULL;
+    MAllocator deviceAllocator{};
     PTPDeviceList ptpDeviceList{};
     PTPDevice* device = NULL;
     PTPControl ptp{};
@@ -198,9 +200,14 @@ struct AppContext {
         if (selectedDeviceIndex != -1 && MArraySize(ptpDeviceList.devices) > selectedDeviceIndex) {
             PTPDeviceInfo* deviceInfo = ptpDeviceList.devices + selectedDeviceIndex;
             DisconnectDevice();
-            b32 ok = PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
+            b32 ok = PTPDeviceList_OpenDevice(&ptpDeviceList, deviceInfo, &device);
             if (ok) {
-                PTPControl_Init(&ptp, device);
+                MAllocatorMakeClibHeap(&deviceAllocator);
+                deviceAllocator.name = (char*)"PTPDevice";
+#ifdef M_MEM_DEBUG
+                MMemDebugInit(&deviceAllocator);
+#endif
+                PTPControl_Init(&ptp, device, &deviceAllocator);
                 PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
                 connected = true;
             }
@@ -235,8 +242,11 @@ struct AppContext {
     void DisconnectDevice() {
         if (device != NULL) {
             PTPControl_Cleanup(&ptp);
-            PTPDeviceList_DisconnectDevice(&ptpDeviceList, device);
+            PTPDeviceList_CloseDevice(&ptpDeviceList, device);
             MMemFree(&this->liveViewImage);
+#ifdef M_MEM_DEBUG
+            MMemDebugDeinit(&deviceAllocator);
+#endif
             device = NULL;
         }
     }

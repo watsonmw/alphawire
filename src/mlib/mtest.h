@@ -17,18 +17,37 @@ static int m_passed_tests = 0;
 
 // Print test results
 #define MTEST_PRINT_RESULTS() \
-    MLogf("\nTest Results: %d/%d passed\n", m_passed_tests, m_total_tests)
+    if ((m_passed_tests) == (m_total_tests)) { \
+        MLogf("\n" MANSI_COLOR_GREEN "Test Results: %d/%d passed" MANSI_COLOR_RESET "\n", \
+              m_passed_tests, m_total_tests); \
+    } else { \
+        MLogf("\n" MANSI_COLOR_RED "Test Results: %d/%d passed" MANSI_COLOR_RESET "\n", \
+              m_passed_tests, m_total_tests); \
+    }
 
 // Assert equality for integers
 #define MASSERT_INT_EQ(actual, expected) do { \
     m_total_tests++; \
     if ((expected) == (actual)) { \
         m_passed_tests++; \
-        MLogf(MANSI_COLOR_GREEN "PASS" MANSI_COLOR_RESET ": %s:%d  %s=%s  %d=%d", \
+        MLogf(MANSI_COLOR_GREEN "PASS" MANSI_COLOR_RESET ": %s:%d  %s==%s  %d==%d", \
                __FILE__, __LINE__, #actual, #expected, (actual), (expected)); \
     } else { \
-        MLogf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d  %s=%s  %d=%d", \
-               __FILE__, __LINE__, #actual, #expected, (expected), (actual)); \
+        MBreakpointf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d  %s==%s  %d==%d", \
+                     __FILE__, __LINE__, #actual, #expected, (expected), (actual)); \
+    } \
+} while(0)
+
+// Assert equality for unsigned integers
+#define MASSERT_UINT_EQ(actual, expected) do { \
+    m_total_tests++; \
+    if ((expected) == (actual)) { \
+        m_passed_tests++; \
+        MLogf(MANSI_COLOR_GREEN "PASS" MANSI_COLOR_RESET ": %s:%d  %s==%s  0x%x==0x%x", \
+              __FILE__, __LINE__, #actual, #expected, (actual), (expected)); \
+    } else { \
+        MBreakpointf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d  %s==%s 0x%x==0x%x", \
+                     __FILE__, __LINE__, #actual, #expected, (expected), (actual)); \
     } \
 } while(0)
 
@@ -40,8 +59,8 @@ static int m_passed_tests = 0;
         MLogf(MANSI_COLOR_GREEN "PASS" MANSI_COLOR_RESET ": %s:%d - Expected \"%s\", got \"%s\"\n", \
               __FILE__, __LINE__, (expected), (actual)); \
     } else { \
-        MLogf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d - Expected \"%s\", got \"%s\"\n", \
-               __FILE__, __LINE__, (expected), (actual)); \
+        MBreakpointf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d - Expected \"%s\", got \"%s\"\n", \
+                     __FILE__, __LINE__, (expected), (actual)); \
     } \
 } while(0)
 
@@ -53,8 +72,8 @@ static int m_passed_tests = 0;
         MLogf(MANSI_COLOR_GREEN "PASS" MANSI_COLOR_RESET ": %s:%d  %s", \
               __FILE__, __LINE__, #condition); \
     } else { \
-        MLogf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d  %s", \
-              __FILE__, __LINE__, #condition); \
+        MBreakpointf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d  %s", \
+                     __FILE__, __LINE__, #condition); \
     } \
 } while(0)
 
@@ -68,8 +87,8 @@ static int m_passed_tests = 0;
         MLogf(MANSI_COLOR_GREEN "PASS" MANSI_COLOR_RESET ": %s:%d - Expected %f, got %f (within %f)\n", \
                __FILE__, __LINE__, (float)(expected), (float)(actual), (float)(epsilon)); \
     } else { \
-        MLogf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d - Expected %f, got %f (epsilon %f)\n", \
-               __FILE__, __LINE__, (float)(expected), (float)(actual), (float)(epsilon)); \
+        MBreakpointf(MANSI_COLOR_RED "FAIL" MANSI_COLOR_RESET ": %s:%d - Expected %f, got %f (epsilon %f)\n", \
+                     __FILE__, __LINE__, (float)(expected), (float)(actual), (float)(epsilon)); \
     } \
 } while(0)
 
