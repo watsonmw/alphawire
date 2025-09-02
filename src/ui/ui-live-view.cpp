@@ -61,10 +61,10 @@ void UiPtpLiveViewShow(AppContext& c) {
         c.liveViewLastTime = currentTime;
         if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames) == PTP_OK) {
             PTP_FreeLiveViewFrames(c.ptp.allocator, &c.liveViewFrames);
-        }
 
-        LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId,
-                              &c.liveViewImageWidth, &c.liveViewImageHeight);
+            LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId,
+                                  &c.liveViewImageWidth, &c.liveViewImageHeight);
+        }
     }
 
     if (c.liveViewImage.size != 0) {

@@ -1861,7 +1861,7 @@ PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, M
 
     RETURN_IF_FAIL(r);
 
-    MMemReadCopy(&r.memIo, fileOut, r.memIo.size);
+    MMemReadCopy(&r.memIo, fileOut, r.memIo.capacity);
 
     return r.result;
 }

@@ -94,7 +94,7 @@ MINLINE void* MMemDebug_ArrayMaybeGrow(MAllocator* allocator, void* a, size_t el
     size_t newSize = elementSize * newCapacity + sizeof(MArrayHeader);
     void* mem = allocator->reallocFunc(allocator, p, oldSize, newSize);
     if (mem == NULL)  {
-        MLogf("MMemDebug_ArrayMaybeGrow realloc failed for %p", a);
+        MBreakpointf("MMemDebug_ArrayMaybeGrow realloc failed for %p", a);
         return NULL;
     }
 
@@ -111,8 +111,7 @@ MINLINE void* MMemDebug_ArrayMaybeGrow(MAllocator* allocator, void* a, size_t el
 
 #ifdef M_STACKTRACE
 static void MMemDebug_AddStacktrace(MAllocator* alloc, MMemAllocInfo* memAlloc, int skipFrames) {
-    // TODO: Hash stacktrace array
-    // TODO: Garbage collection of stack traces to make room for new hashes
+    // TODO: More efficient stacktrace lookup and storage
     MStacktrace currentStacktrace = {};
     MGetStacktrace(&currentStacktrace, skipFrames);
     memAlloc->stacktraceHash = currentStacktrace.hash;
@@ -163,11 +162,11 @@ void MMemDebugDeinit(MAllocator* alloc) {
         return;
     }
 
-    if (alloc->name) {
-        MLogf("Arena '%s':", alloc->name);
-    } else {
-        MLogf("Arena 'default':", alloc->name);
+    const char* name = alloc->name;
+    if (!name) {
+        name = "default";
     }
+    MLogf("Releasing Arena '%s':", name);
 
     MLogf("   Total allocations: %ld", alloc->debug.totalAllocations);
     MLogf("   Total allocated: %ld bytes", alloc->debug.totalAllocatedBytes);
@@ -189,13 +188,13 @@ void MMemDebugDeinit(MAllocator* alloc) {
 
     if (alloc->debug.allocSlots) {
         alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.allocSlots),
-            M_ArrayHeader(alloc->debug.allocSlots)->capacity * sizeof(MMemAllocInfo));
+                        M_ArrayHeader(alloc->debug.allocSlots)->capacity * sizeof(MMemAllocInfo));
         alloc->debug.allocSlots = NULL;
     }
 
     if (alloc->debug.freeSlots) {
         alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.freeSlots),
-            M_ArrayHeader(alloc->debug.freeSlots)->capacity * sizeof(u32));
+                        M_ArrayHeader(alloc->debug.freeSlots)->capacity * sizeof(u32));
         alloc->debug.freeSlots = NULL;
     }
 
@@ -278,10 +277,10 @@ b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
 
     if (beforeBytes || afterBytes) {
 #ifdef M_STACKTRACE
-        MLogf("MMemDebugCheck: 0x%p [%d]", memAlloc->mem, memAlloc->size);
+        MBreakpointf("MMemDebugCheck: 0x%p [%d]", memAlloc->mem, memAlloc->size);
         MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-        MLogf("MMemDebugCheck: %s:%d : 0x%p [%d]", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
+        MBreakpointf("MMemDebugCheck: %s:%d : 0x%p [%d]", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
 #endif
     }
 
@@ -311,7 +310,7 @@ b32 MMemDebugCheck(MAllocator* alloc, void* p) {
     }
 
     if (memAllocFound == NULL) {
-        MLogf("MMemDebugCheck called on invalid ptr %p", p);
+        MBreakpointf("MMemDebugCheck called on invalid ptr %p", p);
 #ifdef M_STACKTRACE
         MLogStacktraceCurrent(1);
 #endif
@@ -434,13 +433,13 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
             MMemDebugCheckMemAlloc(alloc, memAlloc);
             if (size != memAlloc->size) {
 #ifdef M_STACKTRACE
-                MLogf("MFree 0x%p called with wrong size: %d - should be: %d", p, size, memAlloc->size);
+                MBreakpointf("MFree 0x%p called with wrong size: %d - should be: %d", p, size, memAlloc->size);
                 MLogStacktrace(0);
                 MLog(" allocated @");
                 MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-                MLogf("MFree %s:%d 0x%p called with wrong size: %d - should be: %d", file, line, p, size,
-                      memAlloc->size);
+                MBreakpointf("MFree %s:%d 0x%p called with wrong size: %d - should be: %d", file, line, p, size,
+                             memAlloc->size);
 #endif
             }
             alloc->freeFunc(alloc, memAlloc->start, M_SENTINEL_BEFORE + memAlloc->size + M_SENTINEL_AFTER);
@@ -448,7 +447,7 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
             memAlloc->start = NULL;
             memAlloc->mem = NULL;
 #ifdef M_LOG_ALLOCATIONS
-#ifdef M_STACKTRACE
+            #ifdef M_STACKTRACE
             MLogf("free(0x%p) size: %d [allocated @ %s:%d]", p, memAlloc->size, memAlloc->file, memAlloc->line);
             MLogStacktrace(1);
 #else
@@ -460,7 +459,7 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
         }
     }
 
-    MLogf("MFree %s:%d called on invalid ptr: 0x%p", file, line, p);
+    MBreakpointf("MFree %s:%d called on invalid ptr: 0x%p", file, line, p);
 #ifdef M_STACKTRACE
     MLogStacktrace(0);
 #endif
@@ -497,7 +496,7 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     }
 
     if (memAllocFound == NULL) {
-        MLogf("MRealloc called on invalid ptr at line: %s:%d %p", file, line, p);
+        MBreakpointf("MRealloc called on invalid ptr at line: %s:%d %p", file, line, p);
 #ifdef M_STACKTRACE
         MLogStacktrace(0);
 #endif
@@ -505,8 +504,8 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     }
 
     if (memAllocFound->size != oldSize) {
-        MLogf("MRealloc %s:%d 0x%p called with old size: %d - should be: %d", file, line, p, oldSize,
-              memAllocFound->size);
+        MBreakpointf("MRealloc %s:%d 0x%p called with old size: %d - should be: %d", file, line, p, oldSize,
+                     memAllocFound->size);
 #ifdef M_STACKTRACE
         MMemDebug_LogAllocStacktrace(alloc, memAllocFound);
 #endif
@@ -538,7 +537,7 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
 #endif
     return memAllocFound->mem;
 #else
-#ifdef M_LOG_ALLOCATIONS
+    #ifdef M_LOG_ALLOCATIONS
     MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
     void* mem = smem->reallocFunc(alloc, p, oldSize, newSize);
     MLogf("-> 0x%p (resized)", mem);
@@ -1583,14 +1582,16 @@ b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
     return TRUE;
 }
 
-#elif defined(__GLIBC__)
+#elif defined(__GLIBC__) || defined(__APPLE__)
 #include <stdio.h>
 #include <stdlib.h>
 #include <execinfo.h>
 
 b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
+    skipFrames+=1;
+
     void* array[64];
-    size_t frames = backtrace(array, MStaticArraySize(array));
+    int frames = backtrace(array, MStaticArraySize(array));
 
     u64 hash = 0;
     stacktrace->frames = 0;
@@ -1616,13 +1617,14 @@ void MLogStacktrace(MStacktrace* stacktrace) {
 }
 
 void MLogStacktraceCurrent(int skipFrames) {
+    skipFrames += 1;
     void* array[64];
-    size_t frames = backtrace(array, MStaticArraySize(array));
+    int frames = backtrace(array, MStaticArraySize(array));
 
     char** strings;
     strings = backtrace_symbols(array, frames);
     for (size_t i = skipFrames; i < frames; i++) {
-        MLogf("  %s()", strings[i]);
+        MLogf("  %s", strings[i]);
     }
 
     free(strings);

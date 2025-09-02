@@ -40,6 +40,8 @@ int main(int argc, char** argv) {
 
     AppContext c;
     c.allocator = &allocator;
+    // Log to the highest logging level enabled at compile time
+    c.ptpDeviceList.logger.level = PTP_LOG_LEVEL_TRACE;
     PTPDeviceList_Open(&c.ptpDeviceList, &allocator);
     PTPDeviceList_RefreshList(&c.ptpDeviceList);
 

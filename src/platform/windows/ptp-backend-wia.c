@@ -107,6 +107,8 @@ static ULONG STDMETHODCALLTYPE WiaEventCallback_Release(IWiaEventCallback* This)
     return count;
 }
 
+// WIA Event callback function - called from a WIA thread - not the main thread
+// TODO: Add locking for device list iteration
 static HRESULT STDMETHODCALLTYPE WiaEventCallback_ImageEventCallback(IWiaEventCallback* This,
                                                                      const GUID* pEventGuid,
                                                                      BSTR bstrEventDescription,
@@ -250,6 +252,10 @@ b32 PTPWiaDeviceList_Close(PTPWiaDeviceList* self) {
     return TRUE;
 }
 
+b32 PTPWiaDeviceList_NeedsRefresh(PTPWiaDeviceList* self) {
+    return (self->deviceListUpToDate == FALSE);
+}
+
 b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceList) {
     PTPWiaDeviceList_ReleaseList(self);
 
@@ -288,11 +294,11 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         }
 
         WiaDeviceInfo* wiaDeviceInfo = MArrayAddPtr(self->allocator, self->devices);
-        PTPDeviceInfo* deviceInfo = MArrayAddPtr(self->allocator, *deviceList);
+        PTPDeviceInfo* deviceInfo = MArrayAddPtrZ(self->allocator, *deviceList);
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
         deviceInfo->manufacturer = WinUtils_BSTRToUTF8(self->allocator, propVar[1].bstrVal);
         deviceInfo->deviceName = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
-        deviceInfo->backendType = PTP_BACKEND_WIA;
+        deviceInfo->backendType = PTP_ENABLE_WIA;
         deviceInfo->device = wiaDeviceInfo;
 
         PTP_INFO_F("Found device: %s (%s)", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
@@ -495,6 +501,11 @@ b32 PTPWiaDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceLis
     return PTPWiaDeviceList_RefreshList(self, deviceList);
 }
 
+b32 PTPWiaDeviceList_NeedsRefresh_(PTPBackend* backend) {
+    PTPWiaDeviceList* self = backend->self;
+    return PTPWiaDeviceList_NeedsRefresh(self);
+}
+
 void PTPWiaDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPWiaDeviceList* self = backend->self;
     PTPWiaDeviceList_ReleaseList(self);
@@ -515,6 +526,7 @@ b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
     backend->self = deviceList;
     backend->close = PTPWiaDeviceList_Close_;
     backend->refreshList = PTPWiaDeviceList_RefreshList_;
+    backend->needsRefresh = PTPWiaDeviceList_NeedsRefresh_;
     backend->releaseList = PTPWiaDeviceList_ReleaseList_;
     backend->openDevice = PTPWiaDeviceList_ConnectDevice_;
     backend->closeDevice = PTPWiaDeviceList_DisconnectDevice_;

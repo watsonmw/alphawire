@@ -475,6 +475,9 @@ typedef struct {
 // Add space for item to the end of the array and return ptr to it
 #define MArrayAddPtr(m, a) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), ((a) + M_ArrayHeader(a)->size++))
 
+// Add space for item to the end of the array, zero its memory and return ptr to it
+#define MArrayAddPtrZ(m, a) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), memset((a) + M_ArrayHeader(a)->size, 0, sizeof(*a)), ((a) + M_ArrayHeader(a)->size++))
+
 // Grow the array, adding new elements. New elements are uninitialized, old elements are unchanged but may be moved (they are
 // memmove()d if the backing memory needs to be relocated to fit the new elements, and left alone if not).
 #define MArrayGrow(m, a, s) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s))

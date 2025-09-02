@@ -9,7 +9,9 @@
 #include <locale>
 #include <string>
 
+#ifdef PTP_ENABLE_WIA
 #include "platform/windows/ptp-backend-wia.h"
+#endif
 
 #include "imgui.h"
 
@@ -104,7 +106,7 @@ struct PropTable {
             PTPProperty *property = ptp.properties + i;
 
             UiPtpProperty uiPtpProperty{};
-            sprintf(uiPtpProperty.propCode, "0x%04x", property->propCode);
+            snprintf(uiPtpProperty.propCode,  sizeof(uiPtpProperty.propCode), "0x%04x", property->propCode);
             uiPtpProperty.propName = PTP_GetPropertyStr(property->propCode);
             if (uiPtpProperty.propName == NULL) {
                 uiPtpProperty.propName = uiPtpProperty.propCode;

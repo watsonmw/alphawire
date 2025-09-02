@@ -7,8 +7,6 @@
 extern "C" {
 #endif
 
-void ListUsbK();
-
 typedef struct {
     void* deviceId;
 } UsbkDeviceInfo;
@@ -29,7 +27,7 @@ typedef struct {
 typedef struct {
     UsbkDeviceInfo* devices;
     PTPDeviceUsbk* openDevices;
-    void* deviceList;
+    void* deviceList; // Device list reference
     int timeoutMilliseconds;
     MAllocator* allocator;
     PTPLog logger;

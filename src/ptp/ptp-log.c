@@ -9,7 +9,7 @@ void PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *format, ...) {
         return;
     }
 
-    if (level < logger->level) {
+    if (level > logger->level) {
         return;
     }
 

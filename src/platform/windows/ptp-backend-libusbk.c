@@ -15,31 +15,11 @@
 #endif
 
 #include "mlib/mlib.h"
-
-#include "ptp-backend-libusbk.h"
-
-#include "win-utils.h"
 #include "ptp/ptp-control.h"
 
-#define SONY_VID 0x054C
-#define USB_EN_US 0x0409
-#define USB_PROTOCOL_PTP 0x01
-#define USB_CLASS_STILL_IMAGE 0x06
-#define USB_SUBCLASS_STILL_IMAGE 0x01
-#define BULK_MAX_PACKET_SIZE 512
-
-// PTP Container Types
-#define PTP_CONTAINER_COMMAND  0x0001
-#define PTP_CONTAINER_DATA     0x0002
-#define PTP_CONTAINER_RESPONSE 0x0003
-#define PTP_CONTAINER_EVENT    0x0004
-
-typedef MSTRUCTPACKED(struct {
-    u32 length;
-    u16 type;
-    u16 code;
-    u32 transactionId;
-}) PTPContainerHeader;
+#include "platform/usb-const.h"
+#include "platform/windows/ptp-backend-libusbk.h"
+#include "platform/windows/win-utils.h"
 
 b32 PTPUsbkDeviceList_Open(PTPUsbkDeviceList* self) {
     PTP_TRACE("PTPUsbkDeviceList_Open");
@@ -224,6 +204,11 @@ b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMi
     return FALSE;
 }
 
+b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkDeviceList* self, PTPDeviceInfo** devices) {
+    PTP_TRACE("PTPUsbkDeviceList_NeedsRefresh");
+    return FALSE;
+}
+
 b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devices) {
     PTP_TRACE("PTPUsbkDeviceList_RefreshList");
 
@@ -278,12 +263,14 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                         WCHAR* wideString = (WCHAR*)(&stringDescriptor[2]);
 
                         UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->allocator, self->devices);
-                        PTPDeviceInfo* device = MArrayAddPtr(self->allocator, *devices);
+                        PTPDeviceInfo* device = MArrayAddPtrZ(self->allocator, *devices);
                         usbkDevice->deviceId = deviceInfo;
                         device->manufacturer = MStrMake(self->allocator, deviceInfo->Mfg);
                         device->backendType = PTP_BACKEND_LIBUSBK;
                         device->device = usbkDevice;
                         device->deviceName = WinUtils_BSTRWithSizeToUTF8(self->allocator, wideString, length/2);
+                        device->usbVID = deviceInfo->Common.Vid;
+                        device->usbPID = deviceInfo->Common.Pid;
 
                         PTP_INFO_F("Found device: %s (%s)", device->deviceName.str, device->manufacturer.str);
                     } else {
@@ -697,6 +684,11 @@ b32 PTPUsbkDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceLi
     return PTPUsbkDeviceList_RefreshList(self, deviceList);
 }
 
+b32 PTPUsbkDeviceList_NeedsRefresh_(PTPBackend* backend) {
+    PTPUsbkDeviceList* self = backend->self;
+    return PTPUsbkDeviceList_NeedsRefresh(self);
+}
+
 void PTPUsbkDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPUsbkDeviceList* self = backend->self;
     PTPUsbkDeviceList_ReleaseList(self);
@@ -716,13 +708,14 @@ b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) 
     PTP_LOG_TRACE(&backend->logger, "PTPUsbkDeviceList_OpenBackend");
 
     if (timeoutMilliseconds == 0) {
-        timeoutMilliseconds = 20000;
+        timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;
     }
 
     PTPUsbkDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(PTPUsbkDeviceList));
     backend->self = deviceList;
     backend->close = PTPUsbkDeviceList_Close_;
     backend->refreshList = PTPUsbkDeviceList_RefreshList_;
+    backend->needsRefresh = PTPUsbkDeviceList_NeedsRefresh_;
     backend->releaseList = PTPUsbkDeviceList_ReleaseList_;
     backend->openDevice = PTPUsbkDeviceList_ConnectDevice_;
     backend->closeDevice = PTPUsbkDeviceList_DisconnectDevice_;

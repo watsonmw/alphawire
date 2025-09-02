@@ -7,9 +7,14 @@
 #include "ui/ui-live-view.h"
 
 #include "ptp/ptp-control.h"
-#include "platform/windows/ptp-backend-wia.h"
-#include "platform/windows/ptp-backend-libusbk.h"
+#include "platform/usb-const.h"
 
+#ifdef PTP_ENABLE_WIA
+#include "platform/windows/ptp-backend-wia.h"
+#endif
+#ifdef PTP_BACKEND_USB
+#include "platform/windows/ptp-backend-libusbk.h"
+#endif
 
 // TODO:
 //   Build list of property editors / widgets?
@@ -603,31 +608,29 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 }
 
                 ImGui::TableNextColumn();
-                ImGui::Text(uiPtpProperty.propName);
+                ImGui::TextUnformatted(uiPtpProperty.propName);
 
                 ImGui::TableNextColumn();
                 char *dataTypeName = PTP_GetDataTypeStr((PTPDataType) property->dataType);
                 if (dataTypeName) {
-                    ImGui::Text(dataTypeName);
+                    ImGui::TextUnformatted(dataTypeName);
                 }
 
                 ImGui::TableNextColumn();
                 char *formTypeName = PTP_GetFormFlagStr((PTPFormFlag) property->formFlag);
                 if (formTypeName) {
-                    ImGui::Text(formTypeName);
+                    ImGui::TextUnformatted(formTypeName);
                 }
 
                 ImGui::TableNextColumn();
-                sprintf(text, "%02x", property->getSet);
-                ImGui::Text(text);
+                ImGui::Text("%02x", property->getSet);
 
                 ImGui::TableNextColumn();
                 char *isEnabled = PTP_GetPropIsEnabledStr(property->isEnabled);
                 if (isEnabled) {
-                    ImGui::Text(isEnabled);
+                    ImGui::TextUnformatted(isEnabled);
                 } else {
-                    sprintf(text, "%02x", property->isEnabled);
-                    ImGui::Text("%s", text);
+                    ImGui::Text("%02x", property->isEnabled);
                 }
 
                 ImGui::TableNextColumn();
@@ -758,6 +761,7 @@ void ShowCameraControlsWindow(AppContext& c) {
             }
         }
 
+#ifdef PTP_ENABLE_LIBUSBK
         if (c.device->backendType == PTP_BACKEND_LIBUSBK) {
             if (ImGui::Button("Read Event")) {
                 PTPEvent event = {};
@@ -766,6 +770,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                 }
             }
         }
+#endif
     }
 
     ImGui::Spacing();
@@ -926,17 +931,17 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TableNextColumn();
 
                         char label[32];
-                        sprintf(label, "0x%04x", imageFormat);
+                        snprintf(label, sizeof(label), "0x%04x", imageFormat);
 
                         ImGui::SameLine();
-                        ImGui::Text(label);
+                        ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
                         char *objectFormatStr = PTP_GetObjectFormatStr(imageFormat);
                         if (objectFormatStr == NULL) {
                             objectFormatStr = label;
                         }
-                        ImGui::Text(objectFormatStr);
+                        ImGui::TextUnformatted(objectFormatStr);
                     }
 
                     ImGui::EndTable();
@@ -975,17 +980,17 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TableNextColumn();
 
                         char label[32];
-                        sprintf(label, "0x%04x", propertyCode);
+                        snprintf(label, sizeof(label), "0x%04x", propertyCode);
 
                         ImGui::SameLine();
-                        ImGui::Text(label);
+                        ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
                         char *opName = PTP_GetOperationStr(propertyCode);
                         if (opName == NULL) {
                             opName = label;
                         }
-                        ImGui::Text(opName);
+                        ImGui::TextUnformatted(opName);
                     }
 
                     ImGui::EndTable();
@@ -1032,7 +1037,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::PushID(i);
 
                         char label[32];
-                        sprintf(label, "0x%04x", controlCode);
+                        snprintf(label, sizeof(label), "0x%04x", controlCode);
 
                         if (ImGui::Selectable(label, c.selectedControl == control, selectFlags)) {
                             c.selectedControlValue = {};
@@ -1046,21 +1051,21 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         if (!name) {
                             name = label;
                         }
-                        ImGui::Text(name);
+                        ImGui::TextUnformatted(name);
 
                         ImGui::TableNextColumn();
                         const char *dataType = PTP_GetDataTypeStr((PTPDataType)control->dataType);
                         if (dataType == NULL) {
                             dataType = "";
                         }
-                        ImGui::Text(dataType);
+                        ImGui::TextUnformatted(dataType);
 
                         ImGui::TableNextColumn();
                         const char *formFlagStr = PTP_GetFormFlagStr((PTPFormFlag)control->formFlag);
                         if (formFlagStr == NULL) {
                             formFlagStr = "";
                         }
-                        ImGui::Text(formFlagStr);
+                        ImGui::TextUnformatted(formFlagStr);
 
                         ImGui::PopID();
                     }
@@ -1101,17 +1106,17 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TableNextColumn();
 
                         char label[32];
-                        sprintf(label, "0x%04x", eventCode);
+                        snprintf(label, sizeof(label), "0x%04x", eventCode);
 
                         ImGui::SameLine();
-                        ImGui::Text(label);
+                        ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
                         char *name = PTP_GetEventStr(eventCode);
                         if (name == NULL) {
                             name = label;
                         }
-                        ImGui::Text(name);
+                        ImGui::TextUnformatted(name);
                     }
 
                     ImGui::EndTable();
@@ -1133,7 +1138,7 @@ static void ShowDeviceListWindow(AppContext& c) {
     ImGui::SetNextWindowSize(ImVec2(910, 150), ImGuiCond_FirstUseEver);
     ImGui::Begin("Device List");
 
-    if (!c.ptpDeviceList.listUpToDate) {
+    if (!PTPDeviceList_NeedsRefresh(&c.ptpDeviceList)) {
         c.RefreshDevices();
     }
     if (c.device && c.device->disconnected) {
@@ -1158,10 +1163,12 @@ static void ShowDeviceListWindow(AppContext& c) {
     //     }
     // }
 
+#ifdef PTP_ENABLE_WIA
     ImGui::SameLine();
     if (ImGui::Button("Restart WIA Service")) {
         PTPWiaServiceRestart();
     }
+#endif
 
     const char *protoVersions[] = {"2.00", "3.00"};
     ImGui::Combo("Protocol Version", &c.selectedProtoVersion, protoVersions, 2);
@@ -1170,9 +1177,12 @@ static void ShowDeviceListWindow(AppContext& c) {
                                  ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable |
                                  ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
 
-    if (ImGui::BeginTable("Devices", 3, tableFlags)) {
+    if (ImGui::BeginTable("Devices", 6, tableFlags)) {
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 200.0);
         ImGui::TableSetupColumn("Manufacturer", ImGuiTableColumnFlags_WidthFixed, 300);
+        ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_WidthFixed, 300);
+        ImGui::TableSetupColumn("USB Id", ImGuiTableColumnFlags_WidthFixed, 100);
+        ImGui::TableSetupColumn("USB Version", ImGuiTableColumnFlags_WidthFixed, 100);
         ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
@@ -1186,7 +1196,7 @@ static void ShowDeviceListWindow(AppContext& c) {
                     ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
             ImGui::PushID(i);
             char label[32];
-            sprintf(label, "##%04lld", i);
+            snprintf(label, sizeof(label), "##%04lld", i);
             if (ImGui::Selectable(label, c.selectedDeviceIndex == i, selectFlags)) {
                 c.selectedDeviceIndex = i;
             }
@@ -1195,13 +1205,27 @@ static void ShowDeviceListWindow(AppContext& c) {
             }
 
             ImGui::SameLine();
-            ImGui::Text(deviceInfo->deviceName.str);
+            ImGui::TextUnformatted(deviceInfo->deviceName.str);
 
             ImGui::TableNextColumn();
-            ImGui::Text(deviceInfo->manufacturer.str);
+            ImGui::TextUnformatted(deviceInfo->manufacturer.str);
 
             ImGui::TableNextColumn();
-            ImGui::Text(deviceInfo->backendType == PTP_BACKEND_LIBUSBK ? "libusbk" : "Wia");
+            ImGui::TextUnformatted(deviceInfo->serial.str);
+
+            ImGui::TableNextColumn();
+            ImGui::Text("%04x:%04x", deviceInfo->usbVID, deviceInfo->usbPID);
+
+            ImGui::TableNextColumn();
+            char versionStr[8];
+            if (deviceInfo->usbVersion && USB_BcdVersionAsString(deviceInfo->usbVersion, versionStr, sizeof(versionStr)) > 0) {
+                ImGui::TextUnformatted(versionStr);
+            } else {
+                ImGui::TextUnformatted("");
+            }
+
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(PTP_GetBackendTypeStr(deviceInfo->backendType));
 
             ImGui::PopID();
         }

@@ -1,16 +1,34 @@
 ﻿#include "ptp-device-list.h"
 
-#ifdef WIN32
+#ifdef PTP_ENABLE_IOKIT
+#include "platform/osx/ptp-backend-iokit.h"
+#endif
+#ifdef PTP_ENABLE_WIA
 #include "platform/windows/ptp-backend-wia.h"
+#endif
+#ifdef PTP_ENABLE_LIBUSBK
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
 
 static PTPBackendType sBackends[] = {
-#ifdef WIN32
+#ifdef PTP_ENABLE_IOKIT
+    PTP_BACKEND_IOKIT,
+#endif
+#ifdef PTP_ENABLE_WIA
     PTP_BACKEND_WIA,
+#endif
+#ifdef PTP_ENABLE_LIBUSBK
     PTP_BACKEND_LIBUSBK
 #endif
 };
+
+static PTPBackend* AddBackendSlot(PTPDeviceList* self, PTPBackendType backendType) {
+    PTPBackend* backend = MArrayAddPtr(self->allocator, self->backends);
+    backend->type = backendType;
+    backend->logger = self->logger;
+    backend->allocator = self->allocator;
+    return backend;
+}
 
 b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
     self->allocator = allocator;
@@ -26,23 +44,30 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
         PTPBackendType backendType = sBackends[i];
         switch (backendType) {
             case PTP_BACKEND_LIBUSBK: {
-                PTPBackend* backend = MArrayAddPtr(self->allocator, self->backends);
-                backend->type = backendType;
-                backend->logger = self->logger;
-                backend->allocator = self->allocator;
+#ifdef PTP_ENABLE_LIBUSBK
+                PTPBackend *backend = AddBackendSlot(self, backendType);
                 if (PTPUsbkDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
                     backendsOpened = TRUE;
                 }
                 break;
+#endif
             }
             case PTP_BACKEND_WIA: {
-                PTPBackend* backend = MArrayAddPtr(self->allocator, self->backends);
-                backend->type = backendType;
-                backend->logger = self->logger;
-                backend->allocator = self->allocator;
+#ifdef PTP_ENABLE_WIA
+                PTPBackend *backend = AddBackendSlot(self, backendType);
                 if (PTPWiaDeviceList_OpenBackend(backend)) {
                     backendsOpened = TRUE;
                 }
+#endif
+                break;
+            }
+            case PTP_BACKEND_IOKIT: {
+#ifdef PTP_ENABLE_IOKIT
+                PTPBackend *backend = AddBackendSlot(self, backendType);
+                if (PTPIokitDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                    backendsOpened = TRUE;
+                }
+#endif
                 break;
             }
         }
@@ -66,11 +91,12 @@ void PTPDeviceList_ReleaseList(PTPDeviceList* self, b32 free) {
             PTPDeviceInfo* deviceInfo = self->devices + i;
             MStrFree(self->allocator, deviceInfo->manufacturer);
             MStrFree(self->allocator, deviceInfo->deviceName);
+            MStrFree(self->allocator, deviceInfo->serial);
         }
         if (free) {
             MArrayFree(self->allocator, self->devices);
         } else {
-            MArrayInit(self->allocator, self->devices, 0);
+            MArrayClear(self->devices);
         }
     }
 
@@ -94,13 +120,22 @@ b32 PTPDeviceList_RefreshList(PTPDeviceList* self) {
     PTP_TRACE("PTPDeviceList_RefreshList");
 
     PTPDeviceList_ReleaseList(self, FALSE);
-    self->listUpToDate = TRUE;
     PTP_INFO("Refreshing device list...");
     MArrayEachPtr(self->backends, backend) {
         PTP_INFO_F("Checking backend '%s'...", PTP_GetBackendTypeStr(backend.p->type));
         backend.p->refreshList(backend.p, &self->devices);
     }
     return TRUE;
+}
+
+b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self) {
+    PTP_TRACE("PTPDeviceList_NeedsRefresh");
+    MArrayEachPtr(self->backends, backend) {
+        if (backend.p->needsRefresh && backend.p->needsRefresh(backend.p)) {
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
@@ -138,6 +173,8 @@ const char* PTP_GetBackendTypeStr(PTPBackendType type) {
             return "WIA";
         case PTP_BACKEND_LIBUSBK:
             return "libusbk";
+        case PTP_BACKEND_IOKIT:
+            return "IOKit";
     }
     MBreakpointf("PTP_GetBackendTypeStr: Unknown PTPBackendType %d", type);
     return "Unknown";

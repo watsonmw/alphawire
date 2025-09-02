@@ -14,11 +14,17 @@ It has some advantages over the official SDK:
 - Supports older cameras not covered by official Sony Camera Remote SDK
 - Easily debugging of camera PTP (Picture Transfer Protocol) support
 
+Downsides to alphawire:
+- Missing backends for Linux and TCP (on the roadmap)
+- Possibly missing metadata for latest cameras (will add as needed)
+- No image processing (out of scope for this project)
+
 > **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks or registered
 > trademarks of Sony Corporation.
 
 ## Current Status
-- **Platform Support**: Currently Windows-only (Visual Studio 2018 or MinGW)
+- **Platform Support**: Currently Windows (Visual Studio 2018 or MinGW) and OSX (clang)
+- **Build System**: CMake
 - **Architecture**: Designed for easy cross-platform expansion
 
 ## Library Features
@@ -34,6 +40,9 @@ It has some advantages over the official SDK:
 ### Windows Backend Support
 - WIA (Windows Image Acquisition)
 - libusbk
+
+### OSX Backend Support
+- IOKit
 
 ## Demo Application
 A GUI application is included for camera control and PTP protocol debugging.
@@ -52,7 +61,6 @@ A GUI application is included for camera control and PTP protocol debugging.
    - Packaged releases for UI application
 - [ ] Platform Extensions
    - Linux support
-   - macOS support
    - TCP backend implementation
 - [ ] API Development
    - Threading - support separate thread per device

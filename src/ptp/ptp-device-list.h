@@ -43,9 +43,6 @@ typedef struct {
     PTPDeviceInfo* devices;
     PTPBackend* backends;
     PTPDevice* openDevices;
-    // Does the list need to be refreshed (depending on the backends available, this may be set when a new USB device is
-    // plugged in).
-    b32 listUpToDate;
     // Set before calling When PTPDeviceList_Open().  When et to 0 will block during device enumeration.
     u32 timeoutMilliseconds;
 
@@ -87,6 +84,17 @@ b32 PTPDeviceList_Close(PTPDeviceList* self);
  * @return Returns TRUE (1) upon successful refresh of the device list.
  */
 b32 PTPDeviceList_RefreshList(PTPDeviceList* self);
+
+/**
+ * Quick check if PTPDeviceList needs a refresh, without actually refreshing.
+ *
+ * Check each backend for device addition/removal flags.  Some backends may not support
+ * this functionality.
+ *
+ * @param self Pointer to the PTPDeviceList instance to be checked.
+ * @return TRUE if the list needs to be refreshed, FALSE otherwise.
+ */
+b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
 
 /**
  * Connects to a device listed in the given PTPDeviceList, using the specified device's transport.

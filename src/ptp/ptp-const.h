@@ -641,6 +641,7 @@ typedef struct {
 typedef enum {
     PTP_BACKEND_WIA,
     PTP_BACKEND_LIBUSBK,
+    PTP_BACKEND_IOKIT,
 } PTPBackendType;
 
 // Generic device info - describing an available device
@@ -648,7 +649,11 @@ typedef struct {
     PTPBackendType backendType;
     MStr manufacturer;
     MStr deviceName;
-    void* device; // concrete backend device info
+    MStr serial;
+    u16 usbVID;
+    u16 usbPID;
+    u16 usbVersion;
+    void* device; // concrete backend device info - this is used to uniquely identify a connected device
 } PTPDeviceInfo;
 
 // Generic device and transport for sending commands to
@@ -657,13 +662,15 @@ typedef struct {
     PTPLog logger;
     PTPBackendType backendType;
     b32 disconnected;
-    void* device; // concrete backend device
+    void* device; // concrete backend device - contains backend specific device data
+    PTPDeviceInfo* deviceInfo;
 } PTPDevice;
 
 struct PTPBackend;
 
 typedef b32 (*PTPBackend_Close_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
+typedef b32 (*PTPBackend_NeedsRefresh_Func)(struct PTPBackend* backend);
 typedef void (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
@@ -672,6 +679,7 @@ typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice
 typedef struct PTPBackend {
     PTPBackend_Close_Func close;
     PTPBackend_RefreshList_Func refreshList;
+    PTPBackend_NeedsRefresh_Func needsRefresh;
     PTPBackend_ReleaseList_Func releaseList;
     PTPBackend_OpenDevice_Func openDevice;
     PTPBackend_CloseDevice_Func closeDevice;
