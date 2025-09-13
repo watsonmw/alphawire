@@ -427,7 +427,7 @@ b32 PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** dev
         if (!productStr) {
             productStr = (CFStringRef)CFDictionaryGetValue(props, CFSTR(kUSBProductString));
         }
-        device->deviceName = CFStringToMStr(self->allocator, productStr);
+        device->product = CFStringToMStr(self->allocator, productStr);
 
         CFStringRef serialStr = (CFStringRef)CFDictionaryGetValue(props, CFSTR(kUSBSerialNumberString));
         device->serial = CFStringToMStr(self->allocator, serialStr);

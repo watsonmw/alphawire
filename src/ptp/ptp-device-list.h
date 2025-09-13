@@ -1,8 +1,10 @@
 ﻿#pragma once
 
-#include "ptp-log.h"
 #include "mlib/mlib.h"
+
+#include "ptp/ptp-backend.h"
 #include "ptp/ptp-const.h"
+#include "ptp/ptp-log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +32,7 @@ extern "C" {
  *        PTPDeviceInfo* deviceInfo = ptpDeviceList.devices;
  *        PTPDevice* device = NULL;
  *        // Establish transport for first device
- *        PTPDeviceList_ConnectDevice(&ptpDeviceList, deviceInfo, &device);
+ *        PTPDeviceList_OpenDevice(&ptpDeviceList, deviceInfo, &device);
  *        PTPControl ptp{};
  *        // Init control structure
  *        PTPControl_Init(&ptp, device, &allocator);
@@ -39,7 +41,7 @@ extern "C" {
  *    }
  * @endcode
  */
-typedef struct {
+typedef struct PTPDeviceList {
     PTPDeviceInfo* devices;
     PTPBackend* backends;
     PTPDevice* openDevices;
@@ -60,7 +62,7 @@ typedef struct {
  * @param self A pointer to the PTPDeviceList to be initialized.
  * @return TRUE if at least one backend was initialized
  */
-b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
+b32 PTP_EXPORT PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
 
 /**
  * Closes the PTPDeviceList and releases all associated resources.
@@ -72,7 +74,7 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
  * @param self Pointer to the PTPDeviceList instance to be closed.
  * @return TRUE when the closure and resource release are successful.
  */
-b32 PTPDeviceList_Close(PTPDeviceList* self);
+b32 PTP_EXPORT PTPDeviceList_Close(PTPDeviceList* self);
 
 /**
  * @brief Refreshes the list of PTP devices by clearing the current list and updating it.
@@ -83,7 +85,7 @@ b32 PTPDeviceList_Close(PTPDeviceList* self);
  * @param self A pointer to the PTPDeviceList instance to be refreshed.
  * @return Returns TRUE (1) upon successful refresh of the device list.
  */
-b32 PTPDeviceList_RefreshList(PTPDeviceList* self);
+b32 PTP_EXPORT PTPDeviceList_RefreshList(PTPDeviceList* self);
 
 /**
  * Quick check if PTPDeviceList needs a refresh, without actually refreshing.
@@ -94,7 +96,15 @@ b32 PTPDeviceList_RefreshList(PTPDeviceList* self);
  * @param self Pointer to the PTPDeviceList instance to be checked.
  * @return TRUE if the list needs to be refreshed, FALSE otherwise.
  */
-b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
+b32 PTP_EXPORT PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
+
+/**
+ * Number of devices found.
+ *
+ * @param self Pointer to the PTPDeviceList instance to be checked.
+ * @return number of devices found
+ */
+size_t PTP_EXPORT PTPDeviceList_NumDevices(PTPDeviceList* self);
 
 /**
  * Connects to a device listed in the given PTPDeviceList, using the specified device's transport.
@@ -107,7 +117,7 @@ b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
  *                  instance if the connection is successful.
  * @return TRUE if the connection was successful.
  */
-b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+b32 PTP_EXPORT PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 
 /**
  * Disconnects from the specified device's transport.
@@ -116,18 +126,16 @@ b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTP
  * @param device Pointer to the PTPDevice to be disconnected.
  * @return TRUE if the device was successfully disconnected.
  */
-b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
+b32 PTP_EXPORT PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
 
 /**
  * Retrieves the backend of the specified type from the given PTPDeviceList.
  *
  * @param self A pointer to the PTPDeviceList structure containing the list of backends.
- * @param backendType The type of backend to be retrieved.
+ * @param backend The type of backend to be retrieved.
  * @return A pointer to the PTPBackend of the specified type, or NULL if the backend is not available.
  */
-PTPBackend* PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backend);
-
-const char* PTP_GetBackendTypeStr(PTPBackendType type);
+PTPBackend* PTP_EXPORT PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backend);
 
 #ifdef __cplusplus
 } // extern "C"

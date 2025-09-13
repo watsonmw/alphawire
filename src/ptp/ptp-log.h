@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include "ptp-const.h"
+
 #define PTP_LOG_LEVEL_TRACE_VALUE 4
 #define PTP_LOG_LEVEL_DEBUG_VALUE 3
 #define PTP_LOG_LEVEL_INFO_VALUE 2
@@ -27,9 +29,9 @@ typedef struct PTPLog {
     char msgBuffer[1024];
 } PTPLog;
 
-void PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *fmt, ...);
-void PTPLog_LogDefault(PTPLog* logger, PTPLogLevel level, const char *message);
-char* PTPLog_LevelAsStr(PTPLogLevel level);
+void PTP_EXPORT PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *fmt, ...);
+void PTP_EXPORT PTPLog_LogDefault(PTPLog* logger, PTPLogLevel level, const char *message);
+char* PTP_EXPORT PTPLog_LevelAsStr(PTPLogLevel level);
 
 #if PTP_LOG_LEVEL >= PTP_LOG_LEVEL_TRACE_VALUE
 #define PTP_LOG_TRACE(logger, msg) { PTPLog_Log(logger, PTP_LOG_LEVEL_TRACE, msg); }

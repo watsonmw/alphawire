@@ -1,6 +1,6 @@
 #pragma once
 
-#include <../mlib/mlib.h>
+#include "mlib/mlib.h"
 
 #ifdef __cplusplus
 extern "C" {

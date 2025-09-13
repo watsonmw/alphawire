@@ -1,10 +1,12 @@
 #pragma once
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include "mlib/mlib.h"
+#include "ptp/ptp-const.h"
 
 #define USB_SONY_VID 0x054C
 #define USB_EN_US 0x0409
@@ -31,7 +33,7 @@ typedef MSTRUCTPACKED(struct {
  * Convert USB version to a string, the USB version is stored as BCD (binary code decimal).
  * @return number of bytes written, see snprintf()
  */
-int USB_BcdVersionAsString(u16 bcdVersion, char* dstStr, size_t dstStrLen);
+int PTP_EXPORT USB_BcdVersionAsString(u16 bcdVersion, char* dstStr, size_t dstStrLen);
 
 #ifdef __cplusplus
 }

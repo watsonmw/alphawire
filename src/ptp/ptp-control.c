@@ -2,8 +2,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "mlib/utf.h"
 #include "ptp/ptp-control.h"
-#include "ptp/utf.h"
+#include "ptp/ptp-util.h"
 
 
 typedef struct {
@@ -911,7 +912,7 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
     return 0;
 }
 
-void PropValueFree(MAllocator* mem, PTPDataType dataType, PTPPropValue* value) {
+static void PropValueFree(MAllocator* mem, PTPDataType dataType, PTPPropValue* value) {
     if (value == NULL) {
         return;
     }
@@ -2168,6 +2169,14 @@ PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode) {
         }
     }
     return NULL;
+}
+
+size_t PTPControl_NumProperties(PTPControl* self) {
+    return MArraySize(self->properties);
+}
+
+PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index) {
+    return self->properties + index;
 }
 
 PTPResult PTPControl_UpdateProperties(PTPControl* self) {
@@ -4222,6 +4231,17 @@ b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch) {
         return PTP_GENERAL_ERROR;
     }
     return SDIO_ControlDevice(self, propertyCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
+}
+
+size_t PTPControl_NumControls(PTPControl* self) {
+    return MArraySize(self->controls);
+}
+
+PtpControl* PTPControl_GetControlAtIndex(PTPControl* self, u16 index) {
+    if (index >= MArraySize(self->controls)) {
+        return NULL;
+    }
+    return self->controls + index;
 }
 
 PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode) {

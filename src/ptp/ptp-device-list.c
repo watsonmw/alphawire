@@ -90,7 +90,7 @@ void PTPDeviceList_ReleaseList(PTPDeviceList* self, b32 free) {
         for (int i = 0; i < MArraySize(self->devices); i++) {
             PTPDeviceInfo* deviceInfo = self->devices + i;
             MStrFree(self->allocator, deviceInfo->manufacturer);
-            MStrFree(self->allocator, deviceInfo->deviceName);
+            MStrFree(self->allocator, deviceInfo->product);
             MStrFree(self->allocator, deviceInfo->serial);
         }
         if (free) {
@@ -118,14 +118,17 @@ b32 PTPDeviceList_Close(PTPDeviceList* self) {
 
 b32 PTPDeviceList_RefreshList(PTPDeviceList* self) {
     PTP_TRACE("PTPDeviceList_RefreshList");
-
     PTPDeviceList_ReleaseList(self, FALSE);
     PTP_INFO("Refreshing device list...");
     MArrayEachPtr(self->backends, backend) {
-        PTP_INFO_F("Checking backend '%s'...", PTP_GetBackendTypeStr(backend.p->type));
+        PTP_INFO_F("Checking backend '%s'...", PTPBackend_GetTypeAsStr(backend.p->type));
         backend.p->refreshList(backend.p, &self->devices);
     }
     return TRUE;
+}
+
+size_t PTPDeviceList_NumDevices(PTPDeviceList* self) {
+    return MArraySize(self->devices);
 }
 
 b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self) {
@@ -140,7 +143,7 @@ b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self) {
 
 b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPDeviceList_OpenDevice");
-    PTP_INFO_F("Opening device %s (%s)...", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
+    PTP_INFO_F("Opening device %s (%s)...", deviceInfo->product.str, deviceInfo->manufacturer.str);
 
     PTPBackend* backend = PTPDeviceList_GetBackend(self, deviceInfo->backendType);
     PTPDevice* device = MArrayAddPtr(self->allocator, self->openDevices);
@@ -165,17 +168,4 @@ b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device) {
     }
 
     return backend->closeDevice(backend, device);
-}
-
-const char* PTP_GetBackendTypeStr(PTPBackendType type) {
-    switch (type) {
-        case PTP_BACKEND_WIA:
-            return "WIA";
-        case PTP_BACKEND_LIBUSBK:
-            return "libusbk";
-        case PTP_BACKEND_IOKIT:
-            return "IOKit";
-    }
-    MBreakpointf("PTP_GetBackendTypeStr: Unknown PTPBackendType %d", type);
-    return "Unknown";
 }

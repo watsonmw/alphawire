@@ -2,7 +2,7 @@
 
 #include "ptp/ptp-control.h"
 #include "ptp/ptp-device-list.h"
-#include "ptp/utf.h"
+#include "../mlib/utf.h"
 
 #include <vector>
 #include <algorithm>

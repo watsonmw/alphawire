@@ -8,6 +8,7 @@
 
 #include "ptp/ptp-control.h"
 #include "platform/usb-const.h"
+#include "ptp/ptp-util.h"
 
 #ifdef PTP_ENABLE_WIA
 #include "platform/windows/ptp-backend-wia.h"
@@ -1178,7 +1179,7 @@ static void ShowDeviceListWindow(AppContext& c) {
                                  ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
 
     if (ImGui::BeginTable("Devices", 6, tableFlags)) {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 200.0);
+        ImGui::TableSetupColumn("Pr", ImGuiTableColumnFlags_WidthFixed, 200.0);
         ImGui::TableSetupColumn("Manufacturer", ImGuiTableColumnFlags_WidthFixed, 300);
         ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_WidthFixed, 300);
         ImGui::TableSetupColumn("USB Id", ImGuiTableColumnFlags_WidthFixed, 100);
@@ -1205,7 +1206,7 @@ static void ShowDeviceListWindow(AppContext& c) {
             }
 
             ImGui::SameLine();
-            ImGui::TextUnformatted(deviceInfo->deviceName.str);
+            ImGui::TextUnformatted(deviceInfo->product.str);
 
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(deviceInfo->manufacturer.str);
@@ -1225,7 +1226,7 @@ static void ShowDeviceListWindow(AppContext& c) {
             }
 
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(PTP_GetBackendTypeStr(deviceInfo->backendType));
+            ImGui::TextUnformatted(PTPBackend_GetTypeAsStr(deviceInfo->backendType));
 
             ImGui::PopID();
         }

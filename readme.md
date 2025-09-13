@@ -57,12 +57,11 @@ A GUI application is included for camera control and PTP protocol debugging.
 
 ## Roadmap
 - [ ] Build System Improvements
-   - CMake/Makefile targets for library
    - Packaged releases for UI application
 - [ ] Platform Extensions
    - Linux support
    - TCP backend implementation
 - [ ] API Development
    - Threading - support separate thread per device
-   - Python bindings (cffi/ctypes)
+   - Expand Python bindings
    - Enhanced high-level API
