@@ -48,7 +48,7 @@ if(APPLE)
 
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
     find_library(IOKIT_LIBRARY IOKit REQUIRED)
-    target_link_libraries(alphawire PUBLIC ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
+    list(APPEND ALPHAWIRE_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
 endif()
 
 # MinGW and Visual Studio compiles on Windows
@@ -71,22 +71,29 @@ if(WIN32)
 
     # Configure libUSBK
     target_include_directories(alphawire PRIVATE libs/libusbk)
-    target_link_libraries(alphawire PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib)
+    list(APPEND ALPHAWIRE_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib)
+
+    # Export functions
+    target_compile_definitions(alphawire PRIVATE ALPHAWIRE_BUILDING_SHARED_LIB)
 
     # MinGW specific
     if (MINGW)
         # MinGW 13 headers are missing IWiaItemExtras, use our own copies of the MinGW 12 versions:
         target_include_directories(alphawire PRIVATE libs/mingw)
-        target_link_libraries(alphawire mingw32 ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw/libuuid.a)
+        list(APPEND ALPHAWIRE_LIBS mingw32 ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw/libuuid.a)
 
         target_compile_options(alphawire PRIVATE -ggdb -Wall)
         target_compile_options(alphawire PRIVATE -fvisibility=hidden)
-        target_link_libraries(alphawire mingw32 -static-libgcc -static-libstdc++)
+        list(APPEND ALPHAWIRE_LIBS -static-libgcc -static-libstdc++)
     else()
         # Configure WIA
-        target_link_libraries(alphawire PUBLIC wiaguid.lib)
+        list(APPEND ALPHAWIRE_LIBS wiaguid.lib)
     endif()
+
+    list(APPEND ALPHAWIRE_LIBS dbghelp.lib)
 endif()
+
+target_link_libraries(alphawire PUBLIC ${ALPHAWIRE_LIBS})
 
 ##########################################
 # Alphawire UI
@@ -139,16 +146,16 @@ endif()
 # Configure SDL
 target_include_directories(alphawireui PUBLIC ${SDL3_INCLUDE_DIRS})
 target_compile_definitions(alphawireui PRIVATE SDL_MAIN_USE_CALLBACKS)
-target_link_libraries(alphawireui PRIVATE SDL3::SDL3)
+list(APPEND ALPHAWIREUI_LIBS SDL3::SDL3)
 
 # Link alphawire lib to ui
-target_link_libraries(alphawireui PRIVATE alphawire)
+list(APPEND ALPHAWIREUI_LIBS alphawire)
 
 if(APPLE)
     find_package(OpenGL REQUIRED)
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
     find_library(IOKIT_LIBRARY IOKit REQUIRED)
-    target_link_libraries(alphawireui PRIVATE ${COCOA_LIBRARY} ${OPENGL_LIBRARIES} ${IOKIT_LIBRARY})
+    list(APPEND ALPHAWIREUI_LIBS ${COCOA_LIBRARY} ${OPENGL_LIBRARIES} ${IOKIT_LIBRARY})
 endif()
 
 # MinGW and Visual Studio compiles on Windows
@@ -159,13 +166,13 @@ if(WIN32)
     # MinGW specific
     if (MINGW)
         target_compile_options(alphawireui PRIVATE -ggdb -Wall -mconsole)
-        target_link_libraries(alphawireui mingw32 -static-libgcc -static-libstdc++)
+        list(APPEND ALPHAWIREUI_LIBS mingw32 -static-libgcc -static-libstdc++)
     else()
         target_link_options(alphawireui PRIVATE /SUBSYSTEM:CONSOLE)
     endif()
 
     # ImGUI
-    target_link_libraries(alphawireui opengl32)
+    list(APPEND ALPHAWIREUI_LIBS opengl32 )
 
     # Copy SDL binary to runtime directory
     add_custom_command(
@@ -181,3 +188,5 @@ add_custom_command(
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:alphawire>" "${CMAKE_CURRENT_SOURCE_DIR}/build"
         VERBATIM
 )
+
+target_link_libraries(alphawireui PRIVATE ${ALPHAWIREUI_LIBS})

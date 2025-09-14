@@ -29,9 +29,9 @@ typedef struct PTPLog {
     char msgBuffer[1024];
 } PTPLog;
 
-void PTP_EXPORT PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *fmt, ...);
-void PTP_EXPORT PTPLog_LogDefault(PTPLog* logger, PTPLogLevel level, const char *message);
-char* PTP_EXPORT PTPLog_LevelAsStr(PTPLogLevel level);
+PTP_EXPORT void PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *fmt, ...);
+PTP_EXPORT void PTPLog_LogDefault(PTPLog* logger, PTPLogLevel level, const char *message);
+PTP_EXPORT char* PTPLog_LevelAsStr(PTPLogLevel level);
 
 #if PTP_LOG_LEVEL >= PTP_LOG_LEVEL_TRACE_VALUE
 #define PTP_LOG_TRACE(logger, msg) { PTPLog_Log(logger, PTP_LOG_LEVEL_TRACE, msg); }

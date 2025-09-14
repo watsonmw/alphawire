@@ -2,6 +2,7 @@
 
 #include "ptp/ptp-const.h"
 #include "mlib/mlib.h"
+#include "ptp/ptp-backend.h"
 
 #include "Wia.h"
 
@@ -33,16 +34,16 @@ typedef struct {
 
 b32 PTP_EXPORT PTPWiaDeviceList_OpenBackend(PTPBackend* backend);
 
-b32 PTP_EXPORT PTPWiaDeviceList_Open(PTPWiaDeviceList* self);
-b32 PTP_EXPORT PTPWiaDeviceList_Close(PTPWiaDeviceList* self);
-b32 PTP_EXPORT PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device);
-b32 PTP_EXPORT PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** devices);
-void PTP_EXPORT PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self);
-b32 PTP_EXPORT PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
-b32 PTP_EXPORT PTPWiaDeviceList_DisconnectDevice(PTPWiaDeviceList* self, PTPDevice* device);
+PTP_EXPORT b32 PTPWiaDeviceList_Open(PTPWiaDeviceList* self);
+PTP_EXPORT b32 PTPWiaDeviceList_Close(PTPWiaDeviceList* self);
+PTP_EXPORT b32 PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device);
+PTP_EXPORT b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** devices);
+PTP_EXPORT void PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self);
+PTP_EXPORT b32 PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
+PTP_EXPORT b32 PTPWiaDeviceList_DisconnectDevice(PTPWiaDeviceList* self, PTPDevice* device);
 
 // Errors can occur in the WIA Service restart it
-void PTP_EXPORT PTPWiaServiceRestart();
+PTP_EXPORT void PTPWiaServiceRestart();
 
 #ifdef __cplusplus
 } // extern "C"

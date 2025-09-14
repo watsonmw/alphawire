@@ -73,7 +73,7 @@ typedef struct PTPBackend {
     void* self; // Pointer to concrete backend
 } PTPBackend;
 
-const char* PTP_EXPORT PTPBackend_GetTypeAsStr(PTPBackendType type);
+PTP_EXPORT const char* PTPBackend_GetTypeAsStr(PTPBackendType type);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -33,15 +33,15 @@ typedef struct {
     PTPLog logger;
 } PTPUsbkDeviceList;
 
-b32 PTP_EXPORT PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds);
-b32 PTP_EXPORT PTPUsbkDeviceList_Open(PTPUsbkDeviceList* self);
-b32 PTP_EXPORT PTPUsbkDeviceList_Close(PTPUsbkDeviceList* self);
-b32 PTP_EXPORT PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devices);
-void PTP_EXPORT PTPUsbkDeviceList_ReleaseList(PTPUsbkDeviceList* self);
-b32 PTP_EXPORT PTPUsbkDeviceList_ConnectDevice(PTPUsbkDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
-b32 PTP_EXPORT PTPUsbkDeviceList_DisconnectDevice(PTPUsbkDeviceList* self, PTPDevice* device);
+PTP_EXPORT b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds);
+PTP_EXPORT b32 PTPUsbkDeviceList_Open(PTPUsbkDeviceList* self);
+PTP_EXPORT b32 PTPUsbkDeviceList_Close(PTPUsbkDeviceList* self);
+PTP_EXPORT b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devices);
+PTP_EXPORT void PTPUsbkDeviceList_ReleaseList(PTPUsbkDeviceList* self);
+PTP_EXPORT b32 PTPUsbkDeviceList_ConnectDevice(PTPUsbkDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
+PTP_EXPORT b32 PTPUsbkDeviceList_DisconnectDevice(PTPUsbkDeviceList* self, PTPDevice* device);
 
-b32 PTP_EXPORT PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
+PTP_EXPORT b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
 
 #ifdef __cplusplus
 } // extern "C"

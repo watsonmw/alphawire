@@ -1137,7 +1137,7 @@ static void ShowDeviceListWindow(AppContext& c) {
     ImGui::SetNextWindowSize(ImVec2(910, 150), ImGuiCond_FirstUseEver);
     ImGui::Begin("Device List");
 
-    if (!PTPDeviceList_NeedsRefresh(&c.ptpDeviceList)) {
+    if (PTPDeviceList_NeedsRefresh(&c.ptpDeviceList)) {
         c.RefreshDevices();
     }
     if (c.device && c.device->disconnected) {

@@ -33,7 +33,7 @@ typedef MSTRUCTPACKED(struct {
  * Convert USB version to a string, the USB version is stored as BCD (binary code decimal).
  * @return number of bytes written, see snprintf()
  */
-int PTP_EXPORT USB_BcdVersionAsString(u16 bcdVersion, char* dstStr, size_t dstStrLen);
+PTP_EXPORT int USB_BcdVersionAsString(u16 bcdVersion, char* dstStr, size_t dstStrLen);
 
 #ifdef __cplusplus
 }

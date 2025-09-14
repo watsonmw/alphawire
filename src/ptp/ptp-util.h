@@ -3,5 +3,5 @@
 #include "mlib/mlib.h"
 #include "ptp/ptp-const.h"
 
-void PTP_EXPORT PTP_InitDefaultAllocator(MAllocator* allocator);
-void PTP_EXPORT PTP_MemIOFree(MMemIO* memIO);
+PTP_EXPORT void PTP_InitDefaultAllocator(MAllocator* allocator);
+PTP_EXPORT void PTP_MemIOFree(MMemIO* memIO);

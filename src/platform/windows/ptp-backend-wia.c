@@ -277,6 +277,8 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
     propSpec[1].propid = WIA_DIP_VEND_DESC;
     propSpec[2].ulKind = PRSPEC_PROPID;
     propSpec[2].propid = WIA_DIP_DEV_NAME;
+    // propSpec[3].ulKind = PRSPEC_PROPID;
+    // propSpec[3].propid = WIA_DIP_REMOTE_DEV_ID;
 
     MArrayInit(self->allocator, self->devices, countElements);
     for (int i = 0; i < countElements; i++) {
@@ -297,11 +299,11 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         PTPDeviceInfo* deviceInfo = MArrayAddPtrZ(self->allocator, *deviceList);
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
         deviceInfo->manufacturer = WinUtils_BSTRToUTF8(self->allocator, propVar[1].bstrVal);
-        deviceInfo->deviceName = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
+        deviceInfo->product = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
+        // PTP_INFO_F("Remote device id: %s", WinUtils_BSTRToUTF8(self->allocator, propVar[3].bstrVal));
         deviceInfo->backendType = PTP_ENABLE_WIA;
         deviceInfo->device = wiaDeviceInfo;
-
-        PTP_INFO_F("Found device: %s (%s)", deviceInfo->deviceName.str, deviceInfo->manufacturer.str);
+        PTP_INFO_F("Found device: %s (%s)", deviceInfo->product.str, deviceInfo->manufacturer.str);
 
         for (int j = 0; j < PROP_NUM; j++) {
             PropVariantClear(propVar + j);

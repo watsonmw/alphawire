@@ -62,7 +62,7 @@ typedef struct PTPDeviceList {
  * @param self A pointer to the PTPDeviceList to be initialized.
  * @return TRUE if at least one backend was initialized
  */
-b32 PTP_EXPORT PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
+PTP_EXPORT b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
 
 /**
  * Closes the PTPDeviceList and releases all associated resources.
@@ -74,7 +74,7 @@ b32 PTP_EXPORT PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
  * @param self Pointer to the PTPDeviceList instance to be closed.
  * @return TRUE when the closure and resource release are successful.
  */
-b32 PTP_EXPORT PTPDeviceList_Close(PTPDeviceList* self);
+PTP_EXPORT b32 PTPDeviceList_Close(PTPDeviceList* self);
 
 /**
  * @brief Refreshes the list of PTP devices by clearing the current list and updating it.
@@ -96,7 +96,7 @@ b32 PTP_EXPORT PTPDeviceList_RefreshList(PTPDeviceList* self);
  * @param self Pointer to the PTPDeviceList instance to be checked.
  * @return TRUE if the list needs to be refreshed, FALSE otherwise.
  */
-b32 PTP_EXPORT PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
+PTP_EXPORT b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
 
 /**
  * Number of devices found.
@@ -104,7 +104,7 @@ b32 PTP_EXPORT PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
  * @param self Pointer to the PTPDeviceList instance to be checked.
  * @return number of devices found
  */
-size_t PTP_EXPORT PTPDeviceList_NumDevices(PTPDeviceList* self);
+PTP_EXPORT size_t PTPDeviceList_NumDevices(PTPDeviceList* self);
 
 /**
  * Connects to a device listed in the given PTPDeviceList, using the specified device's transport.
@@ -117,7 +117,7 @@ size_t PTP_EXPORT PTPDeviceList_NumDevices(PTPDeviceList* self);
  *                  instance if the connection is successful.
  * @return TRUE if the connection was successful.
  */
-b32 PTP_EXPORT PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+PTP_EXPORT b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 
 /**
  * Disconnects from the specified device's transport.
@@ -126,7 +126,7 @@ b32 PTP_EXPORT PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* devi
  * @param device Pointer to the PTPDevice to be disconnected.
  * @return TRUE if the device was successfully disconnected.
  */
-b32 PTP_EXPORT PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
+PTP_EXPORT b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
 
 /**
  * Retrieves the backend of the specified type from the given PTPDeviceList.
@@ -135,7 +135,7 @@ b32 PTP_EXPORT PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device)
  * @param backend The type of backend to be retrieved.
  * @return A pointer to the PTPBackend of the specified type, or NULL if the backend is not available.
  */
-PTPBackend* PTP_EXPORT PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backend);
+PTP_EXPORT PTPBackend* PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backend);
 
 #ifdef __cplusplus
 } // extern "C"

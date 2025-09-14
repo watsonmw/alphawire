@@ -204,7 +204,7 @@ b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMi
     return FALSE;
 }
 
-b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkDeviceList* self, PTPDeviceInfo** devices) {
+b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkDeviceList* self) {
     PTP_TRACE("PTPUsbkDeviceList_NeedsRefresh");
     return FALSE;
 }
@@ -227,7 +227,7 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
     // Iterate through the device list
     while (LstK_MoveNext(deviceList, &deviceInfo)) {
         // Skip if not Sony
-        if (deviceInfo->Common.Vid != SONY_VID) {
+        if (deviceInfo->Common.Vid != USB_SONY_VID) {
             PTP_ERROR("Skipping non Sony device");
             continue;
         }
@@ -268,11 +268,13 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
                         device->manufacturer = MStrMake(self->allocator, deviceInfo->Mfg);
                         device->backendType = PTP_BACKEND_LIBUSBK;
                         device->device = usbkDevice;
-                        device->deviceName = WinUtils_BSTRWithSizeToUTF8(self->allocator, wideString, length/2);
+                        device->product = WinUtils_BSTRWithSizeToUTF8(self->allocator, wideString, length/2);
                         device->usbVID = deviceInfo->Common.Vid;
                         device->usbPID = deviceInfo->Common.Pid;
+                        device->serial = MStrMake(self->allocator, deviceInfo->SerialNumber);
+                        device->usbVersion = deviceDescriptor.bcdUSB;
 
-                        PTP_INFO_F("Found device: %s (%s)", device->deviceName.str, device->manufacturer.str);
+                        PTP_INFO_F("Found device: %s (%s)", device->product.str, device->manufacturer.str);
                     } else {
                         PTP_ERROR("Error getting product string descriptor");
                     }
