@@ -23,7 +23,6 @@
 //      - Enum List Read only support (except in debug)
 //   Remove sorting for other tabs
 //   Connectors:
-//     OSX
 //     Linux
 //     IP
 //   Timing / Position
@@ -747,7 +746,7 @@ void ShowCameraControlsWindow(AppContext& c) {
             SDL_GetCurrentTime(&dlTime);
             if (r != PTP_OK) {
                 MLogf("Error fetching image from camera: %04x", r);
-            } else {
+            } else if (cii.filename.size) {
                 MFileWriteDataFully(cii.filename.str, fileContents.mem, fileContents.size);
                 SDL_Time writeTime = 0;
                 SDL_GetCurrentTime(&writeTime);
@@ -795,7 +794,6 @@ void ShowCameraControlsWindow(AppContext& c) {
         }
 
         ImGui::Dummy(ImVec2(43.0f, 10)); // Horizontal padding
-        ImGui::SameLine();
         ImGuiControlButton(c, "Up", DPC_REMOTE_KEY_UP);
 
         // Left + Right buttons
@@ -1179,7 +1177,7 @@ static void ShowDeviceListWindow(AppContext& c) {
                                  ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
 
     if (ImGui::BeginTable("Devices", 6, tableFlags)) {
-        ImGui::TableSetupColumn("Pr", ImGuiTableColumnFlags_WidthFixed, 200.0);
+        ImGui::TableSetupColumn("Product", ImGuiTableColumnFlags_WidthFixed, 200.0);
         ImGui::TableSetupColumn("Manufacturer", ImGuiTableColumnFlags_WidthFixed, 300);
         ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_WidthFixed, 300);
         ImGui::TableSetupColumn("USB Id", ImGuiTableColumnFlags_WidthFixed, 100);

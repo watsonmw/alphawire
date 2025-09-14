@@ -35,9 +35,9 @@ const char* IOReturnToString(IOReturn ret) {
             case kIOReturnLockedWrite:
                 return "kIOReturnLockedWrite - Device write locked";
             case kIOReturnExclusiveAccess:
-                return "kIOReturnExclusiveAccess - Exclusive access and";
+                return "kIOReturnExclusiveAccess - Exclusive access and device already open";
             case kIOReturnBadMessageID:
-                return "kIOReturnBadMessageID - Sent/received messages";
+                return "kIOReturnBadMessageID - Sent/received messages had different msg_id";
             case kIOReturnUnsupported:
                 return "kIOReturnUnsupported - Unsupported function";
             case kIOReturnVMError:
@@ -81,13 +81,13 @@ const char* IOReturnToString(IOReturn ret) {
             case kIOReturnPortExists:
                 return "kIOReturnPortExists - Port already exists";
             case kIOReturnCannotWire:
-                return "kIOReturnCannotWire - Can't wire down";
+                return "kIOReturnCannotWire - Can't wire down physical memory";
             case kIOReturnNoInterrupt:
                 return "kIOReturnNoInterrupt - No interrupt attached";
             case kIOReturnNoFrames:
                 return "kIOReturnNoFrames - No DMA frames enqueued";
             case kIOReturnMessageTooLarge:
-                return "kIOReturnMessageTooLarge - Oversized msg received";
+                return "kIOReturnMessageTooLarge - Oversized msg received on interrupt port";
             case kIOReturnNotPermitted:
                 return "kIOReturnNotPermitted - Not permitted";
             case kIOReturnNoPower:
@@ -611,6 +611,32 @@ PTPResult PTPDeviceIokit_SendAndRecv(void* deviceSelf, PTPRequestHeader* request
     return PTP_OK;
 }
 
+static char* USBTransferTypeAsStr(u8 transferType) {
+    switch (transferType) {
+        case kUSBControl:
+            return "kUSBControl";
+        case kUSBIsoc:
+            return "kUSBIsoc";
+        case kUSBBulk:
+            return "kUSBBulk";
+        case kUSBInterrupt:
+            return "kUSBInterrupt";
+        default:
+            return "Unknown";
+    }
+}
+
+static char* USBDirectionAsStr(u8 direction) {
+    switch (direction) {
+        case kUSBIn:
+            return "kUSBIn";
+        case kUSBOut:
+            return "kUSBOut";
+        default:
+            return "Unknown";
+    }
+}
+
 b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPIokitDeviceList_ConnectDevice");
     IOKitDeviceInfo* device = deviceInfo->device;
@@ -712,18 +738,38 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
 
         if (ioUsbInterface) {
             // Open the interface
-            (*ioUsbInterface)->USBInterfaceOpen(ioUsbInterface);
+            IOReturn r = (*ioUsbInterface)->USBInterfaceOpen(ioUsbInterface);
+            if (r != kIOReturnSuccess) {
+                PTP_ERROR_F("Failed to connect to device: Unable to get USB endpoints: %s (%08x)",
+                    IOReturnToString(r), r);
+                (*ioUsbInterface)->Release(ioUsbInterface);
+                continue;
+            }
 
-            UInt8 numEndpoints;
-            (*ioUsbInterface)->GetNumEndpoints(ioUsbInterface, &numEndpoints);
+            UInt8 numEndpoints = 0;
+            r = (*ioUsbInterface)->GetNumEndpoints(ioUsbInterface, &numEndpoints);
+            if (r != kIOReturnSuccess) {
+                PTP_ERROR_F("Failed to connect to device: Unable to get USB endpoints: %s (%08x)",
+                    IOReturnToString(r), r);
+                (*ioUsbInterface)->Release(ioUsbInterface);
+                continue;
+            }
 
             u8 bulkIn = 0, bulkOut = 0, interruptOut = 0;
 
             for (UInt8 i=1; i<=numEndpoints; i++) {
-                UInt8 direction, number, transferType, interval;
-                UInt16 maxPacketSize;
-                (*ioUsbInterface)->GetPipeProperties(ioUsbInterface, i, &direction, &number, &transferType,
-                                                     &maxPacketSize, &interval);
+                UInt8 direction = 0, number = 0, transferType = 0, interval = 0;
+                UInt16 maxPacketSize = 0;
+                r = (*ioUsbInterface)->GetPipeProperties(ioUsbInterface, i, &direction, &number,
+                    &transferType, &maxPacketSize, &interval);
+                if (r != kIOReturnSuccess) {
+                    PTP_ERROR_F("Failed to connect to device: Unable to get USB endpoint properties: %s (%08x)",
+                        IOReturnToString(r), r);
+                    break;
+                }
+
+                PTP_TRACE_F("Pipe %d: Transfer Type: %s (%02x) Direction: %s (%02x)", number,
+                    USBTransferTypeAsStr(transferType), transferType, USBDirectionAsStr(direction), direction);
 
                 if (transferType == kUSBBulk) {
                     if (direction == kUSBIn) {
@@ -739,7 +785,7 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
             if (!bulkIn || !bulkOut || !interruptOut) {
                 PTP_WARNING("Failed to connect to device: Unable to get USB endpoints");
                 (*ioUsbInterface)->Release(ioUsbInterface);
-                goto fail;
+                continue;
             }
 
             // Store the interface pointer

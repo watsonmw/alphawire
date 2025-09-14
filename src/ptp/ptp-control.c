@@ -1898,6 +1898,14 @@ PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapt
     if (r != PTP_OK) {
         return r;
     }
+    if (objectInfo.objectCompressedSize == 0 || objectInfo.filename.str == NULL) {
+        PTP_DEBUG_F("No image to download (size was %d, filename was %s)", objectInfo.objectCompressedSize,
+            objectInfo.filename.str);
+        ciiOut->size = 0;
+        ciiOut->filename.size = 0;
+        ciiOut->filename.str = NULL;
+        return r;
+    }
     PTP_DEBUG_F("Downloading image... (%s format: %s size: %d)", objectInfo.filename.str,
         PTP_GetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
     ciiOut->filename = objectInfo.filename;

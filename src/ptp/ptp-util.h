@@ -5,4 +5,3 @@
 
 void PTP_EXPORT PTP_InitDefaultAllocator(MAllocator* allocator);
 void PTP_EXPORT PTP_MemIOFree(MMemIO* memIO);
-

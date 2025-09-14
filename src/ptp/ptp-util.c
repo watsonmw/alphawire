@@ -1,7 +1,4 @@
 #include "ptp/ptp-util.h"
-
-#include <stdio.h>
-
 #include "ptp/ptp-device-list.h"
 
 void PTP_InitDefaultAllocator(MAllocator* allocator) {

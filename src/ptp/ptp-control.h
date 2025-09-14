@@ -116,8 +116,8 @@ PTPResult PTP_EXPORT PTPControl_Connect(PTPControl* self, SonyProtocolVersion ve
 
 /**
  * Cleanup the PTPControl structure.
- * Depending on the underlying transport this may also close the PTP session, if it does not then releasing the
- * transport will close the PTP session.
+ * Depending on the underlying transport this may also close the PTP session, if it does not then
+ * releasing the transport will close the PTP session.
  * After PTPControl_Cleanup() is called, the device transport should be closed.
  *
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
