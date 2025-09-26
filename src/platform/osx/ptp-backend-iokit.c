@@ -235,14 +235,14 @@ b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
     PTP_TRACE("PTPIokitDeviceList_Open");
 
     // Set up device attach notifications
-    mach_port_t masterPort = MACH_PORT_NULL;
-    kern_return_t kr = IOMainPort(MACH_PORT_NULL, &masterPort);
+    mach_port_t mainPort = MACH_PORT_NULL;
+    kern_return_t kr = IOMainPort(MACH_PORT_NULL, &mainPort);
     if (kr != KERN_SUCCESS) {
-        PTP_ERROR("Failed to get IOKit master port for notifications");
+        PTP_ERROR("Failed to get IOKit main port for notifications");
         return FALSE;
     }
 
-    self->notifyPort = IONotificationPortCreate(masterPort);
+    self->notifyPort = IONotificationPortCreate(mainPort);
     if (!self->notifyPort) {
         PTP_ERROR("Failed to create IOKit notification port");
         return FALSE;
@@ -456,7 +456,7 @@ next:
 
 b32 PTPIokitDeviceList_NeedsRefresh(PTPIokitDeviceList* self) {
     PTP_TRACE("PTPIokitDeviceList_NeedsRefresh");
-    return self->deviceListUpToDate;
+    return !self->deviceListUpToDate;
 }
 
 void PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self) {
@@ -480,8 +480,7 @@ void* PTPDeviceIokit_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* d
         u8* mem = ((u8*)dataMem)-headerSize;
         MFree(self->transport.allocator, mem, dataOldSize + headerSize); dataMem = NULL;
     }
-    dataMem = MMalloc(self->transport.allocator, dataSize);
-    memset(dataMem, 0, dataSize);
+    dataMem = MMallocZ(self->transport.allocator, dataSize);
     return ((u8*)dataMem) + headerSize;
 }
 

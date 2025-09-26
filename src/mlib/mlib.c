@@ -154,47 +154,61 @@ void MMemDebugInit(MAllocator* allocator) {
         allocator->debug.allocSlots = NULL;
         allocator->debug.freeSlots = NULL;
         allocator->debug.initialized = TRUE;
+        allocator->debug.leakTracking = TRUE;
+        allocator->debug.sentinelCheck = TRUE;
+        allocator->debug.maxAllocatedBytes = 0;
+        allocator->debug.curAllocatedBytes = 0;
+        allocator->debug.totalAllocations = 0;
+        allocator->debug.totalAllocatedBytes = 0;
     }
 }
 
 void MMemDebugDeinit(MAllocator* alloc) {
+    MMemDebugDeinit2(alloc, TRUE);
+}
+
+void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
     if (!alloc->debug.initialized) {
         return;
     }
 
-    const char* name = alloc->name;
-    if (!name) {
-        name = "default";
-    }
-    MLogf("Releasing Arena '%s':", name);
+    if (logSummary) {
+        const char* name = alloc->name;
+        if (!name) {
+            name = "default";
+        }
+        MLogf("Releasing Allocator '%s':", name);
 
-    MLogf("   Total allocations: %ld", alloc->debug.totalAllocations);
-    MLogf("   Total allocated: %ld bytes", alloc->debug.totalAllocatedBytes);
-    MLogf("   Max memory used: %ld bytes", alloc->debug.maxAllocatedBytes);
+        MLogf("   Total allocations: %d", alloc->debug.totalAllocations);
+        MLogf("   Total allocated: %d bytes", alloc->debug.totalAllocatedBytes);
+        MLogf("   Max memory used: %d bytes", alloc->debug.maxAllocatedBytes);
+    }
 
     MMemDebugCheckAll(alloc);
 
-    for (u32 i = 0; i < MArraySize(alloc->debug.allocSlots); ++i) {
-        MMemAllocInfo* memAlloc = alloc->debug.allocSlots + i;
-        if (memAlloc->start) {
+    if (alloc->debug.leakTracking) {
+        MArrayEachPtr(alloc->debug.allocSlots, it) {
+            MMemAllocInfo* memAlloc = it.p;
+            if (memAlloc->start) {
 #ifdef M_STACKTRACE
-            MLogf("Leaking allocation: 0x%p (%d bytes)", memAlloc->start, memAlloc->size);
-            MMemDebug_LogAllocStacktrace(alloc, memAlloc);
+                MLogf("Leaking allocation: 0x%p (%zu bytes)", memAlloc->start, memAlloc->size);
+                MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-            MLogf("Leaking allocation: %s:%d 0x%p (%d bytes)", memAlloc->file, memAlloc->line, memAlloc->start, memAlloc->size);
+                MLogf("Leaking allocation: %s:%d 0x%p (%d bytes)", memAlloc->file, memAlloc->line, memAlloc->start, memAlloc->size);
 #endif
+            }
         }
     }
 
     if (alloc->debug.allocSlots) {
         alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.allocSlots),
-                        M_ArrayHeader(alloc->debug.allocSlots)->capacity * sizeof(MMemAllocInfo));
+            M_ArrayHeader(alloc->debug.allocSlots)->capacity * sizeof(MMemAllocInfo));
         alloc->debug.allocSlots = NULL;
     }
 
     if (alloc->debug.freeSlots) {
         alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.freeSlots),
-                        M_ArrayHeader(alloc->debug.freeSlots)->capacity * sizeof(u32));
+            M_ArrayHeader(alloc->debug.freeSlots)->capacity * sizeof(u32));
         alloc->debug.freeSlots = NULL;
     }
 
@@ -272,12 +286,16 @@ b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
         return FALSE;
     }
 
+    if (!alloc->debug.sentinelCheck) {
+        return TRUE;
+    }
+
     u32 beforeBytes = MMemDebugCanaryCheck(memAlloc->mem - M_SENTINEL_BEFORE, M_SENTINEL_BEFORE);
     u32 afterBytes = MMemDebugCanaryCheck(memAlloc->mem + memAlloc->size, M_SENTINEL_AFTER);
 
     if (beforeBytes || afterBytes) {
 #ifdef M_STACKTRACE
-        MBreakpointf("MMemDebugCheck: 0x%p [%d]", memAlloc->mem, memAlloc->size);
+        MBreakpointf("MMemDebugCheck: 0x%p [%zu]", memAlloc->mem, memAlloc->size);
         MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
         MBreakpointf("MMemDebugCheck: %s:%d : 0x%p [%d]", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
@@ -301,8 +319,8 @@ b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
 
 b32 MMemDebugCheck(MAllocator* alloc, void* p) {
     MMemAllocInfo* memAllocFound = NULL;
-    for (u32 i = 0; i < MArraySize(alloc->debug.allocSlots); ++i) {
-        MMemAllocInfo* memAlloc = alloc->debug.allocSlots + i;
+    MArrayEachPtr(alloc->debug.allocSlots, it) {
+        MMemAllocInfo* memAlloc = it.p;
         if (p == memAlloc->mem) {
             memAllocFound = memAlloc;
             break;
@@ -322,8 +340,8 @@ b32 MMemDebugCheck(MAllocator* alloc, void* p) {
 
 b32 MMemDebugCheckAll(MAllocator* alloc) {
     b32 memOk = TRUE;
-    for (u32 i = 0; i < MArraySize(alloc->debug.allocSlots); ++i) {
-        MMemAllocInfo* memAlloc = alloc->debug.allocSlots + i;
+    MArrayEachPtr(alloc->debug.allocSlots, it) {
+        MMemAllocInfo* memAlloc = it.p;
         if (memAlloc->mem && MMemDebugCheckMemAlloc(alloc, memAlloc)) {
             memOk = FALSE;
         }
@@ -334,15 +352,37 @@ b32 MMemDebugCheckAll(MAllocator* alloc) {
 
 b32 MMemDebugListAll(MAllocator* alloc) {
     b32 memOk = TRUE;
-    for (u32 i = 0; i < MArraySize(alloc->debug.allocSlots); ++i) {
-        MMemAllocInfo* memAlloc = alloc->debug.allocSlots + i;
-        MLogf("%s:%d %p %d", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
+    MLogf("Allocations for %s:", alloc->name);
+    MArrayEachPtr(alloc->debug.allocSlots, it) {
+        MMemAllocInfo* memAlloc = it.p;
+        MLogf("   %s:%d %p %zu", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
         if (!MMemDebugCheckMemAlloc(alloc, memAlloc)) {
             memOk = FALSE;
         }
     }
 
     return memOk;
+}
+
+void MMemDebugFreePtrsInRange(MAllocator* alloc, u8* startAddress, u8* endAddress) {
+    size_t compactedSize = 0;
+    MArrayEachPtr(alloc->debug.allocSlots, it) {
+        MMemAllocInfo* memAlloc = it.p;
+        if (memAlloc->mem >= startAddress && memAlloc->mem <= endAddress) {
+            MMemDebugCheckMemAlloc(alloc, memAlloc);
+            alloc->debug.curAllocatedBytes -= memAlloc->size;
+            memAlloc->start = NULL;
+            memAlloc->mem = NULL;
+            memAlloc->size = 0;
+        } else {
+            // compact as we go
+            alloc->debug.allocSlots[compactedSize] = *memAlloc;
+            compactedSize++;
+        }
+    }
+
+    MArrayResize(alloc, alloc->debug.allocSlots, compactedSize);
+    MArrayResize(alloc, alloc->debug.freeSlots, 0);
 }
 
 static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
@@ -357,14 +397,31 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
         memAlloc = alloc->debug.allocSlots + pos;
     } else {
         memAlloc = MMemDebugArrayAddPtr(alloc, alloc->debug.allocSlots);
+        if (memAlloc == NULL) {
+            return NULL;
+        }
         pos = MArraySize(alloc->debug.allocSlots) - 1;
     }
 
-    size_t start = M_SENTINEL_BEFORE;
-    size_t allocSize = start + size + M_SENTINEL_AFTER;
+    if (alloc->debug.sentinelCheck) {
+        size_t start = M_SENTINEL_BEFORE;
+        size_t allocSize = start + size + M_SENTINEL_AFTER;
+        u8* mem = (u8*)alloc->mallocFunc(alloc, allocSize);
+        if (mem == NULL) {
+            return NULL;
+        }
+        memAlloc->start = mem;
+        memAlloc->mem = (u8*)memAlloc->start + M_SENTINEL_BEFORE;
+    } else {
+        u8* mem = (u8*)alloc->mallocFunc(alloc, size);
+        if (mem == NULL) {
+            return NULL;
+        }
+        memAlloc->start = mem;
+        memAlloc->mem = mem;
+    }
+
     memAlloc->size = size;
-    memAlloc->start = (u8*)alloc->mallocFunc(alloc, allocSize);
-    memAlloc->mem = (u8*)memAlloc->start + M_SENTINEL_BEFORE;
     memAlloc->file = file;
     memAlloc->line = line;
 
@@ -379,8 +436,10 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
         alloc->debug.maxAllocatedBytes = alloc->debug.curAllocatedBytes;
     }
 
-    MMemDebugCanarySet(memAlloc->mem - M_SENTINEL_BEFORE, M_SENTINEL_BEFORE);
-    MMemDebugCanarySet(memAlloc->mem + memAlloc->size, M_SENTINEL_AFTER);
+    if (alloc->debug.sentinelCheck) {
+        MMemDebugCanarySet(memAlloc->mem - M_SENTINEL_BEFORE, M_SENTINEL_BEFORE);
+        MMemDebugCanarySet(memAlloc->mem + memAlloc->size, M_SENTINEL_AFTER);
+    }
 
 #ifdef M_LOG_ALLOCATIONS
     MLogf("-> 0x%p", memAlloc->mem);
@@ -395,7 +454,7 @@ void* M_Malloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
 #ifdef M_LOG_ALLOCATIONS
 #ifdef M_STACKTRACE
     MLogf("malloc(%d):", size);
-    MLogStacktrace(0);
+    MLogStacktraceCurrent(0);
 #else
     MLogf("malloc(%d) %s:%d", size, file, line);
 #endif
@@ -427,18 +486,18 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
     }
 
 #ifdef M_MEM_DEBUG
-    for (u32 i = 0; i < MArraySize(alloc->debug.allocSlots); ++i) {
-        MMemAllocInfo* memAlloc = alloc->debug.allocSlots + i;
+    MArrayEachPtr(alloc->debug.allocSlots, it) {
+        MMemAllocInfo* memAlloc = it.p;
         if (p == memAlloc->mem) {
             MMemDebugCheckMemAlloc(alloc, memAlloc);
             if (size != memAlloc->size) {
 #ifdef M_STACKTRACE
-                MBreakpointf("MFree 0x%p called with wrong size: %d - should be: %d", p, size, memAlloc->size);
-                MLogStacktrace(0);
+                MBreakpointf("MFree 0x%p called with wrong size: %zu - should be: %zu", p, size, memAlloc->size);
+                MLogStacktraceCurrent(0);
                 MLog(" allocated @");
                 MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-                MBreakpointf("MFree %s:%d 0x%p called with wrong size: %d - should be: %d", file, line, p, size,
+                MBreakpointf("MFree %s:%d 0x%p called with wrong size: %zu - should be: %d", file, line, p, size,
                              memAlloc->size);
 #endif
             }
@@ -447,21 +506,21 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
             memAlloc->start = NULL;
             memAlloc->mem = NULL;
 #ifdef M_LOG_ALLOCATIONS
-            #ifdef M_STACKTRACE
-            MLogf("free(0x%p) size: %d [allocated @ %s:%d]", p, memAlloc->size, memAlloc->file, memAlloc->line);
-            MLogStacktrace(1);
+#ifdef M_STACKTRACE
+            MLogf("free(0x%p) size: %zu [allocated @ %s:%d]", p, memAlloc->size, memAlloc->file, memAlloc->line);
+            MLogStacktraceCurrent(1);
 #else
-            MLogf("free(0x%p) size: %d %s:%d [allocated @ %s:%d]", p, memAlloc->size, file, line, memAlloc->file, memAlloc->line);
+            MLogf("free(0x%p) size: %zu %s:%d [allocated @ %s:%d]", p, memAlloc->size, file, line, memAlloc->file, memAlloc->line);
 #endif
 #endif
-            *(MMemDebugArrayAddPtr(alloc, alloc->debug.freeSlots)) = i;
+            *(MMemDebugArrayAddPtr(alloc, alloc->debug.freeSlots)) = it.i;
             return;
         }
     }
 
     MBreakpointf("MFree %s:%d called on invalid ptr: 0x%p", file, line, p);
 #ifdef M_STACKTRACE
-    MLogStacktrace(0);
+    MLogStacktraceCurrent(0);
 #endif
 #else
 #ifdef M_LOG_ALLOCATIONS
@@ -475,10 +534,10 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
 #ifdef M_MEM_DEBUG
 #ifdef M_LOG_ALLOCATIONS
 #ifdef M_STACKTRACE
-    MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
-    MLogStacktrace(0);
+    MLogf("realloc(0x%p, %zu, %zu)", p, oldSize, newSize);
+    MLogStacktraceCurrent(0);
 #else
-    MLogf("realloc(0x%p, %d, %d) [%s:%d]", p, oldSize, newSize, file, line);
+    MLogf("realloc(0x%p, %zu, %zu) [%s:%d]", p, oldSize, newSize, file, line);
 #endif
 #endif
     if (p == NULL) {
@@ -486,8 +545,8 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     }
 
     MMemAllocInfo* memAllocFound = NULL;
-    for (u32 i = 0; i < MArraySize(alloc->debug.allocSlots); ++i) {
-        MMemAllocInfo* memAlloc = alloc->debug.allocSlots + i;
+    MArrayEachPtr(alloc->debug.allocSlots, it) {
+        MMemAllocInfo* memAlloc = it.p;
         if (p == memAlloc->mem) {
             MMemDebugCheckMemAlloc(alloc, memAlloc);
             memAllocFound = memAlloc;
@@ -498,14 +557,14 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     if (memAllocFound == NULL) {
         MBreakpointf("MRealloc called on invalid ptr at line: %s:%d %p", file, line, p);
 #ifdef M_STACKTRACE
-        MLogStacktrace(0);
+        MLogStacktraceCurrent(0);
 #endif
         return p;
     }
 
     if (memAllocFound->size != oldSize) {
-        MBreakpointf("MRealloc %s:%d 0x%p called with old size: %d - should be: %d", file, line, p, oldSize,
-                     memAllocFound->size);
+        MBreakpointf("MRealloc %s:%d 0x%p called with old size: %zu - should be: %zu", file, line, p, oldSize,
+              memAllocFound->size);
 #ifdef M_STACKTRACE
         MMemDebug_LogAllocStacktrace(alloc, memAllocFound);
 #endif
@@ -518,26 +577,34 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
         alloc->debug.maxAllocatedBytes = alloc->debug.curAllocatedBytes;
     }
 
-    size_t allocSize = M_SENTINEL_BEFORE + newSize + M_SENTINEL_AFTER;
-    memAllocFound->size = newSize;
-    memAllocFound->start = (u8*)alloc->reallocFunc(alloc, memAllocFound->start,
-        M_SENTINEL_BEFORE + oldSize + M_SENTINEL_AFTER, allocSize);
-    memAllocFound->mem = memAllocFound->start + M_SENTINEL_BEFORE;
+    if (alloc->debug.sentinelCheck) {
+        size_t allocSize = M_SENTINEL_BEFORE + newSize + M_SENTINEL_AFTER;
+        memAllocFound->size = newSize;
+        memAllocFound->start = (u8*)alloc->reallocFunc(alloc, memAllocFound->start,
+            M_SENTINEL_BEFORE + oldSize + M_SENTINEL_AFTER, allocSize);
+        memAllocFound->mem = memAllocFound->start + M_SENTINEL_BEFORE;
+
+        MMemDebugCanarySet(memAllocFound->start, M_SENTINEL_BEFORE);
+        MMemDebugCanarySet(memAllocFound->mem + memAllocFound->size, M_SENTINEL_AFTER);
+    } else {
+        memAllocFound->size = newSize;
+        memAllocFound->start = (u8*)alloc->reallocFunc(alloc, memAllocFound->start, oldSize, newSize);
+        memAllocFound->mem = memAllocFound->start;
+    }
+
     memAllocFound->file = file;
     memAllocFound->line = line;
+
 #ifdef M_STACKTRACE
     MMemDebug_AddStacktrace(alloc, memAllocFound, 2);
 #endif
-
-    MMemDebugCanarySet(memAllocFound->start, M_SENTINEL_BEFORE);
-    MMemDebugCanarySet(memAllocFound->mem + memAllocFound->size, M_SENTINEL_AFTER);
 
 #ifdef M_LOG_ALLOCATIONS
     MLogf("-> %p (resized)", memAllocFound->mem);
 #endif
     return memAllocFound->mem;
 #else
-    #ifdef M_LOG_ALLOCATIONS
+#ifdef M_LOG_ALLOCATIONS
     MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
     void* mem = smem->reallocFunc(alloc, p, oldSize, newSize);
     MLogf("-> 0x%p (resized)", mem);
@@ -546,14 +613,6 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     return alloc->reallocFunc(alloc, p, oldSize, newSize);
 #endif
 #endif
-}
-
-void* M_ReallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize) {
-    void* r = M_Realloc(MDEBUG_SOURCE_PASS alloc, p, oldSize, newSize);
-    if (r) {
-        memset(r, 0, newSize);
-    }
-    return r;
 }
 
 static const char* sHexChars = "0123456789abcdef";
@@ -636,7 +695,7 @@ void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, MArrayHeader*
     void* mem = M_Realloc(MDEBUG_SOURCE_PASS alloc, p, oldSize, newSize);
     if (mem == NULL)  {
         MLogf("M_ArrayGrow realloc failed for %p", a);
-        return 0;
+        return NULL;
     }
 
     MArrayHeader* c = mem;
@@ -1610,7 +1669,7 @@ void MLogStacktrace(MStacktrace* stacktrace) {
     char** strings = backtrace_symbols(stacktrace->addresses, stacktrace->frames);
     if (strings) {
         for (int i = 0; i < stacktrace->frames; i++) {
-            MLogf("  %s()", strings[i]);
+            MLogf("  %s", strings[i]);
         }
         free(strings);
     }

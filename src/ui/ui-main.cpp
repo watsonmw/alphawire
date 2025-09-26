@@ -1,4 +1,5 @@
-#include "../mlib/mlib.h"
+#include "mlib/mlib.h"
+#include "mlib/marena.h"
 
 // Dear ImGui: standalone example application for SDL3 + OpenGL
 // (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation, etc.)
@@ -38,8 +39,12 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    MArena autoReleasePool;
+    MArenaInitGrowable(&autoReleasePool, &allocator, 1024 * 1024, 16);
     AppContext c;
-    c.allocator = &allocator;
+    c.deviceListAllocator = &allocator;
+    c.autoReleasePool = &autoReleasePool.alloc;
+
     // Log to the highest logging level enabled at compile time
     c.ptpDeviceList.logger.level = PTP_LOG_LEVEL_TRACE;
     PTPDeviceList_Open(&c.ptpDeviceList, &allocator);
@@ -178,6 +183,8 @@ int main(int argc, char** argv) {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+
+        MArenaReset(&autoReleasePool);
     }
 
     // Cleanup
@@ -190,6 +197,8 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     c.CleanupAll();
+
+    MArenaFreeGrowable(&autoReleasePool);
 
 #ifdef M_MEM_DEBUG
     MMemDebugDeinit(&allocator);

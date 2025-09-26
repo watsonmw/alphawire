@@ -317,8 +317,7 @@ void* PTPDeviceUsbk_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* da
         u8* mem = ((u8*)dataMem)-headerSize;
         MFree(self->transport.allocator, mem, dataOldSize + headerSize); dataMem = NULL;
     }
-    dataMem = MMalloc(self->transport.allocator, dataSize);
-    memset(dataMem, 0, dataSize);
+    dataMem = MMallocZ(self->transport.allocator, dataSize);
     return ((u8*)dataMem) + headerSize;
 }
 

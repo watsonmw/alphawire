@@ -107,9 +107,12 @@ add_executable(alphawireui
     src/imgui/imgui_impl_sdl3.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
+    src/mlib/marena.c
+    src/mlib/marena.h
     src/mlib/mlib-file-stdlib.c
     src/mlib/mlib-log-stdlib.c
     src/mlib/mlib.c
+    src/mlib/mlib.h
     src/mlib/utf.c
     src/mlib/utf.h
     src/ui/ui-live-view.cpp

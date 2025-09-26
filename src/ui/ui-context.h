@@ -142,7 +142,8 @@ struct PropTable {
 };
 
 struct AppContext {
-    MAllocator* allocator = NULL;
+    MAllocator* deviceListAllocator = NULL;
+    MAllocator* autoReleasePool = NULL;
     MAllocator deviceAllocator{};
     PTPDeviceList ptpDeviceList{};
     PTPDevice* device = NULL;

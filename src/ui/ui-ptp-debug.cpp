@@ -1,5 +1,6 @@
 #include <string>
 #include <SDL3/SDL_time.h>
+#include <SDL3/SDL_timer.h>
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
@@ -35,6 +36,7 @@
 //   Log window to IMGUI
 //   Pre-2020 notch setter for ISO, fstop etc
 //   Settings apply
+//   Optional allocator
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
     // Buffer for hex input (max length depends on integer type)
@@ -270,11 +272,8 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
     ImGui::Separator();
 
     MStr propAsString = {};
-    if (PTPControl_GetPropertyAsStr(&c.ptp, property->propCode, &propAsString)) {
+    if (PTPControl_GetPropertyAsStr(&c.ptp, property->propCode, c.autoReleasePool, &propAsString)) {
         ImGui::Text("Value: %s", propAsString.str);
-        if (propAsString.size) {
-            MStrFree(c.ptp.allocator, propAsString);
-        }
     } else {
         char text[32];
         PTP_GetPropValueStr((PTPDataType)property->dataType, property->value, text, sizeof(text));
@@ -305,7 +304,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
 
         PTPPropValueEnums outEnums{};
 
-        if (PTPControl_GetEnumsForProperty(&c.ptp, property->propCode, &outEnums) && MArraySize(outEnums.values)) {
+        if (PTPControl_GetEnumsForProperty(&c.ptp, property->propCode, c.autoReleasePool, &outEnums) && MArraySize(outEnums.values)) {
             if (ImGui::BeginTable("Properties", 3, flags)) {
                 ImGui::TableSetupColumn("Option", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed,130.0);
@@ -357,7 +356,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
             }
         }
 
-        PTP_FreePropValueEnums(c.ptp.allocator, &outEnums);
+        PTPControl_FreePropValueEnums(&c.ptp, &outEnums);
     }
     else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
         if (ImGuiSlider(property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
@@ -519,7 +518,7 @@ static void ShowDebugPropertyOrControl(AppContext& c) {
 
 void ShowDebugPropertyListTab(AppContext& c) {
     if (ImGui::BeginTabItem("Properties")) {
-        ImGui::Text("Properties: %lld", c.propTable.items.size());
+        ImGui::Text("Properties: %zu", c.propTable.items.size());
 
         ImGui::SameLine();
         if (ImGui::InputText("Search", c.propTable.searchText, sizeof(c.propTable.searchText))) {
@@ -640,11 +639,8 @@ void ShowDebugPropertyListTab(AppContext& c) {
 
                 ImGui::TableNextColumn();
                 MStr propAsString = {};
-                if (PTPControl_GetPropertyAsStr(&c.ptp, property->propCode, &propAsString)) {
+                if (PTPControl_GetPropertyAsStr(&c.ptp, property->propCode, c.autoReleasePool, &propAsString)) {
                     ImGui::Text("%s", propAsString.str);
-                    if (propAsString.size) {
-                        MStrFree(c.ptp.allocator, propAsString);
-                    }
                 }
 
                 ImGui::PopID();
@@ -697,12 +693,106 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Spacing();
     if (ImGui::CollapsingHeader("Focus", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
+
+        // Focus Mode
+        MStr afMode = {};
+        PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MODE, c.autoReleasePool, &afMode);
+        PTPPropValueEnums focusModes = {};
+        if (PTPControl_GetEnumsForProperty(&c.ptp, DPC_FOCUS_MODE, c.autoReleasePool, &focusModes) &&
+                MArraySize(focusModes.values)) {
+            if (ImGui::BeginCombo("Focus Mode", afMode.str)) {
+                for (size_t i = 0; i < MArraySize(focusModes.values); ++i) {
+                    PTPPropValueEnum *valueEnum = focusModes.values + i;
+                    bool isSelected = MStrCmp3(afMode, valueEnum->str);
+                    if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
+                        PTPControl_SetProperty(&c.ptp, DPC_FOCUS_MODE, valueEnum->propValue);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+
         MStr afStatus = {};
-        PTPControl_GetPropertyAsStr(&c.ptp, DPC_AUTO_FOCUS_STATUS, &afStatus);
+        PTPControl_GetPropertyAsStr(&c.ptp, DPC_AUTO_FOCUS_STATUS, c.autoReleasePool, &afStatus);
         ImGui::Text("Focus State: %s", afStatus.str);
 
         if (ImGui::Checkbox("AF-On", &c.autoFocusButton)) {
             PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
+        }
+
+        // Manual Focus Adjust
+
+        PtpControl* focusAdjust = PTPControl_GetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST);
+        if (focusAdjust) {
+            PTPPropValue focusAdjust{};
+            bool enable = PTPControl_PropertyEnabled(&c.ptp, DPC_MANUAL_FOCUS_ADJUST_ENABLED);
+            if (!enable) {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Button("<<7")) {
+                focusAdjust.i16 = -7;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<<6")) {
+                focusAdjust.i16 = -6;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<<5")) {
+                focusAdjust.i16 = -5;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<<4")) {
+                focusAdjust.i16 = -4;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<<<")) {
+                focusAdjust.i16 = -3;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<<")) {
+                focusAdjust.i16 = -2;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<")) {
+                focusAdjust.i16 = -1;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(">")) {
+                focusAdjust.i16 = 1;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(">>")) {
+                focusAdjust.i16 = 2;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(">>>")) {
+                focusAdjust.i16 = 3;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("4>>")) {
+                focusAdjust.i16 = 4;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("5>>")) {
+                focusAdjust.i16 = 5;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("6>>")) {
+                focusAdjust.i16 = 6;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("7>>")) {
+                focusAdjust.i16 = 7;
+            }
+            if (focusAdjust.i16 != 0) {
+                PTPPropValue focusAdjustOff{};
+                PTPControl_SetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
+                PTPControl_SetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjust);
+                PTPControl_SetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
+            }
+            if (!enable) {
+                ImGui::EndDisabled();
+            }
         }
     }
 
@@ -713,7 +803,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::Text("Last Download Time: %lldms (%lldms)", c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
         ImGui::Text("Last Filename: %s", c.fileDownloadPath.c_str());
         ImGui::SameLine();
-        ImGui::Text("Size: %llu", c.fileDownloadTotalBytes);
+        ImGui::Text("Size: %zu", c.fileDownloadTotalBytes);
 
         ImGui::Checkbox("Auto Download", &c.fileDownloadAuto);
 
@@ -777,41 +867,54 @@ void ShowCameraControlsWindow(AppContext& c) {
     if (ImGui::CollapsingHeader("Magnifier", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
 
-        ImGuiControlButton(c, "Zoom", DPC_FOCUS_MAGNIFIER);
-        ImGui::SameLine();
-        ImGuiControlButton(c, "Exit", DPC_FOCUS_MAGNIFIER_CANCEL);
-        ImGui::SameLine();
-        MStr magScale = {};
-        if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_SCALE, &magScale)) {
-            ImGui::Text("%s", magScale.str);
-            MStrFree(c.ptp.allocator, magScale);
+        bool magEnabled = false;
+        if (PTPControl_SupportsProperty(&c.ptp, DPC_FOCUS_MAGNIFY_POS)) {
+            magEnabled = true;
         }
 
-        MStr magPosition = {};
-        if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_POS, &magPosition)) {
-            ImGui::Text("%s", magPosition.str);
-            MStrFree(c.ptp.allocator, magPosition);
+        if (magEnabled) {
+            MStr magPosition = {};
+            if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_POS, c.autoReleasePool, &magPosition)) {
+                ImGui::Text("Magnifier: %s", magPosition.str);
+
+                ImGuiControlButton(c, "Magnify", DPC_FOCUS_MAGNIFIER);
+                ImGui::SameLine();
+                ImGuiControlButton(c, "Exit", DPC_FOCUS_MAGNIFIER_CANCEL);
+                ImGui::SameLine();
+                MStr magScale = {};
+                if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_FOCUS_MAGNIFY_SCALE, c.autoReleasePool, &magScale)) {
+                    ImGui::Text("%s", magScale.str);
+                }
+
+                ImGui::Spacing();
+                ImGui::Dummy(ImVec2(43.0f, 0)); // Horizontal padding
+                ImGui::SameLine();
+                ImGuiControlButton(c, "Up", DPC_REMOTE_KEY_UP);
+
+                // Left + Right buttons
+                ImGuiControlButton(c, "Left", DPC_REMOTE_KEY_LEFT);
+                ImGui::SameLine();
+                ImGui::Dummy(ImVec2(35.0f, 0)); // Space between Left and Right
+                ImGui::SameLine();
+                ImGuiControlButton(c, "Right", DPC_REMOTE_KEY_RIGHT);
+
+                // Center "Down" button
+                ImGui::Dummy(ImVec2(36.0f, 0)); // Horizontal padding
+                ImGui::SameLine();
+                ImGuiControlButton(c, "Down", DPC_REMOTE_KEY_DOWN);
+            }
         }
-
-        ImGui::Dummy(ImVec2(43.0f, 10)); // Horizontal padding
-        ImGuiControlButton(c, "Up", DPC_REMOTE_KEY_UP);
-
-        // Left + Right buttons
-        ImGuiControlButton(c, "Left", DPC_REMOTE_KEY_LEFT);
-        ImGui::SameLine();
-        ImGui::Dummy(ImVec2(35.0f, 0)); // Space between Left and Right
-        ImGui::SameLine();
-        ImGuiControlButton(c, "Right", DPC_REMOTE_KEY_RIGHT);
-
-        // Center "Down" button
-        ImGui::Dummy(ImVec2(36.0f, 0)); // Horizontal padding
-        ImGui::SameLine();
-        ImGuiControlButton(c, "Down", DPC_REMOTE_KEY_DOWN);
     }
 
     ImGui::Spacing();
-    if (ImGui::CollapsingHeader("Settings")) {
+    if (ImGui::CollapsingHeader("Capture Settings")) {
         ImGui::Spacing();
+
+        // Capture Mode
+
+        // ISO
+
+        // Shutter Speed
     }
 
     ImGui::Spacing();
@@ -950,7 +1053,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
             }
 
             if (ImGui::BeginTabItem("Operations")) {
-                ImGui::Text("Operations: %lld", MArraySize(c.ptp.supportedOperations));
+                ImGui::Text("Operations: %zu", MArraySize(c.ptp.supportedOperations));
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -999,7 +1102,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
             }
 
             if (ImGui::BeginTabItem("Controls")) {
-                ImGui::Text("Controls: %lld", MArraySize(c.ptp.supportedControls));
+                ImGui::Text("Controls: %zu", MArraySize(c.ptp.supportedControls));
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1076,7 +1179,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
             }
 
             if (ImGui::BeginTabItem("Events")) {
-                ImGui::Text("Events: %lld", MArraySize(c.ptp.supportedEvents));
+                ImGui::Text("Events: %zu", MArraySize(c.ptp.supportedEvents));
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1195,7 +1298,7 @@ static void ShowDeviceListWindow(AppContext& c) {
                     ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
             ImGui::PushID(i);
             char label[32];
-            snprintf(label, sizeof(label), "##%04lld", i);
+            snprintf(label, sizeof(label), "##%04zu", i);
             if (ImGui::Selectable(label, c.selectedDeviceIndex == i, selectFlags)) {
                 c.selectedDeviceIndex = i;
             }

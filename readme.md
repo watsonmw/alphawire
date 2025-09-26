@@ -1,6 +1,7 @@
 # AlphaWire
 
-A C library for controlling Sony Alpha cameras via USB connection, with a focus on minimal dependencies and broad camera support.
+A C library for controlling Sony Alpha cameras via USB connection, with a focus on minimal dependencies and broad camera
+support.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -12,7 +13,7 @@ It has some advantages over the official SDK:
 - Minimal dependencies
 - Fast
 - Supports older cameras not covered by official Sony Camera Remote SDK
-- Easily debugging of camera PTP (Picture Transfer Protocol) support
+- Easy debugging of camera remote features
 
 Downsides to alphawire:
 - Missing backends for Linux and TCP (on the roadmap)

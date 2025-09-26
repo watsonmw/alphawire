@@ -160,9 +160,29 @@ PTP_EXPORT PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 inde
  */
 PTP_EXPORT PTPResult PTPControl_UpdateProperties(PTPControl* self);
 
+/**
+ * Get property information
+ * @param self
+ * @param propertyCode
+ * @return PTPProperty if found, null if not available
+ */
 PTP_EXPORT PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode);
-PTP_EXPORT b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, PTPPropValueEnums* outEnums);
-PTP_EXPORT b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MStr* strOut);
+
+/**
+ * Build a list of enums for property if enums are available.
+ * Converts values to strings for display.
+ * You must free memory allocated by this function by calling PTPControl_FreePropValueEnums().
+ * @param self
+ * @param propertyCode
+ * @param outEnums
+ * @page allocator Optional allocator to use (when NULL use PTPControl allocator).
+ * @return TRUE if enums are available, false if no enums available for this property
+ */
+PTP_EXPORT b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, MAllocator* allocator, PTPPropValueEnums* outEnums);
+PTP_EXPORT void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums);
+PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outEnums);
+
+PTP_EXPORT b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MAllocator* allocator, MStr* strOut);
 PTP_EXPORT PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PTPPropValue value);
 PTP_EXPORT b32 PTPControl_SetPropertyU16(PTPControl* self, u16 propertyCode, u16 value);
 PTP_EXPORT b32 PTPControl_SetPropertyU32(PTPControl* self, u16 propertyCode, u32 value);
@@ -181,7 +201,7 @@ PTP_EXPORT b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i
  * @param self Pointer to the PTPControl instance to be checked.
  * @return number of controls found
  */
-size_t PTP_EXPORT PTPControl_NumControls(PTPControl* self);
+PTP_EXPORT size_t PTPControl_NumControls(PTPControl* self);
 
 /**
  * Get Control at index (no particular order)
@@ -195,7 +215,7 @@ PTP_EXPORT PtpControl* PTPControl_GetControlAtIndex(PTPControl* self, u16 index)
 PTP_EXPORT PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode);
 PTP_EXPORT PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PTPPropValue value);
 PTP_EXPORT PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed);
-b32 PTP_EXPORT PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums);
+PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -206,14 +226,7 @@ PTP_EXPORT PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileO
 PTP_EXPORT PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut);
 PTP_EXPORT PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut);
 PTP_EXPORT PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-// Release temporary data
-////////////////////////////////////////////////////////////////////////////////////////////
-PTP_EXPORT void PTP_FreeLiveViewFrames(MAllocator* mem, LiveViewFrames* liveViewFrames);
-PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* mem, PTPPropValueEnums* outEnums);
-
+PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // String conversion, value helpers

@@ -1,5 +1,4 @@
-#ifndef MLIB_H
-#define MLIB_H
+#pragma once
 
 //
 // Public domain c library for the following:
@@ -50,7 +49,7 @@ typedef unsigned long long u64;
 #define U64_MAX 0xffffffffffffffff
 
 #ifndef TRUE
-#define TRUE 1
+#define TRUE -1
 #endif
 #ifndef FALSE
 #define FALSE 0
@@ -109,11 +108,13 @@ typedef struct {
 
 typedef struct {
     MMemAllocInfo* allocSlots;
+    u32* freeSlots; // Indices of available allocSlots
 #ifdef M_STACKTRACE
     MStacktrace* stacktraces;
 #endif
-    u32* freeSlots;
-    b32 initialized;
+    b32 initialized : 1;
+    b32 sentinelCheck : 1;
+    b32 leakTracking : 1;
     u32 totalAllocations;
     u32 totalAllocatedBytes;
     u32 curAllocatedBytes;
@@ -150,6 +151,7 @@ void MAllocatorMakeClibHeap(MAllocator* alloc);
 
 void MMemDebugInit(MAllocator* alloc);
 void MMemDebugDeinit(MAllocator* alloc);
+void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary);
 
 // Check if ptr is a valid memory allocation, returns false if there's a problem
 b32 MMemDebugCheck(MAllocator* alloc, void* p);
@@ -160,6 +162,11 @@ b32 MMemDebugCheckAll(MAllocator* alloc);
 
 // Print all current memory allocations
 b32 MMemDebugListAll(MAllocator* alloc);
+
+// Free all allocated pointers in given address range
+// Compacts the allocation slots and free slot list
+void MMemDebugFreePtrsInRange(MAllocator* alloc, u8* startAddress, u8* endAddress);
+
 #else
 // Memory debug mode is off
 #define MDEBUG_SOURCE_DEFINE
@@ -168,14 +175,14 @@ b32 MMemDebugListAll(MAllocator* alloc);
 #endif
 
 void* M_Malloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size);
-void* M_MallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size);
 void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize);
-void* M_ReallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize);
 void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size);
 
 #define MMalloc(alloc, size) M_Malloc(MDEBUG_SOURCE_MACRO (alloc), size)
-#define MMallocZ(alloc, size) M_MallocZ(MDEBUG_SOURCE_MACRO (alloc), size)
+#define MMallocZ(alloc, size) ({void* r = M_Malloc(MDEBUG_SOURCE_MACRO (alloc), size); if (r) { memset(r, 0, size); } r;})
 #define MRealloc(alloc, p, oldSize, newSize) (M_Realloc(MDEBUG_SOURCE_MACRO (alloc), (p), oldSize, newSize))
+#define MReallocZ(alloc, p, oldSize, newSize) ({void* r = M_Realloc(MDEBUG_SOURCE_MACRO (alloc), p, oldSize, newSize); \
+    if (r && newSize > oldSize) { memset(((u8*)r)+oldSize, 0, newSize - oldSize); } r;})
 #define MFree(alloc, p, size) (M_Free(MDEBUG_SOURCE_MACRO (alloc), (p), size), (p) = NULL)
 
 /////////////////////////////////////////////////////////
@@ -363,7 +370,7 @@ MINLINE void MMemFree(MMemIO* memIO) {
 }
 
 // Add capacity to write growByBytes after the current position (grow memory if the additional bytes don't fit in the
-// remaining space)
+// remaining capacity)
 void MMemGrowBytes(MMemIO* memIO, u32 growByBytes);
 
 // Add bytes, allocating new memory if necessary
@@ -444,14 +451,17 @@ MINLINE i32 MMemReadSkipBytes(MMemIO* reader, u32 skipBytes) {
     return MMemReadDone(reader);
 }
 
+// Make pointer align to given given alignment (move pointer forward to make it align)
 MINLINE void* MPtrAlign(void* ptr, size_t alignBytes) {
     return (void*)((uintptr_t)((u8*)ptr + alignBytes - 1) & ~(alignBytes - 1));
 }
 
+// Return byte size nearest multiple of alignBytes that size will fit in
 MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
     return (size + alignBytes - 1) & ~(alignBytes - 1);
 }
 
+// Get number of items in a static array
 #define MStaticArraySize(arr) (sizeof(arr) / sizeof(arr[0]))
 
 /////////////////////////////////////////////////////////
@@ -477,6 +487,9 @@ typedef struct {
 
 // Add space for item to the end of the array, zero its memory and return ptr to it
 #define MArrayAddPtrZ(m, a) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), memset((a) + M_ArrayHeader(a)->size, 0, sizeof(*a)), ((a) + M_ArrayHeader(a)->size++))
+
+// Resize array to given size. New elements are uninitialized.
+#define MArrayResize(m, a, s) ((a) ? ((M_ArrayHeader(a)->size < (s)) ? ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s), 0) : ((M_ArrayHeader(a)->size) = (s))) : 0)
 
 // Grow the array, adding new elements. New elements are uninitialized, old elements are unchanged but may be moved (they are
 // memmove()d if the backing memory needs to be relocated to fit the new elements, and left alone if not).
@@ -661,8 +674,10 @@ MINLINE u32 MStrLen(const char* str) {
     return n;
 }
 
-// Heap alloc strings
+// Alloc space for string of given size
 #define MStrInit(a, s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (a), (len)), ((s).str) ? (s).size = (len) : 0)
+
+// Free allocated string
 #define MStrFree(a, s) ((s).str ? (M_Free(MDEBUG_SOURCE_MACRO (a), (s).str, (s).size), (s).str = 0, (s).size = 0) : 0)
 
 // Make a MStr copy from a C string - includes null terminator in size
@@ -698,6 +713,4 @@ void MLogStacktraceCurrent(int skipFrames);
 
 #ifdef __cplusplus
 } // extern "C"
-#endif
-
 #endif
