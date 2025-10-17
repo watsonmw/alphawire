@@ -193,9 +193,11 @@ MArenaBlockCheckpoint MArenaCheckpoint(MArena* arena) {
 
 void MArenaResetToCheckpoint(MArena* arena, MArenaBlockCheckpoint checkpoint) {
     MArenaBlock *block = arena->curBlock;
+#ifdef M_MEM_DEBUG
     arena->alloc.debug.allocSlots = checkpoint.allocSlots;
     arena->alloc.debug.freeSlots = checkpoint.freeSlots;
     arena->alloc.debug.stacktraces = checkpoint.stacktraces;
+#endif
     while (block) {
         u8* blockStart = (u8*)block;
         u8* blockEnd = (u8*)block + block->size;

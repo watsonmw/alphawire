@@ -191,10 +191,10 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
             MMemAllocInfo* memAlloc = it.p;
             if (memAlloc->start) {
 #ifdef M_STACKTRACE
-                MLogf("Leaking allocation: 0x%p (%zu bytes)", memAlloc->start, memAlloc->size);
+                MBreakpointf("Leaking allocation: 0x%p (%zu bytes)", memAlloc->start, memAlloc->size);
                 MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-                MLogf("Leaking allocation: %s:%d 0x%p (%d bytes)", memAlloc->file, memAlloc->line, memAlloc->start, memAlloc->size);
+                MBreakpointf("Leaking allocation: %s:%d 0x%p (%d bytes)", memAlloc->file, memAlloc->line, memAlloc->start, memAlloc->size);
 #endif
             }
         }
@@ -470,14 +470,6 @@ void* M_Malloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
     return alloc->mallocFunc(alloc, size);
 #endif
 #endif
-}
-
-void* M_MallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
-    void* r = M_Malloc(MDEBUG_SOURCE_PASS alloc, size);
-    if (r) {
-        memset(r, 0, size);
-    }
-    return r;
 }
 
 void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {

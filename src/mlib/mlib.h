@@ -68,15 +68,24 @@ extern "C" {
 
 // Turn off some warnings that will get triggered if -Wall is on
 #ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-function"
+    #define M_DISABLE_ANON_STRUCT_WARN_B
+    #define M_DISABLE_ANON_STRUCT_WARN_E
+#elif defined(_MSC_VER)
+    // Macros to disable C4116 "unnamed type definition in parentheses" when using MArrayEachPtr
+    #define M_DISABLE_ANON_STRUCT_WARN_B __pragma(warning(push)) __pragma(warning(disable: 4116))
+    #define M_DISABLE_ANON_STRUCT_WARN_E __pragma(warning(pop))
+#else
+    #define M_DISABLE_ANON_STRUCT_WARN_B
+    #define M_DISABLE_ANON_STRUCT_WARN_E
 #endif
 
 // Get type of variable. Useful in macros to get the type of a parameter
 #ifdef _MSC_VER
-#define M_TYPEOF(a) __typeof__(a)
+    #define M_TYPEOF(a) __typeof__(a)
 #else
-#define M_TYPEOF(a) typeof(a)
+    #define M_TYPEOF(a) typeof(a)
 #endif
 
 //////////////////////////////////////////////////////////
@@ -177,12 +186,26 @@ void MMemDebugFreePtrsInRange(MAllocator* alloc, u8* startAddress, u8* endAddres
 void* M_Malloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size);
 void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize);
 void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size);
+MINLINE void* M_MallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
+    void* r = M_Malloc(MDEBUG_SOURCE_MACRO (alloc), size);
+    if (r) {
+        memset(r, 0, size);
+    }
+    return r;
+}
+
+MINLINE void* M_ReallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize) {
+    void* r = M_Realloc(MDEBUG_SOURCE_MACRO (alloc), p, oldSize, newSize);
+    if (r && newSize > oldSize) {
+        memset(((u8*)r)+oldSize, 0, newSize - oldSize);
+    }
+    return r;
+}
 
 #define MMalloc(alloc, size) M_Malloc(MDEBUG_SOURCE_MACRO (alloc), size)
-#define MMallocZ(alloc, size) ({void* r = M_Malloc(MDEBUG_SOURCE_MACRO (alloc), size); if (r) { memset(r, 0, size); } r;})
+#define MMallocZ(alloc, size) M_MallocZ(MDEBUG_SOURCE_MACRO (alloc), size)
 #define MRealloc(alloc, p, oldSize, newSize) (M_Realloc(MDEBUG_SOURCE_MACRO (alloc), (p), oldSize, newSize))
-#define MReallocZ(alloc, p, oldSize, newSize) ({void* r = M_Realloc(MDEBUG_SOURCE_MACRO (alloc), p, oldSize, newSize); \
-    if (r && newSize > oldSize) { memset(((u8*)r)+oldSize, 0, newSize - oldSize); } r;})
+#define MReallocZ(alloc, p, oldSize, newSize) (M_ReallocZ(MDEBUG_SOURCE_MACRO (alloc), (p), oldSize, newSize))
 #define MFree(alloc, p, size) (M_Free(MDEBUG_SOURCE_MACRO (alloc), (p), size), (p) = NULL)
 
 /////////////////////////////////////////////////////////
@@ -451,6 +474,12 @@ MINLINE i32 MMemReadSkipBytes(MMemIO* reader, u32 skipBytes) {
     return MMemReadDone(reader);
 }
 
+MINLINE u8* MMemReadAdvance(MMemIO* reader, u32 skipBytes) {
+    u8* pos = reader->mem + reader->size;
+    reader->size += skipBytes;
+    return pos;
+}
+
 // Make pointer align to given given alignment (move pointer forward to make it align)
 MINLINE void* MPtrAlign(void* ptr, size_t alignBytes) {
     return (void*)((uintptr_t)((u8*)ptr + alignBytes - 1) & ~(alignBytes - 1));
@@ -521,7 +550,9 @@ typedef struct {
 
 #define MArrayEach(a, i) for (size_t i = 0; (i) < MArraySize(a); ++(i))
 
-#define MArrayEachPtr(a, it) for (struct {M_TYPEOF(a) p; size_t i;} (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), (it).p = (a) + ((it).i))
+#define MArrayEachPtr(a, it) for ( \
+    M_DISABLE_ANON_STRUCT_WARN_B struct {M_TYPEOF(a) p; size_t i;} M_DISABLE_ANON_STRUCT_WARN_E \
+    (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), (it).p = (a) + ((it).i))
 
 #define M_ArrayHeader(a) ((MArrayHeader*)(a) - 1)
 
