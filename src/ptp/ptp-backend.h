@@ -26,6 +26,7 @@ typedef enum {
     PTP_BACKEND_WIA,
     PTP_BACKEND_LIBUSBK,
     PTP_BACKEND_IOKIT,
+    PTP_BACKEND_LIBUSB,
 } PTPBackendType;
 
 // Generic device info - describing an available device

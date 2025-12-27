@@ -25,6 +25,10 @@
 //
 #include <string.h>
 
+#ifdef __GNUC__
+#include <stdint.h> // uintptr_t
+#endif
+
 typedef char i8;
 typedef unsigned char u8;
 typedef short i16;
@@ -329,8 +333,10 @@ void MLogBytes(const u8* mem, u32 len);
         #else
             #if defined(__i386__) || defined(__x86_64)
                 #define M_DEBUGGER_TRAP() __asm__ volatile("int $3")
-            #elif defined(__arm__) || defined(__aarch64__)
+            #elif defined(__arm__)
                 #define M_DEBUGGER_TRAP() __asm__ volatile("bkpt #0")
+            #elif defined(__aarch64__)
+                #define M_DEBUGGER_TRAP() __asm__ volatile("brk #0")
             #endif
         #endif
     #elif defined(_MSC_VER)

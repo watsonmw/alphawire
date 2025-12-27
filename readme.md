@@ -16,7 +16,7 @@ It has some advantages over the official SDK:
 - Easy debugging of camera remote features
 
 Downsides to alphawire:
-- Missing backends for Linux and TCP (on the roadmap)
+- Missing backends TCP (on the roadmap)
 - Possibly missing metadata for latest cameras (will add as needed)
 - No image processing (out of scope for this project)
 
@@ -24,7 +24,7 @@ Downsides to alphawire:
 > trademarks of Sony Corporation.
 
 ## Current Status
-- **Platform Support**: Currently Windows (Visual Studio 2018 or MinGW) and OSX (clang)
+- **Platform Support**: Currently Windows (Visual Studio 2018 or MinGW), OSX (clang) and Linux
 - **Build System**: CMake
 - **Architecture**: Designed for easy cross-platform expansion
 
@@ -45,6 +45,9 @@ Downsides to alphawire:
 ### OSX Backend Support
 - IOKit
 
+### Linux Backend Support
+- libusb
+
 ## Demo Application
 A GUI application is included for camera control and PTP protocol debugging.
 
@@ -60,7 +63,6 @@ A GUI application is included for camera control and PTP protocol debugging.
 - [ ] Build System Improvements
    - Packaged releases for UI application
 - [ ] Platform Extensions
-   - Linux support
    - TCP backend implementation
 - [ ] API Development
    - Threading - support separate thread per device

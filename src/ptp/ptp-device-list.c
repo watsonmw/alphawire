@@ -9,6 +9,9 @@
 #ifdef PTP_ENABLE_LIBUSBK
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
+#ifdef PTP_ENABLE_LIBUSB
+#include "platform/libusb/ptp-backend-libusb.h"
+#endif
 
 static PTPBackendType sBackends[] = {
 #ifdef PTP_ENABLE_IOKIT
@@ -18,7 +21,10 @@ static PTPBackendType sBackends[] = {
     PTP_BACKEND_WIA,
 #endif
 #ifdef PTP_ENABLE_LIBUSBK
-    PTP_BACKEND_LIBUSBK
+    PTP_BACKEND_LIBUSBK,
+#endif
+#ifdef PTP_ENABLE_LIBUSB
+    PTP_BACKEND_LIBUSB
 #endif
 };
 
@@ -51,6 +57,15 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
                 }
                 break;
 #endif
+            }
+            case PTP_BACKEND_LIBUSB: {
+#ifdef PTP_ENABLE_LIBUSB
+                PTPBackend *backend = AddBackendSlot(self, backendType);
+                if (PTPLibusbDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                    backendsOpened = TRUE;
+                }
+#endif
+                break;
             }
             case PTP_BACKEND_WIA: {
 #ifdef PTP_ENABLE_WIA
