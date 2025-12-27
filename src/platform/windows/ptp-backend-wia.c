@@ -42,7 +42,7 @@ static void PrintComPropertyValue(MAllocator* allocator, PROPVARIANT* pValue) {
         case VT_BSTR:
             utf8Str = WinUtils_BSTRToUTF8(allocator, pValue->bstrVal);
             if (utf8Str.str) {
-                MLogf("String: %s\n", utf8Str.str);
+                MLogf("String: %.*s\n", utf8Str.size, utf8Str.str);
                 MStrFree(allocator, utf8Str);
             }
             break;
@@ -303,7 +303,8 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         // PTP_INFO_F("Remote device id: %s", WinUtils_BSTRToUTF8(self->allocator, propVar[3].bstrVal));
         deviceInfo->backendType = PTP_ENABLE_WIA;
         deviceInfo->device = wiaDeviceInfo;
-        PTP_INFO_F("Found device: %s (%s)", deviceInfo->product.str, deviceInfo->manufacturer.str);
+        PTP_INFO_F("Found device: %.*s (%.*s)", deviceInfo->product.size, deviceInfo->product.str,
+            deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
 
         for (int j = 0; j < PROP_NUM; j++) {
             PropVariantClear(propVar + j);

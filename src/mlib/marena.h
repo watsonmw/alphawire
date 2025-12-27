@@ -90,7 +90,7 @@ void MArenaReset(MArena* arena);
 /**
  * Create a checkpoint of current arena allocation state.
  * The returned MArenaBlockCheckpoint can be passed to MArenaResetToCheckpoint() to free all allocations after the
- * checkpoint
+ * checkpoint in one go.
  */
 MArenaBlockCheckpoint MArenaCheckpoint(MArena *arena);
 

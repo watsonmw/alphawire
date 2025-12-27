@@ -703,7 +703,7 @@ void ShowCameraControlsWindow(AppContext& c) {
             if (ImGui::BeginCombo("Focus Mode", afMode.str)) {
                 for (size_t i = 0; i < MArraySize(focusModes.values); ++i) {
                     PTPPropValueEnum *valueEnum = focusModes.values + i;
-                    bool isSelected = MStrCmp3(afMode, valueEnum->str);
+                    bool isSelected = MStrCmp(afMode, valueEnum->str);
                     if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
                         PTPControl_SetProperty(&c.ptp, DPC_FOCUS_MODE, valueEnum->propValue);
                     }
@@ -714,7 +714,7 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         MStr afStatus = {};
         PTPControl_GetPropertyAsStr(&c.ptp, DPC_AUTO_FOCUS_STATUS, c.autoReleasePool, &afStatus);
-        ImGui::Text("Focus State: %s", afStatus.str);
+        ImGui::Text("Focus State: %.*s", afStatus.size, afStatus.str);
 
         if (ImGui::Checkbox("AF-On", &c.autoFocusButton)) {
             PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
@@ -996,16 +996,16 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                 int minorVersion = c.ptp.protocolVersion % 100;
                 ImGui::Text("Protocol Version: %d.%02d", majorVersion, minorVersion);
 
-                ImGui::Text("Manufacturer: %s", c.ptp.manufacturer.str);
-                ImGui::Text("Model: %s", c.ptp.model.str);
-                ImGui::Text("Device Version: %s", c.ptp.deviceVersion.str);
-                ImGui::Text("Serial Number: %s", c.ptp.serialNumber.str);
+                ImGui::Text("Manufacturer: %.*s", c.ptp.manufacturer.size, c.ptp.manufacturer.str);
+                ImGui::Text("Model: %.*s", c.ptp.model.size, c.ptp.model.str);
+                ImGui::Text("Device Version: %.*s", c.ptp.deviceVersion.size, c.ptp.deviceVersion.str);
+                ImGui::Text("Serial Number: %.*s", c.ptp.serialNumber.size, c.ptp.serialNumber.str);
 
                 ImGui::Text("Vendor Extension Id: %d", c.ptp.vendorExtensionId);
                 majorVersion = c.ptp.vendorExtensionVersion / 100;
                 minorVersion = c.ptp.vendorExtensionVersion % 100;
                 ImGui::Text("Vendor Extension Version: %d.%02d", majorVersion, minorVersion);
-                ImGui::Text("Vendor Extension: %s", c.ptp.vendorExtension.str);
+                ImGui::Text("Vendor Extension: %.*s", c.ptp.vendorExtension.size, c.ptp.vendorExtension.str);
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1307,13 +1307,13 @@ static void ShowDeviceListWindow(AppContext& c) {
             }
 
             ImGui::SameLine();
-            ImGui::TextUnformatted(deviceInfo->product.str);
+            ImGui::TextUnformatted(deviceInfo->product.str, MStrEnd(deviceInfo->product));
 
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(deviceInfo->manufacturer.str);
+            ImGui::TextUnformatted(deviceInfo->manufacturer.str, MStrEnd(deviceInfo->manufacturer));
 
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(deviceInfo->serial.str);
+            ImGui::TextUnformatted(deviceInfo->serial.str, MStrEnd(deviceInfo->serial));
 
             ImGui::TableNextColumn();
             ImGui::Text("%04x:%04x", deviceInfo->usbVID, deviceInfo->usbPID);

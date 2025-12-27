@@ -143,7 +143,8 @@ b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self) {
 
 b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPDeviceList_OpenDevice");
-    PTP_INFO_F("Opening device %s (%s)...", deviceInfo->product.str, deviceInfo->manufacturer.str);
+    PTP_INFO_F("Opening device %.*s (%.*s)...", deviceInfo->product.size, deviceInfo->product.str,
+        deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
 
     PTPBackend* backend = PTPDeviceList_GetBackend(self, deviceInfo->backendType);
     PTPDevice* device = MArrayAddPtr(self->allocator, self->openDevices);
