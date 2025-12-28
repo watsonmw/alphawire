@@ -2228,7 +2228,7 @@ static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProp
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u8 lookupValue = property->form.enums.getSet[i].u8;
         char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u8 = lookupValue;
         MStrSetStaticCStr(&propEnum->str, str);
@@ -2254,7 +2254,7 @@ static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProp
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u8 = lookupValue;
                 MStrSetStaticCStr(&propEnum->str, str);
@@ -4082,7 +4082,7 @@ static PropertyMetadata sPropertyMetadata[] = {
 
 b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* property, PropertyMetadata* meta, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         PTPPropValue propValue = property->form.enums.getSet[i];
         propEnum->propValue = propValue;
         propEnum->str = meta->valueAsStringFunc(self, allocator, property, propValue);

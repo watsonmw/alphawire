@@ -355,8 +355,6 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                 ImGui::EndTable();
             }
         }
-
-        PTPControl_FreePropValueEnums(&c.ptp, &outEnums);
     }
     else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
         if (ImGuiSlider(property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
