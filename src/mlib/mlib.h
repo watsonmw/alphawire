@@ -25,10 +25,6 @@
 //
 #include <string.h>
 
-#ifdef __GNUC__
-#include <stdint.h> // uintptr_t
-#endif
-
 typedef char i8;
 typedef unsigned char u8;
 typedef short i16;
@@ -496,7 +492,7 @@ MINLINE u8* MMemReadAdvance(MMemIO* reader, u32 skipBytes) {
 
 // Make pointer align to given given alignment (move pointer forward to make it align)
 MINLINE void* MPtrAlign(void* ptr, size_t alignBytes) {
-    return (void*)((uintptr_t)((u8*)ptr + alignBytes - 1) & ~(alignBytes - 1));
+    return (void*)((size_t)((u8*)ptr + alignBytes - 1) & ~(alignBytes - 1));
 }
 
 // Return byte size nearest multiple of alignBytes that size will fit in
