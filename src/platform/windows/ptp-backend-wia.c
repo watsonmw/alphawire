@@ -1,10 +1,15 @@
 ﻿#include "ptp-backend-wia.h"
 
 #include <windows.h>
-#include <wia.h>
+#include <Wia.h>
 #include <stdio.h>
 
 #include "win-utils.h"
+
+// MinGW headers are missing this id - we need it to lookup usb vendor and product id
+#ifndef WIA_DIP_PNP_ID
+#define WIA_DIP_PNP_ID 0x00000011
+#endif
 
 typedef MSTRUCTPACKED(struct sWiaPtpRequest {
     u16 OpCode;
