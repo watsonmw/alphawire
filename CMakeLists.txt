@@ -192,6 +192,7 @@ endif()
 if(WIN32)
     # Set Windows version to compile to (this just matches alphawire library - but probably doesnt need to)
     target_compile_definitions(alphawireui PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0600)
+    target_compile_definitions(alphawireui PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA)
 
     # MinGW specific
     if (MINGW)
