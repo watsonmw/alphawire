@@ -42,6 +42,8 @@ Downsides to alphawire:
 - WIA (Windows Image Acquisition)
 - libusbk
 
+Use [Zadig](https://zadig.akeo.ie/) to switch drivers on Windows.
+
 ### OSX Backend Support
 - IOKit
 
@@ -67,4 +69,5 @@ A GUI application is included for camera control and PTP protocol debugging.
 - [ ] API Development
    - Threading - support separate thread per device
    - Expand Python bindings
+   - Descriptions for each property
    - Enhanced high-level API
