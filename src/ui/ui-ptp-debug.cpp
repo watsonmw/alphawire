@@ -14,7 +14,7 @@
 #ifdef PTP_ENABLE_WIA
 #include "platform/windows/ptp-backend-wia.h"
 #endif
-#ifdef PTP_BACKEND_USB
+#ifdef PTP_ENABLE_LIBUSBK
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
 
@@ -908,7 +908,34 @@ void ShowCameraControlsWindow(AppContext& c) {
     if (ImGui::CollapsingHeader("Capture Settings")) {
         ImGui::Spacing();
 
+        MStr exposureMode = {};
+        if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_EXPOSURE_PROGRAM_MODE, c.autoReleasePool, &exposureMode)) {
+            ImGui::Text("Exposure Mode: %s", exposureMode.str);
+
+            // If Dial-mode override is available to allow exposure to be changed
+        }
+
         // Capture Mode
+        // PTPControl_GetPropertyAsStr(&c.ptp, DPC_CAPTURE_MODE, c.autoReleasePool, &captureMode);
+        PTPProperty* captureModeProp = PTPControl_GetProperty(&c.ptp, DPC_CAPTURE_MODE);
+        if (captureModeProp) {
+            MStr captureMode = {};
+            PTPControl_GetPropertyAsStr(&c.ptp, DPC_CAPTURE_MODE, c.autoReleasePool, &captureMode);
+            PTPPropValueEnums captureModes = {};
+            if (PTPControl_GetEnumsForProperty(&c.ptp, DPC_CAPTURE_MODE, c.autoReleasePool, &captureModes) &&
+                    MArraySize(captureModes.values)) {
+                if (ImGui::BeginCombo("Capture Mode", captureMode.str)) {
+                    for (size_t i = 0; i < MArraySize(captureModes.values); ++i) {
+                        PTPPropValueEnum *valueEnum = captureModes.values + i;
+                        bool isSelected = PTPProperty_Equals(captureModeProp, valueEnum->propValue);
+                        if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
+                            PTPControl_SetProperty(&c.ptp, DPC_CAPTURE_MODE, valueEnum->propValue);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+        }
 
         // ISO
 

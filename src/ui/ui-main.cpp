@@ -39,6 +39,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // Create an auto release pool / arena that will be free'd every frame
     MArena autoReleasePool;
     MArenaInitGrowable(&autoReleasePool, &allocator, 1024 * 1024, 16);
     AppContext c;
