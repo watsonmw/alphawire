@@ -140,7 +140,6 @@ PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, u16 propertyCode);
 
 /**
  * Number of properties found.
- * @param self Pointer to the PTPControl instance to be checked.
  * @return number of properties found
  */
 PTP_EXPORT size_t PTPControl_NumProperties(PTPControl* self);
@@ -148,7 +147,6 @@ PTP_EXPORT size_t PTPControl_NumProperties(PTPControl* self);
 /**
  * Get Property at index (no particular order)
  * Use with PTPControl_NumProperties() to list all properties.
- * @param self
  * @param index
  * @return property at index
  */
@@ -162,7 +160,6 @@ PTP_EXPORT PTPResult PTPControl_UpdateProperties(PTPControl* self);
 
 /**
  * Get property information
- * @param self
  * @param propertyCode
  * @return PTPProperty if found, null if not available
  */
@@ -171,15 +168,23 @@ PTP_EXPORT PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCod
 /**
  * Build a list of enums for property if enums are available.
  * Converts values to strings for display.
- * You must free memory allocated by this function by calling PTPControl_FreePropValueEnums().
- * @param self
+ * You must free memory allocated by this function by calling PTPControl_FreePropValueEnums / PTP_FreePropValueEnums.
  * @param propertyCode
+ * @param allocator allocator to use for outEnums, when set to null to uses the default PTPControl allocator
  * @param outEnums
  * @page allocator Optional allocator to use (when NULL use PTPControl allocator).
  * @return TRUE if enums are available, false if no enums available for this property
  */
 PTP_EXPORT b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, MAllocator* allocator, PTPPropValueEnums* outEnums);
+
+/**
+ * Free output enum returned by PTPControl_GetEnumsForProperty()
+ */
 PTP_EXPORT void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums);
+
+/**
+ * Free output enum returned by PTPControl_GetEnumsForProperty()
+ */
 PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outEnums);
 
 PTP_EXPORT b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MAllocator* allocator, MStr* strOut);
@@ -206,7 +211,6 @@ PTP_EXPORT size_t PTPControl_NumControls(PTPControl* self);
 /**
  * Get Control at index (no particular order)
  * Use with PTPControl_NumControls() to list all controls.
- * @param self
  * @param index
  * @return property at index
  */
@@ -243,6 +247,7 @@ PTP_EXPORT char* PTP_GetPropIsEnabledStr(u8 propIsEnabled);
 
 PTP_EXPORT void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen);
 PTP_EXPORT b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2);
+PTP_EXPORT b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -298,7 +298,7 @@ static PropMetadata sPtpPropertiesMetadata[] = {
     {DPC_MEDIA_SLOT2_STATUS, "Media Slot 2 Status"},
     {0xD257, "Media Slot 2 Remaining Shots"},
     {0xD258, "Media Slot 2 Remaining Record Time"},
-    {DPC_EXPOSURE_MODE_KEY, "Exposure Mode Key"},
+    {DPC_DIAL_MODE, "Dial Mode"},
     {DPC_ZOOM_OPERATION_ENABLED, "Zoom Operation Enabled"},
     {DPC_ZOOM_SCALE, "Zoom Scale"},
     {DPC_ZOOM_BAR_INFO, "Zoom Bar Information"},
@@ -859,6 +859,10 @@ b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue valu
     return FALSE;
 }
 
+b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value) {
+    return PTP_PropValueEq((PTPDataType)property->dataType, property->value, value);
+}
+
 size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
     switch (dataType) {
         case PTP_DT_INT8:
@@ -969,35 +973,35 @@ void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums
     PTP_FreePropValueEnums(self->allocator, outEnums);
 }
 
-static MStr ReadPtpString8(MAllocator* allocator, MMemIO* memIo) {
-    MStr r = {};
+static int ReadPtpString8(MAllocator* allocator, MMemIO* memIo, MStr* r) {
     u8 len = 0;
-    u16 buffer[256];
-
     MMemReadU8(memIo, &len);
 
     if (len) {
-        for (size_t i = 0; i < len; i++) {
-            MMemReadU16LE(memIo, buffer + i);
-        }
-
+        u16* buffer = (u16*) MMemReadAdvance(memIo, len * 2);
         size_t utf8Len = UTF8_GetConvertUTF16Len(buffer, len);
         if (utf8Len) {
-            MStrInit(allocator, r, utf8Len);
-            if (UTF8_ConvertFromUTF16(buffer, len, r.str, r.capacity) == 0) {
-                MStrFree(allocator, r);
-                return r;
+            if (r->capacity < utf8Len) {
+                r->str = MRealloc(allocator, r->str, r->capacity, utf8Len);
+                r->capacity = utf8Len;
+            }
+            if (UTF8_ConvertFromUTF16(buffer, len, r->str, r->capacity) == 0) {
+                MStrFree(allocator, *r);
+                return FALSE;
+            } else {
+                r->size = utf8Len;
+                return TRUE;
             }
         }
     }
-    return r;
+    return TRUE;
 }
 
 static char* ReadPtpString16(MAllocator* allocator, MMemIO* memIo) {
     u16 utf8Len = 0;
     MMemReadU16(memIo, &utf8Len);
     if (utf8Len) {
-        char* utf8 = MMalloc(memIo->allocator, utf8Len);
+        char* utf8 = MMalloc(allocator, utf8Len);
         MMemReadCharCopyN(memIo, utf8, utf8Len);
         return utf8;
     }
@@ -1056,7 +1060,7 @@ static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType,
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR:
-            value->str = ReadPtpString8(allocator, memIo);
+            ReadPtpString8(allocator, memIo, &value->str);
             break;
         default:
             break;
@@ -1297,7 +1301,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     MMemReadU16LE(&r.memIo, &vendorExtensionVersion);
     self->vendorExtensionVersion = vendorExtensionVersion;
 
-    self->vendorExtension = ReadPtpString8(self->allocator, &r.memIo);
+    ReadPtpString8(self->allocator, &r.memIo, &self->vendorExtension);
 
     u16 functionalMode = 0;
     MMemReadU16LE(&r.memIo, &functionalMode);
@@ -1342,10 +1346,10 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
         MArrayAdd(self->allocator, self->imageFormats, imageFormat);
     }
 
-    self->manufacturer = ReadPtpString8(self->allocator, &r.memIo);
-    self->model = ReadPtpString8(self->allocator, &r.memIo);
-    self->deviceVersion = ReadPtpString8(self->allocator, &r.memIo);
-    self->serialNumber = ReadPtpString8(self->allocator, &r.memIo);
+    ReadPtpString8(self->allocator, &r.memIo, &self->manufacturer);
+    ReadPtpString8(self->allocator, &r.memIo, &self->model);
+    ReadPtpString8(self->allocator, &r.memIo, &self->deviceVersion);
+    ReadPtpString8(self->allocator, &r.memIo, &self->serialNumber);
 
     return r.result;
 }
@@ -1765,10 +1769,10 @@ static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObject
     MMemReadU32LE(&r.memIo, &objectInfo->associationDesc);
     MMemReadU32LE(&r.memIo, &objectInfo->sequenceNumber);
 
-    objectInfo->filename = ReadPtpString8(self->allocator, &r.memIo);
-    objectInfo->captureDateTime = ReadPtpString8(self->allocator, &r.memIo);
-    objectInfo->modDateTime = ReadPtpString8(self->allocator, &r.memIo);
-    objectInfo->keywords = ReadPtpString8(self->allocator, &r.memIo);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->filename);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->captureDateTime);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->modDateTime);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->keywords);
 
     return r.result;
 }
@@ -1890,6 +1894,7 @@ PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
     if (r != PTP_OK) {
         return r;
     }
+    // Free strings - we dont use them
     PTP_FreeObjectInfo(self->allocator, &objectInfo);
     return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
 }
@@ -3875,9 +3880,9 @@ static EnumValueU8 sProp_IntervalRecStatus[] = {
     {0x01, "Shooting"},
 };
 
-static EnumValueU8 sProp_ExposureModeKey[] = {
+static EnumValueU8 sProp_DialOverride[] = {
     {0x00, "Camera"},
-    {0x01, "PC Remote"},
+    {0x01, "Remote"},
 };
 
 static MStr GetFocusMagnifyScale(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
@@ -3950,6 +3955,8 @@ typedef struct {
 
     PTP_PropBuildEnumsFunc_t buildEnumsFunc;
     PTP_PropValueAsStringFunc_t valueAsStringFunc;
+
+    char* desc; // TODO: Add descriptions
 } PropertyMetadata;
 
 #define META_ENUM_U8(n, c, e) {n, c, PTP_DT_UINT8, .fixedEnums.u8=(e), .fixedEnumsSize=MStaticArraySize(e)}
@@ -3976,7 +3983,7 @@ static PropertyMetadata sPropertyMetadata[] = {
 
     META_ENUM_U16("program-mode", DPC_EXPOSURE_PROGRAM_MODE, sProp_ExposureProgramMode16),
     META_ENUM_U32("program-mode", DPC_EXPOSURE_PROGRAM_MODE, sProp_ExposureProgramMode32),
-    META_ENUM_U8 ("program-mode-key", DPC_EXPOSURE_MODE_KEY, sProp_ExposureModeKey),
+    META_ENUM_U8 ("dial-override", DPC_DIAL_MODE, sProp_DialOverride),
     META_ENUM_U16("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode16),
     META_ENUM_U32("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode32),
     META_FUNC_U16("f-number", DPC_F_NUMBER, NULL, GetFNumberAsString),
@@ -4283,7 +4290,6 @@ b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValu
         return FALSE;
     }
 
-    MLogf("--- %d ---", control->dataType);
     for (int i = 0; i < MArraySize(control->form.enums.values); i++) {
         PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
