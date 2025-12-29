@@ -94,20 +94,32 @@ typedef struct {
     b32 owned;
 } PTPPropValueEnumArray;
 
+// Current status of a single PTP property
 typedef struct {
+    // This struct is mostly filled out from "Camera Control PTP Reference - SDIExtDevicePropInfo"
+
     u16 propCode;
     u16 dataType;
     PTPPropValue defaultValue;
     PTPPropValue value;
+
+    // 0 - Can only get this value, 1 - Can set this value (at least sometimes, see isEnabled for current status)
     u8 getSet;
+
+    // 0 - Invalid, 1 - Read/Write, 2 - Read-only
     u8 isEnabled;
+
+    // 1 - Range, 2 - Enumeration
     u8 formFlag;
-    u8 isNotch; // Property can only be changed by 'notching' - needed for some properties
 
     union {
         PTPRange range;
         PTPPropertyEnum enums;
     } form;
+
+    // isNotch properties can only be changed by 'notching' i.e. up / down rotating through settings
+    // needed for some properties on older pre-2020 cameras
+    u8 isNotch;
 } PTPProperty;
 
 typedef enum {

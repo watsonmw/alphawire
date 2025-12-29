@@ -23,8 +23,7 @@
 //      - Debug Set widgets
 //      - Enum List Read only support (except in debug)
 //   Remove sorting for other tabs
-//   Connectors:
-//     Linux
+//   Backends:
 //     IP
 //   Timing / Position
 //   Connect multiple cameras
@@ -36,7 +35,6 @@
 //   Log window to IMGUI
 //   Pre-2020 notch setter for ISO, fstop etc
 //   Settings apply
-//   Optional allocator
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
     // Buffer for hex input (max length depends on integer type)
@@ -663,6 +661,32 @@ static void ImGuiControlButton(AppContext &c, const char* buttonName, u16 proper
     }
 }
 
+void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* label) {
+    if (PTPProperty* property = PTPControl_GetProperty(&c.ptp, propCode)) {
+        MStr currentValAsStr = {};
+        PTPControl_GetPropertyAsStr(&c.ptp, propCode, c.autoReleasePool, &currentValAsStr);
+        if (PTPControl_IsPropertyWritable(&c.ptp, propCode)) {
+            PTPPropValueEnums captureModes = {};
+            if (PTPControl_GetEnumsForProperty(&c.ptp, propCode, c.autoReleasePool, &captureModes) &&
+                MArraySize(captureModes.values)) {
+                if (ImGui::BeginCombo(label, currentValAsStr.str)) {
+                    for (size_t i = 0; i < MArraySize(captureModes.values); ++i) {
+                        PTPPropValueEnum* valueEnum = captureModes.values + i;
+                        bool isSelected = PTPProperty_Equals(property, valueEnum->propValue);
+                        if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
+                            PTPControl_SetProperty(&c.ptp, propCode, valueEnum->propValue);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                return;
+            }
+        }
+
+        ImGui::Text("%s: %.*s", label, currentValAsStr.size, currentValAsStr.str);
+    }
+}
+
 void ShowCameraControlsWindow(AppContext& c) {
     ImGui::SetNextWindowPos(ImVec2(910, 660), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(990, 305), ImGuiCond_FirstUseEver);
@@ -905,41 +929,15 @@ void ShowCameraControlsWindow(AppContext& c) {
     }
 
     ImGui::Spacing();
-    if (ImGui::CollapsingHeader("Capture Settings")) {
+    if (ImGui::CollapsingHeader("Capture Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
 
-        MStr exposureMode = {};
-        if (PTPControl_GetPropertyAsStr(&c.ptp, DPC_EXPOSURE_PROGRAM_MODE, c.autoReleasePool, &exposureMode)) {
-            ImGui::Text("Exposure Mode: %s", exposureMode.str);
-
-            // If Dial-mode override is available to allow exposure to be changed
-        }
-
-        // Capture Mode
-        // PTPControl_GetPropertyAsStr(&c.ptp, DPC_CAPTURE_MODE, c.autoReleasePool, &captureMode);
-        PTPProperty* captureModeProp = PTPControl_GetProperty(&c.ptp, DPC_CAPTURE_MODE);
-        if (captureModeProp) {
-            MStr captureMode = {};
-            PTPControl_GetPropertyAsStr(&c.ptp, DPC_CAPTURE_MODE, c.autoReleasePool, &captureMode);
-            PTPPropValueEnums captureModes = {};
-            if (PTPControl_GetEnumsForProperty(&c.ptp, DPC_CAPTURE_MODE, c.autoReleasePool, &captureModes) &&
-                    MArraySize(captureModes.values)) {
-                if (ImGui::BeginCombo("Capture Mode", captureMode.str)) {
-                    for (size_t i = 0; i < MArraySize(captureModes.values); ++i) {
-                        PTPPropValueEnum *valueEnum = captureModes.values + i;
-                        bool isSelected = PTPProperty_Equals(captureModeProp, valueEnum->propValue);
-                        if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
-                            PTPControl_SetProperty(&c.ptp, DPC_CAPTURE_MODE, valueEnum->propValue);
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-            }
-        }
-
-        // ISO
-
-        // Shutter Speed
+        ImGuiBuildPropertyCombo(c, DPC_DIAL_MODE, "Dial Mode");
+        ImGuiBuildPropertyCombo(c, DPC_EXPOSURE_PROGRAM_MODE, "Exposure Mode");
+        ImGuiBuildPropertyCombo(c, DPC_CAPTURE_MODE, "Capture Mode");
+        ImGuiBuildPropertyCombo(c, DPC_ISO, "ISO");
+        ImGuiBuildPropertyCombo(c, DPC_SHUTTER_SPEED, "Shutter Speed");
+        ImGuiBuildPropertyCombo(c, DPC_F_NUMBER, "F-Number");
     }
 
     ImGui::Spacing();

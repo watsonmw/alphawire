@@ -4209,7 +4209,8 @@ b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MAllocator* 
 
             if (!strOut->str) {
                 strOut->str = str;
-                strOut->size = 0;
+                strOut->size = MCStrLen(str);
+                strOut->capacity = 0;
             }
 
             return strOut->str != NULL;
@@ -4253,7 +4254,7 @@ b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value) 
     return FALSE;
 }
 
-b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch) {
+PTPResult PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch) {
     PTP_TRACE_F("PTPControl_SetPropertyNotch(%x, %d)", propertyCode, notch);
     PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
     if (!property) {
@@ -4264,6 +4265,15 @@ b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch) {
         return PTP_GENERAL_ERROR;
     }
     return SDIO_ControlDevice(self, propertyCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
+}
+
+b32 PTPControl_IsPropertyWritable(PTPControl* self, u16 propertyCode) {
+    PTP_TRACE_F("PTPControl_IsPropertyWritable(%x)", propertyCode);
+    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+    if (!property) {
+        return FALSE;
+    }
+    return property->getSet == 1 && property->isEnabled == 1;
 }
 
 size_t PTPControl_NumControls(PTPControl* self) {

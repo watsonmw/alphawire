@@ -194,7 +194,8 @@ PTP_EXPORT b32 PTPControl_SetPropertyU32(PTPControl* self, u16 propertyCode, u32
 PTP_EXPORT b32 PTPControl_SetPropertyU64(PTPControl* self, u16 propertyCode, u64 value);
 PTP_EXPORT b32 PTPControl_SetPropertyStr(PTPControl* self, u16 propertyCode, MStr value);
 PTP_EXPORT b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value);
-PTP_EXPORT b32 PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch);
+PTP_EXPORT PTPResult PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch);
+PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, u16 propertyCode);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////

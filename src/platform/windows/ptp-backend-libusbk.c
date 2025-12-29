@@ -513,19 +513,12 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
 }
 
 static b32 PTPDeviceUsbk_Reset(void* deviceSelf) {
-    PTPDevice* dev = (PTPDevice*)deviceSelf;
-    PTPDeviceUsbk* d = (PTPDeviceUsbk*)dev->device;
-    if (!d || !d->usbHandle) {
+    PTPDevice* device = (PTPDevice*)deviceSelf;
+    PTPDeviceUsbk* deviceUsbk = device->device;
+    if (!deviceUsbk || !deviceUsbk->usbHandle) {
         return FALSE;
     }
-    BOOL ok = UsbK_ResetDevice(d->usbHandle);
-    // Best-effort clear stalls to recover pipes
-    UsbK_ClearPipeStall(d->usbHandle, d->usbBulkIn, TRUE);
-    UsbK_ClearPipeStall(d->usbHandle, d->usbBulkOut, TRUE);
-    if (d->usbInterrupt) {
-        UsbK_ClearPipeStall(d->usbHandle, d->usbInterrupt, TRUE);
-    }
-    return ok ? TRUE : FALSE;
+    return UsbK_ResetDevice(deviceUsbk->usbHandle) ? TRUE : FALSE;
 }
 
 static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
