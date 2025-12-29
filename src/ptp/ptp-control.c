@@ -2017,6 +2017,8 @@ static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
 
 PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     PTP_TRACE_F("PTPControl_Connect 0x04%x", version);
+    PTPResult r;
+
     ////////////////////////////////////////////
     // Open Session (if not done by transport layer implicitly)
     ////////////////////////////////////////////
@@ -2024,7 +2026,10 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         self->sessionId = 0;
         self->transactionId = 0;
         u32 sessionId = 0x1;
-        OpenSession(self, sessionId);
+        r = OpenSession(self, sessionId);
+        if (r != PTP_OK) {
+            return r;
+        }
         self->sessionId = sessionId;
     }
 
@@ -2034,10 +2039,16 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     u32 connectionId = 0;
 
     // 1. Authentication Packet 1
-    SDIO_Connect(self, 1, connectionId);
+    r = SDIO_Connect(self, 1, connectionId);
+    if (r != PTP_OK) {
+        return r;
+    }
 
     // 2. Authentication Packet 2
-    SDIO_Connect(self, 2, connectionId);
+    r = SDIO_Connect(self, 2, connectionId);
+    if (r != PTP_OK) {
+        return r;
+    }
 
     // 3. Authentication - Request available properties and controls
     int retries = 10;
@@ -2053,17 +2064,26 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     }
 
     // 4. Authentication Phase 3
-    SDIO_Connect(self, 3, connectionId);
+    r = SDIO_Connect(self, 3, connectionId);
+    if (r != PTP_OK) {
+        return r;
+    }
 
     ////////////////////////////////////////////
     // Authentication done
     ////////////////////////////////////////////
 
     // Get general device info
-    PTP_GetDeviceInfo(self);
+    r = PTP_GetDeviceInfo(self);
+    if (r != PTP_OK) {
+        return r;
+    }
 
     // Get property metadata & values
-    SDIO_GetAllExtDevicePropInfo(self, FALSE, TRUE);
+    r = SDIO_GetAllExtDevicePropInfo(self, FALSE, TRUE);
+    if (r != PTP_OK) {
+        return r;
+    }
 
     // SDIO_GetDisplayStringList(self, PTP_DL_ALL);
 

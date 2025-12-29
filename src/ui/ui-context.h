@@ -210,9 +210,13 @@ struct AppContext {
 #ifdef M_MEM_DEBUG
                 MMemDebugInit(&deviceAllocator);
 #endif
-                PTPControl_Init(&ptp, device, &deviceAllocator);
-                PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
-                connected = true;
+                PTPResult r = PTPControl_Init(&ptp, device, &deviceAllocator);
+                if (r == PTP_OK) {
+                    r = PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
+                    if (r == PTP_OK) {
+                        connected = true;
+                    }
+                }
             }
         }
         propTable.reset();

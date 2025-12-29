@@ -13,6 +13,8 @@
 #include "platform/osx/ptp-backend-iokit.h"
 #include "platform/usb-const.h"
 
+static b32 PTPDeviceIokit_Reset(void* deviceSelf);
+
 const char* IOReturnToString(IOReturn ret) {
     if (ret & sys_iokit) {
         switch (ret) {
@@ -611,6 +613,33 @@ PTPResult PTPDeviceIokit_SendAndRecv(void* deviceSelf, PTPRequestHeader* request
     return PTP_OK;
 }
 
+static b32 PTPDeviceIokit_Reset(void* deviceSelf) {
+    PTPDevice* dev = (PTPDevice*)deviceSelf;
+    if (!dev || !dev->device) {
+        return FALSE;
+    }
+    PTPDeviceIOKit* d = (PTPDeviceIOKit*)dev->device;
+    if (!d || !d->ioUsbDev) {
+        return FALSE;
+    }
+
+    IOReturn r = (*d->ioUsbDev)->ResetDevice(d->ioUsbDev);
+    if (r != kIOReturnSuccess) {
+        PTP_LOG_WARNING_F(&dev->logger, "IOKit ResetDevice failed: %s (%08x)", IOReturnToString(r), r);
+    }
+
+    // Best-effort: clear any endpoint stalls to recover pipes
+    if (d->ioUsbInterface) {
+        (*d->ioUsbInterface)->ClearPipeStall(d->ioUsbInterface, d->usbBulkIn);
+        (*d->ioUsbInterface)->ClearPipeStall(d->ioUsbInterface, d->usbBulkOut);
+        if (d->usbInterrupt) {
+            (*d->ioUsbInterface)->ClearPipeStall(d->ioUsbInterface, d->usbInterrupt);
+        }
+    }
+
+    return (r == kIOReturnSuccess) ? TRUE : FALSE;
+}
+
 static char* USBTransferTypeAsStr(u8 transferType) {
     switch (transferType) {
         case kUSBControl:
@@ -802,6 +831,7 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
             (*deviceOut)->transport.reallocBuffer = PTPDeviceIokit_ReallocBuffer;
             (*deviceOut)->transport.freeBuffer = PTPDeviceIokit_FreeBuffer;
             (*deviceOut)->transport.sendAndRecvEx = PTPDeviceIokit_SendAndRecv;
+            (*deviceOut)->transport.reset = PTPDeviceIokit_Reset;
             (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
             (*deviceOut)->logger = self->logger;
             (*deviceOut)->device = ioKitDevice;

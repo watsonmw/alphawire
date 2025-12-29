@@ -278,6 +278,29 @@ PTPResult PTPDeviceLibusb_SendAndRecv(void* deviceSelf, PTPRequestHeader* reques
     return PTP_OK;
 }
 
+static b32 PTPDeviceLibusb_Reset(void* deviceSelf) {
+    PTPDevice* dev = (PTPDevice*)deviceSelf;
+    PTPDeviceLibusb* d = (PTPDeviceLibusb*)dev->device;
+    int ok = 1;
+    if (d->handle) {
+        // Best-effort device reset; ignore errors on platforms that require re-enumeration
+        int r = libusb_reset_device((libusb_device_handle*)d->handle);
+        if (r != 0) {
+            PTP_LOG_WARNING_F(&dev->logger, "libusb_reset_device failed: %s", libusb_error_name(r));
+            ok = 0;
+        }
+        // Attempt to clear stalls on endpoints
+        libusb_clear_halt((libusb_device_handle*)d->handle, d->usbBulkIn);
+        libusb_clear_halt((libusb_device_handle*)d->handle, d->usbBulkOut);
+        if (d->usbInterrupt) {
+            libusb_clear_halt((libusb_device_handle*)d->handle, d->usbInterrupt);
+        }
+        // Attempt to (re)claim interface 0
+        libusb_claim_interface((libusb_device_handle*)d->handle, 0);
+    }
+    return ok ? TRUE : FALSE;
+}
+
 b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPLibusbDeviceList_ConnectDevice");
     LibusbDeviceInfo* info = deviceInfo->device;
@@ -318,6 +341,7 @@ b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* 
     (*deviceOut)->transport.reallocBuffer = PTPDeviceLibusb_ReallocBuffer;
     (*deviceOut)->transport.freeBuffer = PTPDeviceLibusb_FreeBuffer;
     (*deviceOut)->transport.sendAndRecvEx = PTPDeviceLibusb_SendAndRecv;
+    (*deviceOut)->transport.reset = PTPDeviceLibusb_Reset;
     (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
     (*deviceOut)->transport.allocator = self->allocator;
     (*deviceOut)->logger = self->logger;

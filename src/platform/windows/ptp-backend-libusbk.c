@@ -512,6 +512,22 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
     return PTP_OK;
 }
 
+static b32 PTPDeviceUsbk_Reset(void* deviceSelf) {
+    PTPDevice* dev = (PTPDevice*)deviceSelf;
+    PTPDeviceUsbk* d = (PTPDeviceUsbk*)dev->device;
+    if (!d || !d->usbHandle) {
+        return FALSE;
+    }
+    BOOL ok = UsbK_ResetDevice(d->usbHandle);
+    // Best-effort clear stalls to recover pipes
+    UsbK_ClearPipeStall(d->usbHandle, d->usbBulkIn, TRUE);
+    UsbK_ClearPipeStall(d->usbHandle, d->usbBulkOut, TRUE);
+    if (d->usbInterrupt) {
+        UsbK_ClearPipeStall(d->usbHandle, d->usbInterrupt, TRUE);
+    }
+    return ok ? TRUE : FALSE;
+}
+
 static b32 FindBulkInOutEndpoints(PTPUsbkDeviceList* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
                                   UCHAR* interruptOut, u32 timeoutMilliseconds) {
     USB_CONFIGURATION_DESCRIPTOR configDesc = {};
@@ -642,6 +658,7 @@ b32 PTPUsbkDeviceList_ConnectDevice(PTPUsbkDeviceList* self, PTPDeviceInfo* devi
         (*deviceOut)->transport.reallocBuffer = PTPDeviceUsbk_ReallocBuffer;
         (*deviceOut)->transport.freeBuffer = PTPDeviceUsbk_FreeBuffer;
         (*deviceOut)->transport.sendAndRecvEx = PTPDeviceUsbk_SendAndRecv;
+        (*deviceOut)->transport.reset = PTPDeviceUsbk_Reset;
         (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
         (*deviceOut)->logger = self->logger;
         (*deviceOut)->device = usbkDevice;

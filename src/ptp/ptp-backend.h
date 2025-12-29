@@ -12,12 +12,14 @@ typedef void (*PTP_Device_FreeBuffer_t)(void* deviceSelf, PTPBufferType type, vo
 typedef PTPResult (*PTP_Device_SendAndRecvEx_t)(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
                                                 PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                                 size_t* actualDataOutSize);
+typedef b32 (*PTP_Device_Reset_t)(void* deviceSelf);
 
 // Device transport for communicating with a device
 typedef struct {
     PTP_Device_ReallocBuffer_t reallocBuffer;
     PTP_Device_FreeBuffer_t freeBuffer;
     PTP_Device_SendAndRecvEx_t sendAndRecvEx;
+    PTP_Device_Reset_t reset;
     b32 requiresSessionOpenClose;
     MAllocator* allocator;
 } PTPDeviceTransport;
