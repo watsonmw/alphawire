@@ -268,7 +268,7 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
     ULONG countElements = 0;
     hr = pEnum->lpVtbl->GetCount(pEnum, &countElements);
 
-#define PROP_NUM 3
+#define PROP_NUM 4
     PROPSPEC propSpec[PROP_NUM];
     PROPVARIANT propVar[PROP_NUM];
     propSpec[0].ulKind = PRSPEC_PROPID;
@@ -277,8 +277,8 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
     propSpec[1].propid = WIA_DIP_VEND_DESC;
     propSpec[2].ulKind = PRSPEC_PROPID;
     propSpec[2].propid = WIA_DIP_DEV_NAME;
-    // propSpec[3].ulKind = PRSPEC_PROPID;
-    // propSpec[3].propid = WIA_DIP_REMOTE_DEV_ID;
+    propSpec[3].ulKind = PRSPEC_PROPID;
+    propSpec[3].propid = WIA_DIP_PNP_ID;
 
     MArrayInit(self->allocator, self->devices, countElements);
     for (int i = 0; i < countElements; i++) {
@@ -300,8 +300,13 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
         deviceInfo->manufacturer = WinUtils_BSTRToUTF8(self->allocator, propVar[1].bstrVal);
         deviceInfo->product = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
-        // PTP_INFO_F("Remote device id: %s", WinUtils_BSTRToUTF8(self->allocator, propVar[3].bstrVal));
-        deviceInfo->backendType = PTP_ENABLE_WIA;
+        MStr pnpId = WinUtils_BSTRToUTF8(self->allocator, propVar[3].bstrVal);
+        if (pnpId.str) {
+            // Parse \\?\usb#vid_054c&pid_0e0c#d085e0154e26#{6bdd1fc6-810f-11d0-bec7-08002be2092f}
+            sscanf_s(pnpId.str, "\\\\?\\usb#vid_%04hx&pid_%04hx", &deviceInfo->usbVID, &deviceInfo->usbPID);
+            MStrFree(self->allocator, pnpId);
+        }
+        deviceInfo->backendType = PTP_BACKEND_WIA;
         deviceInfo->device = wiaDeviceInfo;
         PTP_INFO_F("Found device: %.*s (%.*s)", deviceInfo->product.size, deviceInfo->product.str,
             deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
