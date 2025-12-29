@@ -94,6 +94,12 @@ extern "C" {
     #define M_TYPEOF(a) typeof(a)
 #endif
 
+#ifdef __cplusplus
+    #define M_STRUCT(Type) Type
+#else
+    #define M_STRUCT(Type) (Type)
+#endif
+
 //////////////////////////////////////////////////////////
 // Memory allocation
 
@@ -727,11 +733,11 @@ MINLINE u32 MCStrLen(const char* str) {
 }
 
 MINLINE MStrView MStrViewWrap(const char* str) {
-    return (MStrView){(char*)str, MCStrLen(str)};
+    return M_STRUCT(MStrView){(char*)str, MCStrLen(str)};
 }
 
 MINLINE MStrView MStrViewFromStr(MStr str) {
-    return (MStrView){str.str, str.size};
+    return M_STRUCT(MStrView){str.str, str.size};
 }
 
 MINLINE b32 MStrIsEmpty(MStr str) {
@@ -759,7 +765,7 @@ i32 MCStrCmp(const char* str1, const char* str2);
 i32 MStrViewCmpC(MStrView str1, const char* str2);
 i32 MStrViewCmp(MStrView str1, MStrView str2);
 MINLINE i32 MStrCmp(MStr str1, MStr str2) {
-    return MStrViewCmp((MStrView){str1.str, str1.size}, (MStrView){str2.str, str2.size});
+    return MStrViewCmp(M_STRUCT(MStrView){str1.str, str1.size}, M_STRUCT(MStrView){str2.str, str2.size});
 }
 void MCStrCopyN(char* dest, const char* src, size_t size);
 void MCStrU32ToBinary(u32 val, i32 outSize, char* outStr);

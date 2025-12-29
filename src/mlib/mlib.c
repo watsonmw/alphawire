@@ -1668,7 +1668,7 @@ void MLogStacktraceCurrent(int skipFrames) {
             MLogf("  %s()", funcName);
         }
 
-        if (MStrCmp("main", funcName) == 0) {
+        if (MCStrCmp("main", funcName) == 0) {
             break;
         }
 
@@ -1726,7 +1726,7 @@ void MLogStacktrace(MStacktrace* stacktrace) {
             MLogf("  %s()", funcName);
         }
 
-        if (MStrCmp("main", funcName) == 0) {
+        if (MCStrCmp("main", funcName) == 0) {
             break;
         }
     }
