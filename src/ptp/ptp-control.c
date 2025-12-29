@@ -575,7 +575,6 @@ char* PTP_GetEventStr(u16 eventCode) {
     return NULL;
 }
 
-
 typedef struct {
     u16 code;
     char* name;
@@ -829,9 +828,9 @@ b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue valu
         case PTP_DT_UINT64:
             return value1.u64 == value2.u64;
         case PTP_DT_INT128:
-            return MStrCmp(value1.i128, value2.i128) == 0;
+            return MCStrCmp(value1.i128, value2.i128) == 0;
         case PTP_DT_UINT128:
-            return MStrCmp(value1.i128, value2.i128) == 0;
+            return MCStrCmp(value1.i128, value2.i128) == 0;
         case PTP_DT_AINT8:
             break;
         case PTP_DT_AUINT8:
@@ -853,7 +852,7 @@ b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue valu
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR:
-            return MStrCmp(value1.str.str, value2.str.str) == 0;
+            return MCStrCmp(value1.str.str, value2.str.str) == 0;
         default:
             break;
     }
@@ -898,7 +897,7 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR: {
-            size_t len = MStrLen(value.str.str);
+            size_t len = value.str.size;
             if (len == 0) {
                 return 0;
             } else {
@@ -959,7 +958,7 @@ void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFra
 
 void PTP_FreePropValueEnums(MAllocator* allocator, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(outEnums->values); ++i) {
-        if (outEnums->values[i].str.size) {
+        if (outEnums->values[i].str.capacity) {
             MStrFree(allocator, outEnums->values[i].str);
         }
     }
@@ -985,7 +984,7 @@ static MStr ReadPtpString8(MAllocator* allocator, MMemIO* memIo) {
         size_t utf8Len = UTF8_GetConvertUTF16Len(buffer, len);
         if (utf8Len) {
             MStrInit(allocator, r, utf8Len);
-            if (UTF8_ConvertFromUTF16(buffer, len, r.str, r.size) == 0) {
+            if (UTF8_ConvertFromUTF16(buffer, len, r.str, r.capacity) == 0) {
                 MStrFree(allocator, r);
                 return r;
             }
@@ -1902,21 +1901,19 @@ PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapt
     if (r != PTP_OK) {
         return r;
     }
-    if (objectInfo.objectCompressedSize == 0 || objectInfo.filename.str == NULL) {
-        PTP_DEBUG_F("No image to download (size was %d, filename was %s)", objectInfo.objectCompressedSize,
-            objectInfo.filename.str);
+    if (objectInfo.objectCompressedSize == 0 || MStrIsEmpty(objectInfo.filename)) {
+        PTP_DEBUG_F("No image to download (size was %d, filename was %.*s)", objectInfo.objectCompressedSize,
+            objectInfo.filename.size, objectInfo.filename.str);
         ciiOut->size = 0;
-        ciiOut->filename.size = 0;
-        ciiOut->filename.str = NULL;
+        MStrZero(&ciiOut->filename);
         return r;
     }
-    PTP_DEBUG_F("Downloading image... (%s format: %s size: %d)", objectInfo.filename.str,
+    PTP_DEBUG_F("Downloading image... (%.*s format: %s size: %d)", objectInfo.filename.size, objectInfo.filename.str,
         PTP_GetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
     ciiOut->filename = objectInfo.filename;
     ciiOut->objectFormat = objectInfo.objectFormat;
     ciiOut->size = objectInfo.objectCompressedSize;
-    objectInfo.filename.str = NULL; // Pass filename ownership to ciiOut
-    objectInfo.filename.size = 0;
+    MStrZero(&objectInfo.filename); // ownership has passed to ciiOut
     PTP_FreeObjectInfo(self->allocator, &objectInfo); // Free any other strings
     r = PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
     PTP_DEBUG_F("Downloaded image size: %d", fileOut->size);
@@ -2221,15 +2218,20 @@ static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8
     return NULL;
 }
 
+MINLINE void MStrSetStaticCStr(MStr* str, const char* cstr) {
+    str->str = (char*)cstr;
+    str->size = MCStrLen(cstr);
+    str->capacity = 0;
+}
+
 static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProperty* property, EnumValueU8* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u8 lookupValue = property->form.enums.getSet[i].u8;
         char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u8 = lookupValue;
-        propEnum->str.str = str;
-        propEnum->str.size = 0;
+        MStrSetStaticCStr(&propEnum->str, str);
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -2252,11 +2254,10 @@ static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProp
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u8 = lookupValue;
-                propEnum->str.str = str;
-                propEnum->str.size = 0;
+                MStrSetStaticCStr(&propEnum->str, str);
             }
         }
     }
@@ -2281,8 +2282,7 @@ static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPPro
         PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u16 = lookupValue;
-        propEnum->str.str = str;
-        propEnum->str.size = 0;
+        MStrSetStaticCStr(&propEnum->str, str);
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -2308,8 +2308,7 @@ static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPPro
                 PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u16 = lookupValue;
-                propEnum->str.str = str;
-                propEnum->str.size = 0;
+                MStrSetStaticCStr(&propEnum->str, str);
             }
         }
     }
@@ -2335,8 +2334,7 @@ static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPPro
         PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue.u32 = lookupValue;
-        propEnum->str.str = str;
-        propEnum->str.size = 0;
+        MStrSetStaticCStr(&propEnum->str, str);
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -2362,8 +2360,7 @@ static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPPro
                 PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
                 propEnum->propValue.u32 = lookupValue;
-                propEnum->str.str = str;
-                propEnum->str.size = 0;
+                MStrSetStaticCStr(&propEnum->str, str);
             }
         }
     }
@@ -2379,13 +2376,12 @@ static MStr GetFNumberAsString(PTPControl* self, MAllocator* allocator, PTPPrope
     char text[32];
     int len = 0;
     if (value == 0xfffd) {
-        r.str = "Iris Close";
+        MStrSetStaticCStr(&r, "Iris Close");
         return r;
     } else if (value == 0xfffe) {
-        r.str = "--"; // No lens or no lens info
+        MStrSetStaticCStr(&r,"--"); // No lens or no lens info
         return r;
     } else if (value == 0xffff) {
-        r.str = "";
         return r;
     }
     if (whole >= 10 && decimals == 0) {
@@ -2395,9 +2391,7 @@ static MStr GetFNumberAsString(PTPControl* self, MAllocator* allocator, PTPPrope
     }
     if (len > 0) {
         len++;
-        r.str = MMalloc(allocator, len);
-        memcpy(r.str, text, len);
-        r.size = len;
+        r = MStrMakeLen(allocator, text, len);
     }
     return r;
 }
@@ -2406,9 +2400,9 @@ static MStr GetShutterSpeedAsString(PTPControl* self, MAllocator* allocator, PTP
     u32 value = propValue.u32;
     MStr r = {};
     if (value == 0xffffffff) {
-        r.str = "n/a";
+        MStrSetStaticCStr(&r, "n/a");
     } else if (value == 0x0) {
-        r.str = "Bulb";
+        MStrSetStaticCStr(&r, "Bulb");
     } else {
         char text[32];
         u16 top = (value >> 16);
@@ -2426,9 +2420,8 @@ static MStr GetShutterSpeedAsString(PTPControl* self, MAllocator* allocator, PTP
             len = snprintf(text, sizeof(text), "%d/%d", top, bottom);
         }
         if (len > 0) {
-            r.str = MMalloc(allocator, len+1);
-            memcpy(r.str, text, len+1);
-            r.size = len + 1;
+            len++;
+            r = MStrMakeLen(allocator, text, len);
         }
     }
     return r;
@@ -2442,13 +2435,13 @@ static MStr GetWhiteBalanceGMAsString(PTPControl* self, MAllocator* allocator, P
     }
     value = value - (0x9C + 0x24);
     if (value == 0) {
-        r.str = "0.0";
+        MStrSetStaticCStr(&r, "0.0");
         return r;
     }
 
     int len = 6;
     r.str = MMalloc(allocator, len);
-    r.size = len;
+    r.capacity = len;
 
     if (value > 0) {
         r.str[0] = 'G';
@@ -2488,7 +2481,7 @@ static MStr GetWhiteBalanceABAsString(PTPControl* self, MAllocator* allocator, P
     }
     value = value - (0x9C + 0x24);
     if (value == 0) {
-        r.str = "0.0";
+        MStrSetStaticCStr(&r, "0.0");
         return r;
     }
 
@@ -2530,7 +2523,7 @@ static MStr GetPendingFileInfoAsString(PTPControl* self, MAllocator* allocator, 
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
-        r.str = "None";
+        MStrSetStaticCStr(&r,"None");
     } else if (value < 0x8000) {
         char text[32];
         int len = snprintf(text, sizeof(text), "Files (%d)", value);
@@ -2556,9 +2549,9 @@ static MStr GetPixelShootingNumberAsString(PTPControl* self, MAllocator* allocat
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0) {
-        r.str = "None";
+        MStrSetStaticCStr(&r, "None");
     } else if (value == 1) {
-        r.str = "1 Sheet";
+        MStrSetStaticCStr(&r, "1 Sheet");
     } else {
         char text[32];
         int len = snprintf(text, sizeof(text), "%d Sheets", value);
@@ -2575,7 +2568,7 @@ static MStr GetPixelShootingIntervalAsString(PTPControl* self, MAllocator* alloc
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0xFFFF) {
-        r.str = "Shortest Interval";
+        MStrSetStaticCStr(&r, "Shortest Interval");
     } else {
         char text[32];
         value &= 0x7fff;
@@ -2607,7 +2600,7 @@ static MStr GetBatteryRemainingAsString(PTPControl* self, MAllocator* allocator,
     MStr r = {};
     i8 value = propValue.i8;
     if (value == -1) {
-        r.str = "n/a";
+        MStrSetStaticCStr(&r, "n/a");
     } else {
         char text[32];
         int len = snprintf(text, sizeof(text), "%d%%", value);
@@ -2637,9 +2630,9 @@ static MStr GetTemperatureAsString(PTPControl* self, MAllocator* allocator, PTPP
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
-        r.str = "N/A";
+        MStrSetStaticCStr(&r, "N/A");
     } else if (value == 0xFFFF) {
-        r.str = ">9900K";
+        MStrSetStaticCStr(&r, ">9900K");
     } else {
         char text[32];
         int len = snprintf(text, sizeof(text), "%dK", value);
@@ -2659,7 +2652,7 @@ static MStr GetIsoAsString(PTPControl* self, MAllocator* allocator, PTPProperty*
     u32 iso = value & 0xffffff;
     if (mode == 0 || mode == 0x10) {
         if (iso == 0x00ffffff) {
-            r.str = "Auto";
+            MStrSetStaticCStr(&r, "Auto");
         } else {
             char text[32];
             int len = snprintf(text, sizeof(text), "%d", iso);
@@ -2671,7 +2664,7 @@ static MStr GetIsoAsString(PTPControl* self, MAllocator* allocator, PTPProperty*
         }
     } else if (mode == 0x1) {
         if (iso == 0x00ffffff) {
-            r.str = "Multi-Frame NR Auto";
+            MStrSetStaticCStr(&r, "Multi-Frame NR Auto");
         } else {
             char text[32];
             int len = snprintf(text, sizeof(text), "Multi-Frame NR %d", iso);
@@ -2683,7 +2676,7 @@ static MStr GetIsoAsString(PTPControl* self, MAllocator* allocator, PTPProperty*
         }
     } else if (mode == 0x2) {
         if (iso == 0x00ffffff) {
-            r.str = "Multi-Frame NR High Auto";
+            MStrSetStaticCStr(&r, "Multi-Frame NR High Auto");
         } else {
             char text[32];
             int len = snprintf(text, sizeof(text), "Multi-Frame NR High %d", iso);
@@ -4089,11 +4082,11 @@ static PropertyMetadata sPropertyMetadata[] = {
 
 b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* property, PropertyMetadata* meta, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         PTPPropValue propValue = property->form.enums.getSet[i];
         propEnum->propValue = propValue;
         propEnum->str = meta->valueAsStringFunc(self, allocator, property, propValue);
-        if (propEnum->str.size) {
+        if (propEnum->str.capacity) {
             propEnum->flags = ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         } else {
             propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
@@ -4124,7 +4117,7 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* 
                 prop->str = meta->valueAsStringFunc(self, allocator, property, lookupValue);
             }
 
-            if (prop->str.size) {
+            if (prop->str.capacity) {
                 prop->flags = ENUM_VALUE_READ | ENUM_VALUE_WRITE;
             } else {
                 prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
@@ -4295,8 +4288,7 @@ b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValu
         PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
         propEnum->propValue = control->form.enums.values->propValue;
-        propEnum->str.str = 0;
-        propEnum->str.size = 0;
+        MStrZero(&propEnum->str);
     }
 
     return FALSE;

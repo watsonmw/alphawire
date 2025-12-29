@@ -93,6 +93,33 @@ if(WIN32)
     list(APPEND ALPHAWIRE_LIBS dbghelp.lib)
 endif()
 
+if(LINUX)
+    target_sources(alphawire PRIVATE
+        src/platform/libusb/ptp-backend-libusb.c
+        src/platform/libusb/ptp-backend-libusb.h
+    )
+
+    find_package(PkgConfig)
+    if (PKG_CONFIG_FOUND)
+        pkg_check_modules(LIBUSB libusb-1.0)
+    endif()
+
+    if (LIBUSB_FOUND)
+        target_link_libraries(alphawire PRIVATE ${LIBUSB_LIBRARIES})
+        target_include_directories(alphawire PRIVATE ${LIBUSB_INCLUDE_DIRS})
+    else()
+        # Fallback if pkg-config fails
+        find_path(LIBUSB_INCLUDE_DIR libusb.h PATH_SUFFIXES libusb-1.0)
+        find_library(LIBUSB_LIBRARY usb-1.0)
+        if (LIBUSB_INCLUDE_DIR AND LIBUSB_LIBRARY)
+            target_include_directories(alphawire PRIVATE ${LIBUSB_INCLUDE_DIR})
+            target_link_libraries(alphawire PRIVATE ${LIBUSB_LIBRARY})
+        endif()
+    endif()
+
+    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB)
+endif()
+
 target_link_libraries(alphawire PUBLIC ${ALPHAWIRE_LIBS})
 
 ##########################################
@@ -175,7 +202,7 @@ if(WIN32)
     endif()
 
     # ImGUI
-    list(APPEND ALPHAWIREUI_LIBS opengl32 )
+    list(APPEND ALPHAWIREUI_LIBS opengl32)
 
     # Copy SDL binary to runtime directory
     add_custom_command(
@@ -183,6 +210,11 @@ if(WIN32)
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:SDL3::SDL3>" "$<TARGET_FILE_DIR:alphawireui>"
         VERBATIM
     )
+endif()
+
+if(LINUX)
+    find_package(OpenGL REQUIRED)
+    list(APPEND ALPHAWIREUI_LIBS OpenGL::GL)
 endif()
 
 # Copy to build directory, so alphawire-cffi-compile.py can pick up

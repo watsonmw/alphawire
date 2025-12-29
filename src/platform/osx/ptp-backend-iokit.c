@@ -338,7 +338,7 @@ static MStr CFStringToMStr(MAllocator* alloc, CFStringRef str) {
     CFIndex maxLength = CFStringGetMaximumSizeForEncoding(CFStringGetLength(str), kCFStringEncodingUTF8) + 1;
 
     // Create a buffer to hold the string
-    char *buffer = (char *) MMalloc(alloc, maxLength);
+    char* buffer = (char *) MMalloc(alloc, maxLength);
     if (!buffer) {
         return r;
     }
@@ -350,7 +350,8 @@ static MStr CFStringToMStr(MAllocator* alloc, CFStringRef str) {
     }
 
     r.str = buffer;
-    r.size = maxLength;
+    r.size = MCStrLen(buffer);
+    r.capacity = maxLength;
     return r;
 }
 

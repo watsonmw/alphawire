@@ -153,9 +153,9 @@ void MMemDebugInit(MAllocator* allocator) {
     if (!allocator->debug.initialized) {
         allocator->debug.allocSlots = NULL;
         allocator->debug.freeSlots = NULL;
-        allocator->debug.initialized = TRUE;
-        allocator->debug.leakTracking = TRUE;
-        allocator->debug.sentinelCheck = TRUE;
+        allocator->debug.initialized = 1;
+        allocator->debug.leakTracking = 1;
+        allocator->debug.sentinelCheck = 1;
         allocator->debug.maxAllocatedBytes = 0;
         allocator->debug.curAllocatedBytes = 0;
         allocator->debug.totalAllocations = 0;
@@ -220,7 +220,7 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
     }
 #endif
 
-    alloc->debug.initialized = FALSE;
+    alloc->debug.initialized = 0;
 }
 
 static u8 sMagicCanaryValues[4] = { 0x1d, 0xdf, 0x83, 0xc7 };
@@ -364,7 +364,7 @@ b32 MMemDebugListAll(MAllocator* alloc) {
     return memOk;
 }
 
-void MMemDebugFreePtrsInRange(MAllocator* alloc, u8* startAddress, u8* endAddress) {
+void MMemDebugFreePtrsInRange(MAllocator* alloc, const u8* startAddress, const u8* endAddress) {
     size_t compactedSize = 0;
     MArrayEachPtr(alloc->debug.allocSlots, it) {
         MMemAllocInfo* memAlloc = it.p;
@@ -1154,46 +1154,65 @@ char* MMemReadStr(MMemIO* memIO) {
 /////////////////////////////////////////////////////////
 // String parsing / conversion functions
 
-i32 MParseI32(const char* start, const char* end, i32* out) {
-    int val = 0;
-    int begin = 1;
-    int base = 10;
-
-    for (const char* pos = start; pos < end; pos++) {
-        char c = *pos;
-        if (begin && MCharIsWhitespace(c)) {
-            continue;
+MParseResult MParseI32(const char* start, const char* end, i32* out) {
+    const char* pos = start;
+    for (; pos < end; pos++) {
+        if (!MCharIsWhitespace(*pos)) {
+            break;
         }
+    }
 
-        begin = 0;
+    int digitsRead = 0;
+    int val = 0;
+    int base = 10;
+    int minus = FALSE;
 
+    char c = *pos;
+    if (c == '-') {
+        minus = TRUE;
+        pos++;
+    } else if (c == '+') {
+        pos++;
+    }
+
+    for (; pos < end; pos++) {
+        char c = *pos;
         int p = 0;
         if (c >= '0' && c <= '9') {
             p = c - '0';
         } else {
-            return MParse_NOT_A_NUMBER;
+            if (digitsRead) {
+                break;
+            } else {
+                return (MParseResult){MParse_NOT_A_NUMBER, pos};
+            }
         }
 
         val = (val * base) + p;
+        digitsRead++;
     }
 
-    *out = val;
-    return MParse_SUCCESS;
+    if (digitsRead == 0) {
+        return (MParseResult){MParse_EMPTY, pos};
+    } else {
+        *out = minus ? -val : val;
+        return (MParseResult){MParse_SUCCESS, pos};
+    }
 }
 
-i32 MParseI32Hex(const char* start, const char* end, i32* out) {
-    int val = 0;
-    int begin = 1;
-    int base = 16;
-
-    for (const char* pos = start; pos < end; pos++) {
-        char c = *pos;
-        if (begin && MCharIsWhitespace(c)) {
-            continue;
+MParseResult MParseI32Hex(const char* start, const char* end, i32* out) {
+    const char* pos = start;
+    for (; pos < end; pos++) {
+        if (!MCharIsWhitespace(*pos)) {
+            break;
         }
+    }
 
-        begin = 0;
+    int digitsRead = 0;
+    int val = 0;
 
+    for (; pos < end; pos++) {
+        char c = *pos;
         int p = 0;
         if (c >= '0' && c <= '9') {
             p = c - '0';
@@ -1202,57 +1221,163 @@ i32 MParseI32Hex(const char* start, const char* end, i32* out) {
         } else if (c >= 'A' && c <= 'F') {
             p = 10 + c - 'A';
         } else {
-            return MParse_NOT_A_NUMBER;
+            if (digitsRead) {
+                break;
+            } else {
+                return (MParseResult){MParse_NOT_A_NUMBER, pos};
+            }
         }
-
-        val = (val * base) + p;
+        digitsRead++;
+        val = (val << 4) + p;
     }
-    *out = val;
-    return MParse_SUCCESS;
+
+    if (digitsRead == 0) {
+        return (MParseResult){MParse_EMPTY, pos};
+    } else {
+        *out = val;
+        return (MParseResult){MParse_SUCCESS, pos};
+    }
 }
 
-i32 MParseBool(const char* start, const char* end, b32* out) {
-    MStr str = {(char*)start, end - start};
+MParseResult MParseBool(const char* start, const char* end, b32* out) {
+    MStrView str = {(char*)start, end - start};
     if (str.size == 5) {
-        if (MStrCmp2("false", str) == 0) {
+        if (MStrViewCmpC(str, "false") == 0) {
             *out = FALSE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+5};
         }
-        if (MStrCmp2("False", str) == 0) {
+        if (MStrViewCmpC(str, "False") == 0) {
             *out = FALSE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+5};
         }
-        if (MStrCmp2("FALSE", str) == 0) {
+        if (MStrViewCmpC(str, "FALSE") == 0) {
             *out = FALSE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+5};
         }
     } else if (str.size == 4) {
-        if (MStrCmp2("true", str) == 0) {
+        if (MStrViewCmpC(str, "true") == 0) {
             *out = TRUE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+4};
         }
-        if (MStrCmp2("True", str) == 0) {
+        if (MStrViewCmpC(str, "True") == 0) {
             *out = TRUE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+4};
         }
-        if (MStrCmp2("TRUE", str) == 0) {
+        if (MStrViewCmpC(str, "TRUE") == 0) {
             *out = TRUE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+4};
         }
     } else if (str.size == 1) {
         if (*str.str == '1') {
             *out = TRUE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+1};
         }
         if (*str.str == '0') {
             *out = FALSE;
-            return MParse_SUCCESS;
+            return (MParseResult){MParse_SUCCESS, start+1};
         }
     }
-    return MParse_NOT_A_BOOL;
+    return (MParseResult){MParse_NOT_A_BOOL, start};
 }
 
-i32 MStrCmp(const char *str1, const char *str2) {
+MParseResult MParseF32(const char* start, const char* end, f32* out) {
+    float sign = 1.0f;
+    const char* pos = start;
+
+    // Skip leading spaces
+    while (pos < end && MCharIsWhitespace(*pos)) {
+        pos++;
+    }
+
+    if (pos >= end) {
+        return (MParseResult){MParse_NOT_A_NUMBER, pos};
+    }
+
+    // Handle optional sign
+    char c = *pos;
+    if (c == '-') {
+        sign = -1.0f;
+        pos++;
+    } else if (c == '+') {
+        pos++;
+    }
+
+    if (pos >= end) {
+        return (MParseResult){MParse_NOT_A_NUMBER, pos};
+    }
+
+    // Parse integer and fractional parts
+    float result = 0.0f;
+    float fraction = 0.1f;
+    b32 hasDigits = FALSE;  // Track if we've seen any digits
+    b32 inFraction = FALSE;
+    for (; pos < end; pos++) {
+        c = *pos;
+        if (c >= '0' && c <= '9') {
+            hasDigits = TRUE;
+            float digit = (float)(c - '0');
+            if (!inFraction) {
+                result = result * 10.0f + digit;
+            } else {
+                result += digit * fraction;
+                fraction *= 0.1f;
+            }
+        } else if (c == '.') {
+            if (inFraction) {
+                break;
+            }
+            inFraction = TRUE;
+        } else {
+            break;
+        }
+    }
+
+    // Must have seen at least one digit
+    if (!hasDigits) {
+        return (MParseResult){MParse_NOT_A_NUMBER, pos};
+    }
+
+    int exponent = 0;
+    int exponentSign = 1;
+    if (pos < end && (c == 'e' || c == 'E')) {
+        // Handle scientific notation (e or E)
+        pos++;
+        if (pos >= end) {
+            return (MParseResult){MParse_NOT_A_NUMBER, pos};
+        }
+
+        c = *pos;
+        if (c == '-') {
+            exponentSign = -1;
+            pos++;
+        } else if (c == '+') {
+            pos++;
+        }
+
+        if (pos >= end || !(c = *pos, c >= '0' && c <= '9')) {
+            return (MParseResult){MParse_NOT_A_NUMBER, pos};
+        }
+
+        while (pos < end && (c = *pos, c >= '0' && c <= '9')) {
+            exponent = exponent * 10 + (c - '0');
+            pos++;
+        }
+
+        // Apply exponent
+        if (exponent) {
+            float power = 1.0f;
+            for (int i = 0; i < exponent; i++) {
+                power *= 10.0f;
+            }
+            result = (exponentSign == -1) ? (result / power) : (result * power);
+        }
+    }
+
+    *out = sign * result;
+    return (MParseResult){MParse_SUCCESS, pos};
+}
+
+i32 MCStrCmp(const char *str1, const char *str2) {
     while (*str1 && *str1 == *str2) {
         str1++;
         str2++;
@@ -1260,65 +1385,58 @@ i32 MStrCmp(const char *str1, const char *str2) {
     return (*str1 > *str2) - (*str2 > *str1);
 }
 
-i32 MStrCmp2(const char *str1, MStr mstr2) {
-    char c1 = *str1;
-    if (mstr2.size == 0) {
-        return c1 == 0 ? 0 : 1;
-    }
-    char *str2Ptr = mstr2.str;
-    char *str2PtrEnd = mstr2.str + mstr2.size;
-
-    while (TRUE) {
-        char c2 = str2Ptr < str2PtrEnd ? *str2Ptr++ : 0;
-        if (c1 != c2) {
-            return c1 == 0 ? -1 : (c1 > c2 ? 1 : -1);
-        }
-        if (c1 == 0) {
-            return 0;
-        }
-        c1 = *++str1;
-    }
-}
-
-b32 MStrIsEmpty(MStr str) {
-    if (str.size == 0 || str.str[0] == '\0') {
-        return TRUE;
-    }
-    return FALSE;
-}
-
-i32 MStrCmp3(MStr str1, MStr str2) {
-    if (MStrIsEmpty(str1) && MStrIsEmpty(str2)) {
+i32 MStrViewCmpC(MStrView mstr, const char* str) {
+    if (MStrViewIsEmpty(mstr) && !str) {
         return 0;
     }
 
-    char *str1Ptr = str1.str;
-    char *str1PtrEnd = str1.str + str1.size;
-    if (*(str1PtrEnd-1) == 0) {
-        str1PtrEnd--;
+    char c1 = mstr.size > 0 ? *mstr.str : 0;
+    char c2 = str ? *str : 0;
+    if (c1 != c2) {
+        return c1 == 0 ? -1 : (c1 > c2 ? 1 : -1);
     }
 
-    char *str2Ptr = str2.str;
-    char *str2PtrEnd = str2.str + str2.size;
-    if (*(str2PtrEnd-1) == 0) {
-        str2PtrEnd--;
-    }
-
-    while (str1Ptr < str1PtrEnd && str2Ptr < str2PtrEnd) {
-        if (*str1Ptr != *str2Ptr) {
-            return (*str1Ptr > *str2Ptr) ? 1 : -1;
+    size_t strLen = str ? MCStrLen(str) : 0;
+    size_t size = mstr.size < strLen ? mstr.size : strLen;
+    if (size) {
+        int r = memcmp(mstr.str, str, size);
+        if (r != 0) {
+            return r > 0 ? 1 : -1;
         }
-        str1Ptr++;
-        str2Ptr++;
     }
 
-    if (str1Ptr == str1PtrEnd && str2Ptr == str2PtrEnd) {
+    if (mstr.size == strLen) {
         return 0;
     }
-    return (str1Ptr < str1PtrEnd) ? 1 : -1;
+    return mstr.size > strLen ? 1 : -1;
 }
 
-void MStrCopyN(char *dest, const char *src, size_t size) {
+i32 MStrViewCmp(MStrView str1, MStrView str2) {
+    if (MStrViewIsEmpty(str1) && MStrViewIsEmpty(str2)) {
+        return 0;
+    }
+
+    char c1 = str1.size > 0 ? *str1.str : 0;
+    char c2 = str2.size > 0 ? *str2.str : 0;
+    if (c1 != c2) {
+        return c1 == 0 ? -1 : (c1 > c2 ? 1 : -1);
+    }
+
+    size_t size = str1.size < str2.size ? str1.size : str2.size;
+    if (size) {
+        int r = memcmp(str1.str, str2.str, size);
+        if (r != 0) {
+            return r > 0 ? 1 : -1;
+        }
+    }
+
+    if (str1.size == str2.size) {
+        return 0;
+    }
+    return str1.size > str2.size ? 1 : -1;
+}
+
+void MCStrCopyN(char *dest, const char *src, size_t size) {
     if (!src) {
         *dest = 0;
         return;
@@ -1331,20 +1449,20 @@ void MStrCopyN(char *dest, const char *src, size_t size) {
     dest[i] = 0;
 }
 
-void MStrU32ToBinary(u32 val, int size, char* out) {
-    out[size] = '\0';
+void MCStrU32ToBinary(u32 val, int outSize, char* outStr) {
+    outStr[outSize] = '\0';
 
-    u32 z = (1 << (size - 1));
-    for (int i = 0; i < size; i++, z >>= 1) {
+    u32 z = (1 << (outSize - 1));
+    for (int i = 0; i < outSize; i++, z >>= 1) {
         char c = ((val & z) == z) ? '1' : '0';
-        out[i] = c;
+        outStr[i] = c;
     }
 }
 
-i32 MStrAppend(MMemIO* memIo, const char* str) {
-    i32 len = MStrLen(str);
+u32 MStrAppend(MMemIO* memIo, const char* str) {
+    u32 len = MCStrLen(str);
 
-    i32 newSize = memIo->capacity + len + 1;
+    u32 newSize = memIo->capacity + len + 1;
     if (newSize > memIo->capacity) {
         M_MemResize(memIo, newSize);
     }

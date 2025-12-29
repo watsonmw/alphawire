@@ -9,6 +9,9 @@
 #ifdef PTP_ENABLE_LIBUSBK
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
+#ifdef PTP_ENABLE_LIBUSB
+#include "platform/libusb/ptp-backend-libusb.h"
+#endif
 
 static PTPBackendType sBackends[] = {
 #ifdef PTP_ENABLE_IOKIT
@@ -18,7 +21,10 @@ static PTPBackendType sBackends[] = {
     PTP_BACKEND_WIA,
 #endif
 #ifdef PTP_ENABLE_LIBUSBK
-    PTP_BACKEND_LIBUSBK
+    PTP_BACKEND_LIBUSBK,
+#endif
+#ifdef PTP_ENABLE_LIBUSB
+    PTP_BACKEND_LIBUSB
 #endif
 };
 
@@ -51,6 +57,15 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
                 }
                 break;
 #endif
+            }
+            case PTP_BACKEND_LIBUSB: {
+#ifdef PTP_ENABLE_LIBUSB
+                PTPBackend *backend = AddBackendSlot(self, backendType);
+                if (PTPLibusbDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                    backendsOpened = TRUE;
+                }
+#endif
+                break;
             }
             case PTP_BACKEND_WIA: {
 #ifdef PTP_ENABLE_WIA
@@ -143,7 +158,8 @@ b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self) {
 
 b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPDeviceList_OpenDevice");
-    PTP_INFO_F("Opening device %s (%s)...", deviceInfo->product.str, deviceInfo->manufacturer.str);
+    PTP_INFO_F("Opening device %.*s (%.*s)...", deviceInfo->product.size, deviceInfo->product.str,
+        deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
 
     PTPBackend* backend = PTPDeviceList_GetBackend(self, deviceInfo->backendType);
     PTPDevice* device = MArrayAddPtr(self->allocator, self->openDevices);

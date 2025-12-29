@@ -46,7 +46,6 @@ void WinUtils_LogLastError(PTPLog* logger, const char* mesg) {
     }
 }
 
-
 // Helper function to convert BSTR to UTF-8
 MStr WinUtils_BSTRToUTF8(MAllocator* allocator, BSTR bstr) {
     return WinUtils_BSTRWithSizeToUTF8(allocator, bstr, -1);
@@ -96,7 +95,8 @@ MStr WinUtils_BSTRWithSizeToUTF8(MAllocator* allocator, BSTR bstr, i32 size) {
     }
 
     if (size >= 0) {
-        r.str[len-1] = '\0';
+        r.end += len - 1;
+        r.end = '\0';
     }
 
     return r;

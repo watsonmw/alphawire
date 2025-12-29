@@ -25,6 +25,10 @@
 //
 #include <string.h>
 
+#ifdef __GNUC__
+#include <stdint.h> // uintptr_t
+#endif
+
 typedef char i8;
 typedef unsigned char u8;
 typedef short i16;
@@ -34,6 +38,8 @@ typedef int b32;
 typedef unsigned u32;
 typedef long long i64;
 typedef unsigned long long u64;
+typedef float f32;
+typedef double f64;
 
 #define I8_MIN 0x80
 #define I8_MAX 0x7f
@@ -49,7 +55,7 @@ typedef unsigned long long u64;
 #define U64_MAX 0xffffffffffffffff
 
 #ifndef TRUE
-#define TRUE -1
+#define TRUE 1
 #endif
 #ifndef FALSE
 #define FALSE 0
@@ -121,9 +127,9 @@ typedef struct {
 #ifdef M_STACKTRACE
     MStacktrace* stacktraces;
 #endif
-    b32 initialized : 1;
-    b32 sentinelCheck : 1;
-    b32 leakTracking : 1;
+    u32 initialized : 1;
+    u32 sentinelCheck : 1;
+    u32 leakTracking : 1;
     u32 totalAllocations;
     u32 totalAllocatedBytes;
     u32 curAllocatedBytes;
@@ -172,9 +178,10 @@ b32 MMemDebugCheckAll(MAllocator* alloc);
 // Print all current memory allocations
 b32 MMemDebugListAll(MAllocator* alloc);
 
-// Free all allocated pointers in given address range
-// Compacts the allocation slots and free slot list
-void MMemDebugFreePtrsInRange(MAllocator* alloc, u8* startAddress, u8* endAddress);
+// Free all allocated pointers in the given address range
+// Compacts the allocation slots and frees the slot list
+// Used when tracking a bump allocator
+void MMemDebugFreePtrsInRange(MAllocator* alloc, const u8* startAddress, const u8* endAddress);
 
 #else
 // Memory debug mode is off
@@ -193,7 +200,6 @@ MINLINE void* M_MallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
     }
     return r;
 }
-
 MINLINE void* M_ReallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize, size_t newSize) {
     void* r = M_Realloc(MDEBUG_SOURCE_MACRO (alloc), p, oldSize, newSize);
     if (r && newSize > oldSize) {
@@ -327,8 +333,10 @@ void MLogBytes(const u8* mem, u32 len);
         #else
             #if defined(__i386__) || defined(__x86_64)
                 #define M_DEBUGGER_TRAP() __asm__ volatile("int $3")
-            #elif defined(__arm__) || defined(__aarch64__)
+            #elif defined(__arm__)
                 #define M_DEBUGGER_TRAP() __asm__ volatile("bkpt #0")
+            #elif defined(__aarch64__)
+                #define M_DEBUGGER_TRAP() __asm__ volatile("brk #0")
             #endif
         #endif
     #elif defined(_MSC_VER)
@@ -463,9 +471,9 @@ char* MMemReadStr(MMemIO* reader);
 
 MINLINE b32 MMemReadDone(MMemIO* reader) {
     if (reader->size >= reader->capacity) {
-        return 1;
+        return TRUE;
     } else {
-        return 0;
+        return FALSE;
     }
 }
 
@@ -517,6 +525,8 @@ typedef struct {
 // Add space for item to the end of the array, zero its memory and return ptr to it
 #define MArrayAddPtrZ(m, a) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), memset((a) + M_ArrayHeader(a)->size, 0, sizeof(*a)), ((a) + M_ArrayHeader(a)->size++))
 
+#define MArrayClear(a) ((a) ? M_ArrayHeader(a)->size = 0 : 0)
+
 // Resize array to given size. New elements are uninitialized.
 #define MArrayResize(m, a, s) ((a) ? ((M_ArrayHeader(a)->size < (s)) ? ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s), 0) : ((M_ArrayHeader(a)->size) = (s))) : 0)
 
@@ -538,11 +548,9 @@ typedef struct {
 // Pop an item from the end of the array and return a copy of it
 #define MArrayPop(a) ((a)[--(M_ArrayHeader(a)->size)])
 
-#define MArrayTop(a) ((a)[(M_ArrayHeader(a)->size) - 1])
+#define MArrayLast(a) ((a)[(M_ArrayHeader(a)->size) - 1])
 
-#define MArrayTopPtr(a) ((a) + (M_ArrayHeader(a)->size) - 1)
-
-#define MArrayClear(a) ((a) ? M_ArrayHeader(a)->size = 0 : 0)
+#define MArrayLastPtr(a) (M_ArrayHeader(a)->size ? (a) + (M_ArrayHeader(a)->size) - 1 : NULL)
 
 #define MArrayCopy(m, a, b) ((b) = M_ArrayCopy(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), M_ArrayUnpack(b)))
 
@@ -552,7 +560,7 @@ typedef struct {
 
 #define MArrayEachPtr(a, it) for ( \
     M_DISABLE_ANON_STRUCT_WARN_B struct {M_TYPEOF(a) p; size_t i;} M_DISABLE_ANON_STRUCT_WARN_E \
-    (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), (it).p = (a) + ((it).i))
+    (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), ++((it).p))
 
 #define M_ArrayHeader(a) ((MArrayHeader*)(a) - 1)
 
@@ -660,74 +668,151 @@ MINLINE i32 MFileWriteMem(MFile* file, MMemIO* mem) {
 void MFileClose(MFile* file);
 
 /////////////////////////////////////////////////////////
-// String parsing / conversion functions
+// Strings
 
-// String type that includes size. String can be null terminated but doesn't have to be. When null terminated
-// size includes the null.
-typedef struct {
+// View onto a string - you never have to free these
+// Rarely 0 terminated and size doesn't include 0 if it is
+typedef struct MStrView {
     char* str;
     u32 size;
+} MStrView;
+
+// String storage - these need to be MFree()'d if capacity is non-zero
+// Rarely 0 terminated and size doesn't include 0 if it is
+typedef struct MStr {
+    char* str;
+    u32 size;
+    u32 capacity; // size of memory buffer allocated in bytes, when 0 don't MFree()
 } MStr;
 
 enum MParse {
     MParse_SUCCESS = 0,
     MParse_NOT_A_NUMBER = -1,
     MParse_NOT_A_BOOL = -2,
+    MParse_FLOAT_TWO_DOTS = -3,
+    MParse_EMPTY = -4
 };
 
-i32 MParseI32(const char* start, const char* end, i32* out);
-i32 MParseI32Hex(const char* start, const char* end, i32* out);
-i32 MParseBool(const char* pos, const char* end, b32* out);
+typedef struct MParseResult {
+    i32 result;
+    const char* end;
+} MParseResult;
 
-b32 MStrIsEmpty(MStr str);
+MParseResult MParseI32(const char* start, const char* end, i32* out);
+MParseResult MParseI32Hex(const char* start, const char* end, i32* out);
+MParseResult MParseF32(const char* start, const char* end, f32* out);
+MParseResult MParseBool(const char* pos, const char* end, b32* out);
 
-i32 MStrCmp(const char* str1, const char* str2);
-i32 MStrCmp2(const char* str1, MStr str2);
-i32 MStrCmp3(MStr str1, MStr str2);
-void MStrCopyN(char* dest, const char* src, size_t size);
-void MStrU32ToBinary(u32 val, i32 size, char* out);
-
-MINLINE int MCharIsWhitespace(char c) { return (c == '\n' || c == '\r' || c == '\t' || c == ' '); }
+MINLINE int MCharIsDigit(char c) { return (c >= '0' && c <= '9'); }
+MINLINE int MCharIsWhitespace(char c) { return (c == '\t' || c == ' '); }
 MINLINE int MCharIsSpaceTab(char c) { return (c == '\t' || c == ' '); }
 MINLINE int MCharIsNewLine(char c) { return (c == '\n' || c == '\r'); }
 
 // Get pointer to end of str (scan for null terminator)
-MINLINE const char* MStrEnd(const char* str) {
+MINLINE const char* MCStrEnd(const char* str) {
     if (!str) {return NULL;}
     while (*str) {str++;}
     return str;
 }
 
-MINLINE u32 MStrLen(const char* str) {
+MINLINE char* MStrEnd(MStr str) {
+    return str.str + str.size;
+}
+
+MINLINE u32 MCStrLen(const char* str) {
     if (str == NULL) {return 0;}
     u32 n = 0;
     while (*str++) {n++;}
     return n;
 }
 
+MINLINE MStrView MStrViewWrap(const char* str) {
+    return (MStrView){(char*)str, MCStrLen(str)};
+}
+
+MINLINE MStrView MStrViewFromStr(MStr str) {
+    return (MStrView){str.str, str.size};
+}
+
+MINLINE b32 MStrIsEmpty(MStr str) {
+    return str.str == 0 || str.size == 0;
+}
+
+MINLINE b32 MStrViewIsEmpty(MStrView str) {
+    return str.str == 0 || str.size == 0;
+}
+
+MINLINE b32 MStrViewEq(MStrView* a, MStrView* b) {
+    return (a->size == b->size && memcmp(a->str, b->str, a->size) == 0);
+}
+
+MINLINE u32 MStrViewLen(MStrView str) {
+    if (str.str == NULL) {return 0;}
+    return str.size;
+}
+
+MINLINE const char* MStrViewEnd(MStrView str) {
+    return str.str + str.size;
+}
+
+i32 MCStrCmp(const char* str1, const char* str2);
+i32 MStrViewCmpC(MStrView str1, const char* str2);
+i32 MStrViewCmp(MStrView str1, MStrView str2);
+MINLINE i32 MStrCmp(MStr str1, MStr str2) {
+    return MStrViewCmp((MStrView){str1.str, str1.size}, (MStrView){str2.str, str2.size});
+}
+void MCStrCopyN(char* dest, const char* src, size_t size);
+void MCStrU32ToBinary(u32 val, i32 outSize, char* outStr);
+
 // Alloc space for string of given size
-#define MStrInit(a, s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (a), (len)), ((s).str) ? (s).size = (len) : 0)
+#define MStrInit(a, s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (a), (len)), \
+    (s).size = (s).capacity = ((s).str) ? (len) : 0)
 
 // Free allocated string
-#define MStrFree(a, s) ((s).str ? (M_Free(MDEBUG_SOURCE_MACRO (a), (s).str, (s).size), (s).str = 0, (s).size = 0) : 0)
+#define MStrFree(a, s) ((s).capacity ? (M_Free(MDEBUG_SOURCE_MACRO (a), (void*)(s).str, (s).capacity), \
+    (s).str = 0, (s).size = 0, (s).capacity = 0) : 0)
 
-// Make a MStr copy from a C string - includes null terminator in size
+// Make a MStr copy from a C string - includes null terminator
 MINLINE MStr MStrMake(MAllocator* alloc, const char* c) {
     MStr r = {};
-    u32 len = MStrLen(c) + 1;
-    MStrInit(alloc, r, len);
-    memcpy(r.str, c, len);
+    u32 len = MCStrLen(c);
+    MStrInit(alloc, r, len + 1);
+    if (!r.str) {return r;}
+    memcpy((void*)r.str, c, len + 1);
+    r.size = len;
+    r.capacity = len + 1;
     return r;
 }
 
-// Make a MStr from a C string - includes null terminator in size
+MINLINE MStr MStrMakeLen(MAllocator* alloc, const char* c, u32 len) {
+    MStr r = {};
+    MStrInit(alloc, r, len + 1);
+    if (!r.str) {return r;}
+    memcpy((void*)r.str, c, len + 1);
+    r.size = len;
+    r.capacity = len + 1;
+    return r;
+}
+
+// Make a MStr from a C string
 MINLINE MStr MStrWrap(const char* c) {
-    const MStr r = {(char*)c, MStrLen(c) + 1};
+    const MStr r = {(char*)c, MCStrLen(c), 0};
     return r;
 }
 
-i32 MStrAppend(MMemIO* memIo, const char* str);
-i32 MStrAppendf(MMemIO* memIo, const char* format, ...);
+MINLINE void MStrZero(MStr* str) {
+    str->str = NULL; str->size = str->capacity = 0;
+}
+
+MINLINE i32 MStrViewCopyN(MStrView* strView, char* bufOut, size_t bufOutSize) {
+    size_t copySize = strView->size < bufOutSize - 1 ? strView->size : bufOutSize - 1;
+    memcpy(bufOut, strView->str, copySize);
+    bufOut[copySize] = '\0';
+    return (i32)copySize;
+}
+
+u32 MStrAppend(MMemIO* memIo, const char* str);
+u32 MStrAppendf(MMemIO* memIo, const char* format, ...);
 
 
 /////////////////////////////////////////////////////////

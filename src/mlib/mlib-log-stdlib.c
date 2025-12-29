@@ -30,7 +30,7 @@ void MLog(const char *str) {
 // contain the output.
 #define VSNPRINTF_MINUS_1_RETRY 1
 
-i32 MStrAppendf(MMemIO* memIo, const char* format, ...) {
+u32 MStrAppendf(MMemIO* memIo, const char* format, ...) {
     u32 writableLen = memIo->capacity - memIo->size;
 
     va_list vargs1;
