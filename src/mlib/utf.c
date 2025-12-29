@@ -45,7 +45,6 @@ size_t UTF8_ConvertFromUTF16(const u16* utf16In, size_t inLen, char* utf8Out, si
     u32 codePoint;
 
     for (size_t i = 0; i < inLen && outPos < outLen; i++) {
-
         // Handle surrogate pairs
         if (utf16In[i] >= 0xD800 && utf16In[i] <= 0xDBFF) {
             if (i + 1 >= inLen) {

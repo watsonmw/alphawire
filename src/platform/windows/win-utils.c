@@ -94,9 +94,14 @@ MStr WinUtils_BSTRWithSizeToUTF8(MAllocator* allocator, BSTR bstr, i32 size) {
         return r;
     }
 
-    if (size >= 0) {
-        r.end += len - 1;
-        r.end = '\0';
+    if (size == -1) {
+        // always zero terminated, and len contains the zero
+        r.size = len - 1;
+    } else {
+        // maybe zero terminated (depends on if the input len contains the zero)
+        if (r.str[len - 1] == '\0') {
+            r.size = len - 1;
+        }
     }
 
     return r;
