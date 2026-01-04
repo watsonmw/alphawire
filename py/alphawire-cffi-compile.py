@@ -31,7 +31,13 @@ typedef struct {
 typedef struct {
     char* str;
     u32 size;
+    u32 capacity;
 } MStr;
+
+typedef struct {
+    char* str;
+    u32 size;
+} MStrView;
 
 typedef struct {
     u8* mem;
@@ -182,12 +188,15 @@ typedef struct {
     u8 getSet;
     u8 isEnabled;
     u8 formFlag;
-    u8 isNotch; // Property can only be changed by 'notching' - needed for some properties
 
     union {
         PTPRange range;
         PTPPropertyEnum enums;
     } form;
+    
+    u8 isNotch; // Property can only be changed by 'notching' - needed for some properties
+
+    ...;
 } PTPProperty;
 
 typedef struct {
@@ -211,7 +220,7 @@ typedef struct {
     u16 dataType;
     u8 controlType;
     u8 formFlag;
-    char* name;
+    char* label;
 
     union {
         PTPRange range;
@@ -279,20 +288,22 @@ PTPResult PTPControl_Cleanup(PTPControl* self);
 PTPResult PTPControl_UpdateProperties(PTPControl* self);
 size_t PTPControl_NumProperties(PTPControl* self);
 PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index);
-PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode);
-b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MStr* strOut);
+PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode);
+PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* propertyId);
+b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* alloc, MStr* strOut);
 PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
-void PTP_FreeLiveViewFrames(MAllocator* mem, LiveViewFrames* liveViewFrames);
+void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
 
 size_t PTPControl_NumControls(PTPControl* self);
 PtpControl* PTPControl_GetControlAtIndex(PTPControl* self, u16 index);
 
-char* PTP_GetOperationStr(u16 operationCode);
-char* PTP_GetControlStr(u16 controlCode);
-char* PTP_GetEventStr(u16 eventCode);
-char* PTP_GetPropertyStr(u16 propCode);
+char* PTP_GetOperationLabel(u16 operationCode);
+char* PTP_GetControlLabel(u16 controlCode);
+char* PTP_GetEventLabel(u16 eventCode);
+char* PTP_GetPropertyLabel(u16 propCode);
 
 void PTP_MemIOFree(MMemIO* memIO);
+void PTP_StrFree(MAllocator* allocator, MStr* str);
 
 """)
 
@@ -335,4 +346,4 @@ if __name__ == "__main__":
                    library_dirs=[build_dir], # Add library path
                    libraries=['alphawire'])  # library name, for the linker
 
-    ffi.compile(verbose=True, debug=True, tmpdir=build_dir)
+    ffi.compile(verbose=True, debug=False, tmpdir=build_dir)

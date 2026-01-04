@@ -130,8 +130,8 @@ PTP_EXPORT PTPResult PTPControl_Cleanup(PTPControl* self);
 
 PTP_EXPORT b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode);
 PTP_EXPORT b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode);
-PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, u16 propertyCode);
-PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, u16 propertyCode);
+PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, PTPProperty* property);
+PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,23 +159,30 @@ PTP_EXPORT PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 inde
 PTP_EXPORT PTPResult PTPControl_UpdateProperties(PTPControl* self);
 
 /**
- * Get property information
+ * Get property by property code
  * @param propertyCode
  * @return PTPProperty if found, null if not available
  */
-PTP_EXPORT PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode);
+PTP_EXPORT PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode);
+
+/**
+ * Get property by id
+ * @param id
+ * @return PTPProperty if found, null if not available
+ */
+PTP_EXPORT PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* id);
 
 /**
  * Build a list of enums for property if enums are available.
  * Converts values to strings for display.
  * You must free memory allocated by this function by calling PTPControl_FreePropValueEnums / PTP_FreePropValueEnums.
- * @param propertyCode
+ * @param property
  * @param allocator allocator to use for outEnums, when set to null to uses the default PTPControl allocator
  * @param outEnums
  * @page allocator Optional allocator to use (when NULL use PTPControl allocator).
  * @return TRUE if enums are available, false if no enums available for this property
  */
-PTP_EXPORT b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, MAllocator* allocator, PTPPropValueEnums* outEnums);
+PTP_EXPORT b32 PTPControl_GetEnumsForProperty(PTPControl* self, PTPProperty* property, MAllocator* allocator, PTPPropValueEnums* outEnums);
 
 /**
  * Free output enum returned by PTPControl_GetEnumsForProperty()
@@ -187,15 +194,17 @@ PTP_EXPORT void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnum
  */
 PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outEnums);
 
-PTP_EXPORT b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MAllocator* allocator, MStr* strOut);
-PTP_EXPORT PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PTPPropValue value);
-PTP_EXPORT b32 PTPControl_SetPropertyU16(PTPControl* self, u16 propertyCode, u16 value);
-PTP_EXPORT b32 PTPControl_SetPropertyU32(PTPControl* self, u16 propertyCode, u32 value);
-PTP_EXPORT b32 PTPControl_SetPropertyU64(PTPControl* self, u16 propertyCode, u64 value);
-PTP_EXPORT b32 PTPControl_SetPropertyStr(PTPControl* self, u16 propertyCode, MStr value);
-PTP_EXPORT b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value);
-PTP_EXPORT PTPResult PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch);
-PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, u16 propertyCode);
+PTP_EXPORT b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* strOut);
+PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property);
+PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut);
+
+PTP_EXPORT PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value);
+PTP_EXPORT b32 PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value);
+PTP_EXPORT b32 PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value);
+PTP_EXPORT b32 PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value);
+PTP_EXPORT b32 PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value);
+PTP_EXPORT b32 PTPControl_SetPropertyFancy(PTPControl* self, PTPProperty* property, MStr value);
+PTP_EXPORT PTPResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -226,20 +235,51 @@ PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // File download / upload functions
 //////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Get the number of image files queued for download on camera.
+ *
+ * Pre-2020 camera behavior depends on the camera model, sometimes the camera will return 0 but there are actually files
+ * available to download.  Other times the value can go negative if you attempt to download when no images are pending.
+ * Requires testing for your specific camera / firmware.  2020 and on cameras seem to be better behaved.
+ */
 PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
+
+/**
+ * Get the live view image from the camera (if available)
+ *
+ * May have to retry if calling straight away after connecting to the camera.
+ *
+ * @param fileOut MemIO to write the live view image to, required must not be NULL.
+ * @param liveViewFramesOut NULL or output pointer to the focus frames (if available for your camera model and mode)
+ * @return
+ */
 PTP_EXPORT PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
+
+PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
+
+/**
+ * Downloads an image from the cameras buffer.
+ *
+ * NOTE: downloading an image while there are no images available can cause issues on older pre-2020 camera, including
+ * camera crashes and the pending file count to go negative.
+ *
+ * @param fileOut The image contents after it has been downloaded
+ * @param ciiOut Info about the downloaded image
+ * @return
+ */
 PTP_EXPORT PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut);
+
 PTP_EXPORT PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut);
 PTP_EXPORT PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
-PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // String conversion, value helpers
 //////////////////////////////////////////////////////////////////////////////////////////////
-PTP_EXPORT char* PTP_GetOperationStr(u16 operationCode);
-PTP_EXPORT char* PTP_GetControlStr(u16 controlCode);
-PTP_EXPORT char* PTP_GetEventStr(u16 eventCode);
-PTP_EXPORT char* PTP_GetPropertyStr(u16 propCode);
+PTP_EXPORT char* PTP_GetOperationLabel(u16 operationCode);
+PTP_EXPORT char* PTP_GetControlLabel(u16 controlCode);
+PTP_EXPORT char* PTP_GetEventLabel(u16 eventCode);
+PTP_EXPORT char* PTP_GetPropertyLabel(u16 propCode);
 PTP_EXPORT char* PTP_GetObjectFormatStr(u16 objectFormatCode);
 
 PTP_EXPORT char* PTP_GetDataTypeStr(PTPDataType dataType);

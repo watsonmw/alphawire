@@ -4,2219 +4,8 @@
 
 #include "mlib/utf.h"
 #include "ptp/ptp-control.h"
+#include "ptp/ptp-control.h"
 #include "ptp/ptp-util.h"
-
-
-typedef struct {
-    u16 code;
-    char* name;
-} PropMetadata;
-
-static PropMetadata sPtpPropertiesMetadata[] = {
-    {DPC_COMPRESSION_SETTING, "Compression Setting"},
-    {DPC_WHITE_BALANCE, "White Balance"},
-    {DPC_F_NUMBER, "F-Number"},
-    {DPC_FOCUS_MODE, "Focus Mode"},
-    {DPC_EXPOSURE_METERING_MODE, "Exposure Metering Mode"},
-    {DPC_FLASH_MODE, "Flash Mode"},
-    {DPC_EXPOSURE_PROGRAM_MODE, "Exposure Program Mode"},
-    {DPC_EXPOSURE_COMPENSATION, "Exposure Bias Compensation"},
-    {DPC_CAPTURE_MODE, "Capture Mode"},
-    {0xD000, "T-Number"},
-    {DPC_IRIS_MODE, "Iris Mode"},
-    {DPC_IRIS_DISPLAY_UNIT, "Iris Display Unit"},
-    {DPC_FOCAL_DISTANCE_METER, "Focal Distance (Meters)"},
-    {DPC_FOCAL_DISTANCE_FEET, "Focal Distance (Feet)"},
-    {DPC_FOCAL_DISTANCE_UNIT, "Focal Distance Unit Setting"},
-    {DPC_FOCUS_MODE_SETTING, "Focus Mode Setting"},
-    {DPC_FOCUS_SPEED_RANGE, "Focus Speed Range"},
-    {DPC_DIGITAL_ZOOM_SCALE, "Digital Zoom Scale"},
-    {DPC_ZOOM_DISTANCE, "Zoom Distance"},
-    {DPC_WHITE_BALANCE_MODE, "White Balance Mode Setting"},
-    {0xD00D, "White Balance Tint"},
-    {0xD00E, "Shutter Angle"},
-    {DPC_SHUTTER_SETTING, "Shutter Setting"},
-    {DPC_SHUTTER_MODE, "Shutter Mode"},
-    {DPC_SHUTTER_MODE_STATUS, "Shutter Mode Status"},
-    {DPC_SHUTTER_MODE_SETTING, "Shutter Mode Setting"},
-    {DPC_SHUTTER_SLOW, "Shutter Slow"},
-    {DPC_SHUTTER_SLOW_FRAMES, "Shutter Slow Frames"},
-    {DPC_SHUTTER_SPEED_VALUE, "Shutter Speed Value"},
-    {DPC_SHUTTER_SPEED_CURRENT, "Shutter Speed Current Value"},
-    {DPC_ND_FILTER, "ND Filter"},
-    {DPC_ND_FILTER_MODE, "ND Filter Mode"},
-    {DPC_ND_FILTER_MODE_SETTING, "ND Filter Mode Setting"},
-    {DPC_ND_FILTER_VALUE, "ND Filter Value"},
-    {DPC_GAIN_CONTROL, "Gain Control Setting"},
-    {DPC_GAIN_UNIT, "Gain Unit Setting"},
-    {DPC_GAIN_DB_VALUE, "Gain dB Value"},
-    {0xD01F, "Gain dB Current Value"},
-    {0xD020, "Gain Base ISO Sensitivity"},
-    {0xD021, "Gain Base Sensitivity"},
-    {DPC_EXPOSURE_INDEX, "Exposure Index"},
-    {DPC_ISO_CURRENT, "ISO Current"},
-    {0xD024, "Movie Recording Resolution"},
-    {0xD025, "Movie Recording Resolution Proxy"},
-    {DPC_MOVIE_FILE_FORMAT_PROXY, "Movie File Format Proxy"},
-    {0xD028, "Movie Frame Rate Proxy"},
-    {0xD029, "Zoom Distance Unit Setting"},
-    {0xD02E, "Select FTP ServerID"},
-    {0xD02F, "Movie Playing State"},
-    {0xD030, "Movie Playing Speed"},
-    {0xD031, "Media Slot 1 ProfileUrl"},
-    {0xD032, "Media Slot 2 ProfileUrl"},
-    {0xD035, "Media Slot 1 Player"},
-    {0xD036, "Media Slot 2 Player"},
-    {0xD037, "Battery Remain Display Unit"},
-    {0xD038, "Battery Remaining in Minutes"},
-    {0xD039, "Battery Remaining in Voltage"},
-    {0xD03A, "Power Source"},
-    {0xD03B, "AWB"},
-    {0xD03C, "BaseLook Value"},
-    {0xD03E, "DC Voltage"},
-    {0xD040, "Software Version"},
-    {0xD041, "FTP Function"},
-    {0xD02A, "Sync ID for FTP Job List"},
-    {DPC_PLAYBACK_MEDIA, "Playback Media"},
-    {0xD043, "Settings Reset Enabled"},
-    {0xD044, "Monitor DISP (Screen Display) Mode Candidates"},
-    {0xD045, "Monitor DISP (Screen Display) Mode Setting"},
-    {0xD046, "Monitor DISP (Screen Display) Mode"},
-    {DPC_TOUCH_OPERATION, "Touch Operation"},
-    {0xD048, "Select Finder/Monitor"},
-    {0xD049, "Auto Power OFF Temperature"},
-    {0xD04A, "Body Key Lock"},
-    {0xD04B, "Image ID (Numerical Value)"},
-    {0xD04C, "Image ID (String)"},
-    {0xD04D, "Monitor LUT Setting (All Line)"},
-    {0xD04E, "Auto FTP Transfer"},
-    {0xD04F, "Auto FTP Transfer Target"},
-    {0xD052, "S&Q Frame Rate"},
-    {0xD055, "Interval REC (Movie) Time"},
-    {0xD057, "Upload Dataset Version"},
-    {0xD059, "BaseLookImport Command Version"},
-    {0xD060, "Subject Recognition AF"},
-    {0xD061, "AF Transition Speed"},
-    {0xD062, "AF Subj Shift Sens"},
-    {0xD073, "ND Filter Switching Setting"},
-    {0xD079, "Monitoring Output Display HDMI"},
-    {0xD07B, "Lens Model Name"},
-    {0xD07D, "Lens Version Number"},
-    {0xD08B, "BaseLookImport Operation Enabled"},
-    {0xD092, "Image ID (Numerical Value) Setting"},
-    {0xD099, "Exposure Ctrl Type"},
-    {0xD09A, "FTPSettingList Operation Enabled"},
-    {0xD0AB, "Focus Bracket Shooting Status"},
-    {0xD0BC, "Camera Operating Mode"},
-    {0xD0BD, "Playback View Mode"},
-    {0xD0C5, "Type-C Accessory Mode"},
-    {0xD0C6, "Pixel Mapping Enabled"},
-    {0xD0C7, "Delete UserBaseLook"},
-    {0xD0C8, "Select UserBaseLook to Edit"},
-    {0xD0C9, "UserBaseLook Input"},
-    {0xD0CA, "UserBaseLook AE Level Offset"},
-    {0xD0CB, "Base ISO Switch EI"},
-    {0xD0CC, "Select BaseLook to Set in PPLUT"},
-    {0xD0CD, "E-framing Scale (Auto)"},
-    {0xD0CE, "E-framing Speed (Auto)"},
-    {0xD0CF, "Camera E-framing"},
-    {0xD0D0, "S&Q Rec Frame Rate"},
-    {0xD0D1, "S&Q Record Setting"},
-    {0xD0D2, "Audio Recording"},
-    {0xD0D3, "Time Code Preset"},
-    {0xD0D4, "User Bit Preset"},
-    {DPC_TIME_CODE_FORMAT, "Time Code Format"},
-    {0xD0D6, "Time Code Run"},
-    {0xD0D7, "Time Code Make"},
-    {0xD0D8, "User Bit Time Rec"},
-    {0xD0D9, "Image Stabilization Steady Shot"},
-    {0xD0DA, "Movie Stabilization Steady Shot"},
-    {DPC_SILENT_MODE, "Silent Mode"},
-    {DPC_SILENT_MODE_APERTURE_DRIVE_AF, "Aperture Drive AF"},
-    {DPC_SILENT_MODE_POWER_OFF, "Silent Mode Shutter Power Off"},
-    {DPC_SILENT_MODE_AUTO_PIXEL_MAPPING, "Silent Mode Auto Pixel Mapping"},
-    {DPC_SHUTTER_TYPE, "Shutter Type"},
-    {0xD0E0, "Picture Profile BlackLevel"},
-    {0xD0E1, "Picture Profile Gamma"},
-    {0xD0E2, "Picture Profile BlackGamma Range"},
-    {0xD0E3, "Picture Profile BlackGamma Level"},
-    {0xD0E4, "Picture Profile Knee Mode"},
-    {0xD0E5, "Picture Profile Knee AutoSet MaxPoint"},
-    {0xD0E6, "Picture Profile Knee AutoSet Sensitivity"},
-    {0xD0E7, "Picture Profile Knee ManualSet Point"},
-    {0xD0E8, "Picture Profile Knee ManualSet Slope"},
-    {0xD0E9, "Picture Profile Color Mode"},
-    {0xD0EA, "Picture Profile Saturation"},
-    {0xD0EB, "Picture Profile ColorPhase"},
-    {0xD0EC, "Picture Profile Color Depth Red"},
-    {0xD0ED, "Picture Profile Color Depth Green"},
-    {0xD0EE, "Picture Profile Color Depth Blue"},
-    {0xD0EF, "Picture Profile Color Depth Cyan"},
-    {0xD0F0, "Picture Profile Color Depth Magenta"},
-    {0xD0F1, "Picture Profile Color Depth Yellow"},
-    {0xD0F2, "Picture Profile Detail Level"},
-    {0xD0F3, "Picture Profile Detail Adjust Mode"},
-    {0xD0F4, "Picture Profile Detail Adjust V/H Balance"},
-    {0xD0F5, "Picture Profile Detail Adjust B/W Balance"},
-    {0xD0F6, "Picture Profile Detail Adjust Limit"},
-    {0xD0F7, "Picture Profile Detail Adjust Crispening"},
-    {0xD0F8, "Picture Profile Detail Adjust Highlight Detail"},
-    {0xD0F9, "Copy Picture Profile"},
-    {DPC_CREATIVE_LOOK, "Creative Look"},
-    {0xD0FB, "Creative Look Contrast"},
-    {0xD0FC, "Creative Look Highlights"},
-    {0xD0FD, "Creative Look Shadows"},
-    {0xD0FE, "Creative Look Fade"},
-    {0xD0FF, "Creative Look Saturation"},
-    {0xD100, "Creative Look Sharpness"},
-    {0xD101, "Creative Look Sharpness Range"},
-    {0xD102, "Creative Look Clarity"},
-    {0xD103, "Custom Look Image Style"},
-    {0xD104, "Time Code Preset Reset Enabled"},
-    {0xD105, "User Bit Preset Reset Enabled"},
-    {0xD106, "Sensor Cleaning Enabled"},
-    {0xD107, "Reset Picture Profile Enabled"},
-    {0xD108, "Reset Creative Look Enabled"},
-    {0xD109, "Proxy Record Setting"},
-    {0xD11F, "Interval REC (Movie) Count Down Interval Time"},
-    {0xD120, "Recording Duration"},
-    {0xD124, "E-framing Mode (Auto)"},
-    {0xD133, "Flicker Less Shooting"},
-    {0xD15B, "Long Exposure NR"},
-    {0xD15C, "High ISO NR"},
-    {0xD15D, "HLG Image"},
-    {0xD15E, "Color Space Image"},
-    {0xD166, "Bracket order"},
-    {0xD167, "Focus Bracket order"},
-    {0xD168, "Focus Bracket Exposure Lock 1st Img"},
-    {0xD169, "Focus Bracket Interval Until Next Shot"},
-    {0xD16A, "Interval REC Shooting Start Time"},
-    {0xD16B, "Interval REC Shooting Interval"},
-    {0xD16C, "Interval REC Number of Shots"},
-    {0xD16D, "Interval REC AE Tracking Sensitivity"},
-    {0xD16E, "Interval REC Shutter Type"},
-    {0xD16F, "Interval REC Shoot Interval Priority"},
-    {0xD171, "Wind Noise Reduction"},
-    {0xD173, "Auto Slow Shutter"},
-    {0xD14D, "ISO Auto Min Shutter Speed Mode"},
-    {0xD176, "ISO Auto Min Shutter Speed Manual"},
-    {0xD177, "ISO Auto Min Shutter Speed Preset"},
-    {0xD178, "Soft Skin Effect"},
-    {0xD179, "Priority Set in AF-S"},
-    {0xD17A, "Priority Set in AF-C"},
-    {0xD17B, "Focus Magnification Time"},
-    {0xD17C, "Playback Volume Settings"},
-    {0xD17D, "Auto Review"},
-    {0xD17E, "Audio Signals"},
-    {0xD17F, "HDMI Resolution (Still/Play)"},
-    {0xD180, "HDMI Output Rec Media (Movie)"},
-    {0xD181, "HDMI Output Resolution (Movie)"},
-    {0xD182, "HDMI Output 4K Set (Movie)"},
-    {0xD183, "HDMI Output RAW (Movie)"},
-    {0xD184, "HDMI Output Raw Setting (Movie)"},
-    {0xD186, "HDMI Output Time Code (Movie)"},
-    {0xD187, "HDMI Output REC Control (Movie)"},
-    {0xD18E, "Media Slot 3 Status"},
-    {0xD18F, "Media Slot 3 Remaining Shoot Time"},
-    {0xD190, "Media Slot 3 Rec Available Type"},
-    {0xD191, "Media Slot 3 ProfileUrl"},
-    {0xD192, "Image Stabilization Steady Shot Adjust"},
-    {0xD193, "Image Stabilization Steady Shot Focal Length"},
-    {0xD199, "Auto FTP Transfer Target (Movie)"},
-    {0xD19A, "FTP Transfer Target"},
-    {0xD14B, "FTP Transfer Target (Proxy)"},
-    {0xD14C, "FTP Power Save"},
-    {0xD14E, "ND Filter Unit Setting"},
-    {0xD14F, "ND Filter Optical Density Value"},
-    {0xD150, "USB Power Supply"},
-    {0xD151, "Interval REC (Movie) Frame Rate"},
-    {0xD152, "Interval REC (Movie) Record Setting"},
-    {0xD153, "E-framing Recording Image Crop"},
-    {0xD154, "E-framing HDMI Crop"},
-    {0xD157, "Subject Recognition in AF"},
-    {0xD158, "Recognition Target"},
-    {0xD159, "Right/Left Eye Select"},
-    {0xD15F, "Recording Media - Image"},
-    {0xD160, "Recording Media - Movie"},
-    {0xD161, "Auto Switch Media"},
-    {0xD194, "Camera Shake Status"},
-    {0xD195, "Update Body Status"},
-    {0xD197, "Media Slot 1 Writing State"},
-    {0xD198, "Media Slot 2 Writing State"},
-    {0xD19C, "Focus Driving Status (Absolute)"},
-    {0xD19D, "Zoom Driving Status (Absolute)"},
-    {0xD1B6, "ISO Auto Range Limit (min)"},
-    {0xD1B7, "ISO Auto Range Limit (max)"},
-    {DPC_FLASH_COMPENSATION, "Flash Compensation"},
-    {DPC_DRO_HDR_MODE, "Dynamic Range Optimizer"},
-    {DPC_IMAGE_SIZE, "Image Size"},
-    {DPC_SHUTTER_SPEED, "Shutter Speed"},
-    {DPC_BATTERY_LEVEL, "Battery Level Indicator"},
-    {DPC_COLOR_TEMPERATURE, "Color Temperature"},
-    {DPC_WHITE_BALANCE_GM, "White Balance - Fine-Tune G-M"},
-    {DPC_ASPECT_RATIO, "Aspect Ratio"},
-    {DPC_AUTO_FOCUS_STATUS, "Focus Indication"},
-    {DPC_PREDICTED_MAX_FILE_SIZE, "Predicted Maximum File Size"},
-    {DPC_PENDING_FILES, "Files Pending"},
-    {DPC_AE_LOCK_STATUS, "AELock Indication"},
-    {DPC_BATTERY_REMAINING, "Battery Remaining"},
-    {DPC_PICTURE_EFFECT, "Picture Effect"},
-    {DPC_WHITE_BALANCE_AB, "White Balance - Fine-Tune A-B"},
-    {DPC_MOVIE_REC_STATE, "Movie Recording State"},
-    {DPC_ISO, "ISO"},
-    {DPC_FEL_LOCK_STATUS, "FELock Indication"},
-    {DPC_LIVE_VIEW_STATUS, "Live View Status"},
-    {DPC_IMAGE_SAVE_DESTINATION, "Image Save Destination"},
-    {0xD223, "Date/Time Setting"},
-    {DPC_FOCUS_AREA, "Focus Area"},
-    {DPC_FOCUS_MAGNIFY_SCALE, "Focus Magnify Scale"},
-    {DPC_FOCUS_MAGNIFY_POS, "Focus Magnify Position"},
-    {DPC_LIVE_VIEW_SETTING_EFFECT, "Live View Display Effect"},
-    {DPC_FOCUS_AREA_POS_OLD, "Focus Area Position"},
-    {DPC_MANUAL_FOCUS_ADJUST_ENABLED, "Manual Focus Adjust Enabled"},
-    {DPC_PIXEL_SHIFT_SHOOTING_MODE, "Pixel Shift Shooting Mode"},
-    {DPC_PIXEL_SHIFT_SHOOTING_NUMBER, "Pixel Shift Shooting Shot Num"},
-    {DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, "Pixel Shift Shooting Interval"},
-    {DPC_PIXEL_SHIFT_SHOOTING_STATUS, "Pixel Shift Shooting Status"},
-    {DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, "Pixel Shift Shooting Progress"},
-    {DPC_PICTURE_PROFILE, "Picture Profile"},
-    {DPC_CREATIVE_STYLE, "Creative Style"},
-    {DPC_MOVIE_FILE_FORMAT, "Movie File Format"},
-    {DPC_MOVIE_QUALITY, "Movie Recording Setting"},
-    {DPC_MEDIA_SLOT1_STATUS, "Media Slot 1 Status"},
-    {0xD249, "Media Slot 1 Remaining Shots"},
-    {0xD24A, "Media Slot 1 Remaining Record Time"},
-    {DPC_FOCAL_POSITION, "Focal position"},
-    {DPC_AWB_LOCK_STATUS, "AWBLock Indication"},
-    {DPC_INTERVAL_RECORD_MODE, "Interval Record Mode"},
-    {DPC_INTERVAL_RECORD_STATUS, "Interval Record Status"},
-    {DPC_DEVICE_OVERHEATING_STATE, "Device Overheating State"},
-    {DPC_IMAGE_QUALITY, "Image Quality"},
-    {DPC_IMAGE_FILE_FORMAT, "Image File Format"},
-    {DPC_FOCUS_MAGNIFY, "Focus Magnifier"},
-    {DPC_AF_TRACKING_SENS, "AF Tracking Sensitivity"},
-    {DPC_MEDIA_SLOT2_STATUS, "Media Slot 2 Status"},
-    {0xD257, "Media Slot 2 Remaining Shots"},
-    {0xD258, "Media Slot 2 Remaining Record Time"},
-    {DPC_DIAL_MODE, "Dial Mode"},
-    {DPC_ZOOM_OPERATION_ENABLED, "Zoom Operation Enabled"},
-    {DPC_ZOOM_SCALE, "Zoom Scale"},
-    {DPC_ZOOM_BAR_INFO, "Zoom Bar Information"},
-    {0xD25E, "Zoom Speed Range"},
-    {DPC_ZOOM_SETTING, "Zoom Setting"},
-    {DPC_ZOOM_TYPE_STATUS, "Zoom Type Status"},
-    {DPC_WIRELESS_FLASH, "Wireless Flash Setting"},
-    {DPC_RED_EYE_REDUCTION, "Red Eye Reduction"},
-    {DPC_REMOTE_RESTRICT_STATUS, "Remote Control Restriction Status"},
-    {0xD267, "Live View Area (x, y)"},
-    {DPC_IMAGE_TRANSFER_SIZE, "Image Transfer Size"},
-    {DPC_PC_SAVE_IMAGE, "RAW+J PC Save Image"},
-    {DPC_LIVE_VIEW_QUALITY, "Live View Image Quality"},
-    {0xD26B, "Custom WB Capturable Area (x, y)"},
-    {0xD26C, "Custom WB Capture Frame Size (x, y)"},
-    {0xD26D, "Custom WB Capture Standby Operation"},
-    {0xD26E, "Custom WB Capture Standby Cancel Operation"},
-    {0xD26F, "Custom WB Capture Operation"},
-    {0xD270, "Custom WB Execution State"},
-    {DPC_CAMERA_SETTING_SAVE_ENABLED, "Camera-Setting Save Operation"},
-    {DPC_CAMERA_SETTING_READ_ENABLED, "Camera-Setting Read Operation"},
-    {DPC_CAMERA_SETTING_SAVE_READ_STATE, "Camera-Setting Save/Read State"},
-    {0xD274, "FTP-Setting Save Operation"},
-    {0xD275, "FTP-Setting Read Operation"},
-    {0xD276, "FTP-Setting Save/Read State"},
-    {DPC_FORMAT_MEDIA_SLOT1_ENABLED, "Format Media Slot 1 Enabled"},
-    {DPC_FORMAT_MEDIA_SLOT2_ENABLED, "Format Media Slot 2 Enabled"},
-    {DPC_FORMAT_MEDIA_PROGRESS, "Format Media Progress Rate"},
-    {0xD27C, "Select FTP Server"},
-    {0xD27F, "FTP Connection Status"},
-    {0xD280, "FTP Connection Error Info"},
-    {0xD281, "High Resolution SS Setting"},
-    {0xD282, "High Resolution Shutter Speed"},
-    {DPC_TOUCH_OPERATION_FUNCTION, "Touch Operation Function"},
-    {DPC_REMOTE_TOUCH_ENABLED, "Remote Touch Enabled"},
-    {DPC_REMOTE_TOUCH_CANCEL_ENABLED, "Remote Touch Cancel Enabled"},
-    {DPC_MOVIE_FRAME_RATE, "Movie Frame Rate"},
-    {DPC_COMPRESSED_IMAGE_FILE_FORMAT, "Image Compression File Format"},
-    {DPC_RAW_FILE_TYPE, "RAW File Type"},
-    {0xD289, "Media Slot 1 RAW File Type"},
-    {0xD28A, "Media Slot 2 RAW File Type"},
-    {0xD28B, "Media Slot 1 Image File Format"},
-    {0xD28C, "Media Slot 2 Image File Format"},
-    {0xD28D, "Media Slot 1 Image Quality"},
-    {0xD28E, "Media Slot 2 Image Quality"},
-    {0xD28F, "Media Slot 1 Image Size"},
-    {0xD290, "Media Slot 2 Image Size"},
-    {DPC_FORMAT_MEDIA_QUICK_SLOT1_ENABLED, "Format Media Quick Slot 1 Enabled"},
-    {DPC_FORMAT_MEDIA_QUICK_SLOT2_ENABLED, "Format Media Quick Slot 2 Enabled"},
-    {DPC_FORMAT_MEDIA_CANCEL_ENABLED, "Format Media Cancel Enabled"},
-    {DPC_CONTENTS_TRANSFER_ENABLED, "Contents Transfer Enabled"},
-    {0xD297, "Save Zoom and Focus Position"},
-    {0xD298, "Load Zoom and Focus Position"},
-    {0xD299, "Remote Control Zoom Speed Type"},
-    {0xD29A, "APS-C / Full Toggle Enabled"},
-    {0xD29B, "APS-C / Full Toggle State"},
-    {0xD29C, "Movie Record Self Timer"},
-    {0xD29D, "Movie Record Self Timer Count Time"},
-    {0xD29F, "Movie Record Self Timer Continuous"},
-    {0xD2A0, "Movie Record Self Timer Status"},
-    {0xD2A1, "Focus Bracket Shot Num"},
-    {0xD2A2, "Focus Bracket Focus Range"},
-    {0xD2A4, "Bulb Timer Setting"},
-    {0xD2A5, "Bulb Exposure Time Setting"},
-    {0xD2BA, "Flicker Scan Status"},
-    {0xD2BB, "Flicker Scan Enabled"},
-    {0xE000, "Movie Shooting Mode"},
-    {0xE001, "Movie Shooting Mode Color Gamut"},
-    {0xE002, "Movie Shooting Mode Target Display"},
-    {0xE004, "Focus TouchSpot Status"},
-    {0xE005, "Focus Tracking Status"},
-    {0xE006, "Shutter ECS Setting"},
-    {0xE007, "Shutter ECS Number"},
-    {0xE008, "Shutter ECS Frequency"},
-    {0xE009, "Depth of Field Adjustment Mode"},
-    {0xE00A, "Depth of Field Adjustment Interlocking Mode State"},
-    {0xE00B, "Recorder Clip Name"},
-    {0xE00C, "Recorder Control Main Setting"},
-    {0xE00D, "Recorder Control Proxy Setting"},
-    {0xE00E, "Recorder Start Main"},
-    {0xE00F, "Recorder Start Proxy"},
-    {0xE010, "Recorder Main Status"},
-    {0xE011, "Recorder Proxy Status"},
-    {0xE012, "Recorder Ext Raw Status"},
-    {0xE013, "Recorder Save Destination"},
-    {0xE014, "Button Assignment Assignable.1"},
-    {0xE015, "Button Assignment Assignable.2"},
-    {0xE016, "Button Assignment Assignable.3"},
-    {0xE017, "Button Assignment Assignable.4"},
-    {0xE018, "Button Assignment Assignable.5"},
-    {0xE019, "Button Assignment Assignable.6"},
-    {0xE01A, "Button Assignment Assignable.7"},
-    {0xE01B, "Button Assignment Assignable.8"},
-    {0xE01C, "Button Assignment Assignable.9"},
-    {0xE01D, "Button Assignment Assignable.10"},
-    {0xE01E, "Button Assignment LensAssignable.1"},
-    {0xE01F, "SceneFile Index"},
-    {0xE020, "Current SceneFile Edited"},
-    {0xE021, "Movie Play Button"},
-    {0xE022, "Movie Play Pause Button"},
-    {0xE023, "Movie Play Stop Button"},
-    {0xE024, "Movie Forward Button"},
-    {0xE025, "Movie Rewind Button"},
-    {0xE026, "Movie Next Button"},
-    {0xE027, "Movie Prev Button"},
-    {0xE028, "Movie RecReview Button"},
-    {0xE029, "Assignable Button 1"},
-    {0xE02A, "Assignable Button 2"},
-    {0xE02B, "Assignable Button 3"},
-    {0xE02C, "Assignable Button 4"},
-    {0xE02D, "Assignable Button 5"},
-    {0xE02E, "Assignable Button 6"},
-    {0xE02F, "Assignable Button 7"},
-    {0xE030, "Assignable Button 8"},
-    {0xE031, "Assignable Button 9"},
-    {0xE032, "Assignable Button 10"},
-    {0xE033, "LensAssignable Button 1"},
-    {0xE035, "Assignable Button Indicator 1"},
-    {0xE036, "Assignable Button Indicator 2"},
-    {0xE037, "Assignable Button Indicator 3"},
-    {0xE038, "Assignable Button Indicator 4"},
-    {0xE039, "Assignable Button Indicator 5"},
-    {0xE03A, "Assignable Button Indicator 6"},
-    {0xE03B, "Assignable Button Indicator 7"},
-    {0xE03C, "Assignable Button Indicator 8"},
-    {0xE03D, "Assignable Button Indicator 9"},
-    {0xE03E, "Assignable Button Indicator 10"},
-    {0xE03F, "LensAssignable Button Indicator 1"},
-    {0xE042, "Focus Position Setting"},
-    {0xE043, "Focus Position Current Value"},
-    {0xE050, "Audio Input Master Level"},
-    {0xE059, "Audio Output HDMI Monitor CH"},
-    {0xE061, "Movie Rec Button (Toggle) Enabled"},
-    {0xE080, "Movie Stabilization Level"},
-    {0xE082, "Movie Trimming Transfer Support Information"},
-    {0xE083, "Remote Touch Operation Function"},
-    {0xE084, "AF Assist"},
-    {DPC_LENS_INFORMATION_ENABLED, "Lens Information Enabled"},
-    {0xE088, "Follow Focus Position Setting"},
-    {0xE08F, "Assignable Button Indicator 11"},
-    {0xE089, "Follow Focus Position Current Value"},
-    {0xE08D, "Button Assignment Assignable.11"},
-    {0xE08E, "Assignable Button 11"},
-};
-
-typedef struct {
-    u16 code;
-    char* name;
-} EventsMetadata;
-
-static EventsMetadata sPtpEventsMetadata[] = {
-    {0x4004, "StoreAdded"},
-    {0x4005, "StoreRemoved"},
-    {0xC201, "SDIE_ObjectAdded"},
-    {0xC202, "SDIE_ObjectRemoved"},
-    {0xC203, "SDIE_DevicePropChanged"},
-    {0xC205, "SDIE_DateTimeSettingResult"},
-    {0xC206, "SDIE_CapturedEvent"},
-    {0xC208, "SDIE_CWBCapturedResult"},
-    {0xC209, "SDIE_CameraSettingReadResult"},
-    {0xC20A, "SDIE_FTPSettingReadResult"},
-    {0xC20B, "SDIE_MediaFormatResult"},
-    {0xC20C, "SDIE_FTPDisplayNameListChanged"},
-    {0xC20D, "SDIE_ContentsTransferEvent"},
-    {0xC20E, "SDIE_ZoomAndFocusPositionEvent"},
-    {0xC20F, "SDIE_DisplayListChangedEvent"},
-    {0xC210, "SDIE_MediaProfileChanged"},
-    {0xC211, "SDIE_ControlJobListEvent"},
-    {0xC214, "SDIE_ControlUploadDataResult"},
-    {0xC218, "SDIE_FocusPositionResult"},
-    {0xC21B, "SDIE_LensInformationChanged"},
-    {0xC222, "SDIE_OperationResults"},
-    {0xC223, "SDIE_AFStatus"},
-    {0xC224, "SDIE_MovieRecOperationResults"}
-};
-
-static PTPPropValueEnum sControl_UpDown[] = {
-    {.propValue.u16=0x0001, .str.str="Up", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0002, .str.str="Down", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-};
-
-static PTPPropValueEnum sControl_SelectMediaFormat[] = {
-    {.propValue.u16=0x0001, .str.str="Full Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0002, .str.str="Full Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0011, .str.str="Quick Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0012, .str.str="Quick Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-};
-
-#define PROP_ENUM_SET(a) .form.enums = {.values=(a), .size=MStaticArraySize(a)}
-
-static PtpControl sPtpControlsMetadata[] = {
-    {DPC_SHUTTER_HALF_PRESS,           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Press Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_AFL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AFL Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER_ONE_RESET,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter One Reset", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER_ONE,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter One", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_MOVIE_RECORD,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FEL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "FEL Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_MEDIA_FORMAT,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FOCUS_MAGNIFIER,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FOCUS_MAGNIFIER_CANCEL,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_REMOTE_KEY_UP,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Up", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_REMOTE_KEY_DOWN,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Down", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_REMOTE_KEY_LEFT,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Left", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_REMOTE_KEY_RIGHT,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Right", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_MANUAL_FOCUS_ADJUST,          PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Manual Focus Adjust", .form.range={.min.i16=-7,.max.i16=7,.step.i16=1}},
-    {DPC_AUTO_FOCUS_HOLD,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Autofocus Hold", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_PIXEL_SHIFT_SHOOT_CANCEL,     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_PIXEL_SHIFT_SHOOT,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Mode", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_HFR_STANDBY,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Standby", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_HFR_RECORD_CANCEL,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Record Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FOCUS_STEP_NEAR,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Near", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FOCUS_STEP_FAR,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Far", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_AWB_LOCK,                     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AWBL Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FOCUS_AREA_X_Y,               PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "AF Area Position (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Unknown Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_ZOOM,                         PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Zoom Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
-    {DPC_CUSTOM_WB_CAPTURE_STANDBY,    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Custom WB Capture Standby", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_CUSTOM_WB_CAPTURE_STANDBY_CANCEL, PTP_DT_UINT16, SDI_CONTROL_BUTTON, PTP_FORM_FLAG_ENUM, "Custom WB Capture Standby Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_CUSTOM_WB_CAPTURE,            PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Custom WB Capture", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {DPC_FORMAT_MEDIA,                 PTP_DT_UINT16, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_SelectMediaFormat)},
-    {DPC_REMOTE_TOUCH_XY,              PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Remote Touch (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {DPC_REMOTE_TOUCH_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Remote Touch Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER_BOTH,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FORMAT_MEDIA_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media Cancel", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SAVE_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Save Zoom and Focus Position"},
-    {DPC_LOAD_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Load Zoom and Focus Position"},
-    {DPC_APS_C_FULL_TOGGLE,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "APS-C / Full Toggle", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_COLOR_TEMPERATURE_STEP,       PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Color Temperature Step", .form.range={.min.i16=-30,.max.i16=30,.step.i16=1}},
-    {DPC_WHITE_BALANCE_TINT_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "White Balance Tint Step", .form.range={.min.i16=-198,.max.i16=198,.step.i16=1}},
-    {DPC_FOCUS_OPERATION,              PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Focus Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
-    {DPC_FLICKER_SCAN,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Flicker Scan", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SETTINGS_RESET,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Settings Reset", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_PIXEL_MAPPING,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Mapping", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_POWER_OFF,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Power Off", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_TIME_CODE_PRESET_RESET,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Time Code Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_USER_BIT_PRESET_RESET,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "User Bit Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SENSOR_CLEANING,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Sensor Cleaning", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_RESET_PICTURE_PROFILE,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Picture Profile", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_RESET_CREATIVE_LOOK,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Creative Look", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER_ECS_NUMBER_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Shutter ECS Number Step", .form.range={.min.i16=-32768,.max.i16=32767,.step.i16=1}},
-    {DPC_MOVIE_RECORD_TOGGLE,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Toggle", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_FOCUS_POSITION_CANCEL,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Position Cancel", PROP_ENUM_SET(sControl_UpDown)},
-};
-
-char* PTP_GetPropertyStr(u16 propCode) {
-    for (int i = 0; i < MStaticArraySize(sPtpPropertiesMetadata); i++) {
-        if (sPtpPropertiesMetadata[i].code == propCode) {
-            return sPtpPropertiesMetadata[i].name;
-        }
-    }
-
-    return NULL;
-}
-
-char* PTP_GetControlStr(u16 controlCode) {
-    for (int i = 0; i < MStaticArraySize(sPtpControlsMetadata); i++) {
-        if (sPtpControlsMetadata[i].controlCode == controlCode) {
-            return sPtpControlsMetadata[i].name;
-        }
-    }
-
-    return NULL;
-}
-
-char* PTP_GetEventStr(u16 eventCode) {
-    for (int i = 0; i < MStaticArraySize(sPtpEventsMetadata); i++) {
-        if (sPtpEventsMetadata[i].code == eventCode) {
-            return sPtpEventsMetadata[i].name;
-        }
-    }
-
-    return NULL;
-}
-
-typedef struct {
-    u16 code;
-    char* name;
-} ObjectFormatMetadata;
-
-static ObjectFormatMetadata sPtpObjectFormatMetadata[] = {
-    {PTP_OFC_FOLDER, "Folder"},
-    {PTP_OFC_TEXT, "TEXT"},
-    {PTP_OFC_MPEG, "MPEG"},
-    {PTP_OFC_JPEG, "JPEG"},
-    {PTP_OFC_JFIF, "JFIF"},
-    {PTP_OFC_RAW, "RAW"},
-    {PTP_OFC_HEIF, "HEIF"},
-    {PTP_OFC_MPO, "MPO"},
-    {PTP_OFC_WMA, "WMA"},
-    {PTP_OFC_MP4, "MP4"},
-};
-
-char* PTP_GetObjectFormatStr(u16 objectFormatCode) {
-    for (int i = 0; i < MStaticArraySize(sPtpObjectFormatMetadata); i++) {
-        if (sPtpObjectFormatMetadata[i].code == objectFormatCode) {
-            return sPtpObjectFormatMetadata[i].name;
-        }
-    }
-
-    return NULL;
-}
-
-typedef struct {
-    u16 code;
-    char* name;
-    char* description;
-} OperationMetadata;
-
-static OperationMetadata sPtpOperationMetadata[] = {
-    {PTP_OC_GetDeviceInfo, "GetDeviceInfo", NULL},
-    {PTP_OC_OpenSession, "OpenSession", NULL},
-    {PTP_OC_CloseSession, "CloseSession", NULL},
-    {PTP_OC_GetStorageID, "GetStorageIDs", NULL},
-    {PTP_OC_GetStorageInfo, "GetStorageInfo", NULL},
-    {PTP_OC_GetNumObjects, "GetNumObjects", NULL},
-    {PTP_OC_GetObjectHandles, "GetObjectHandles", NULL},
-    {PTP_OC_GetObjectInfo, "GetObjectInfo", NULL},
-    {PTP_OC_GetObject, "GetObject", NULL},
-    {PTP_OC_GetThumb, "GetThumb", NULL},
-    {PTP_OC_DeleteObject, "DeleteObject", NULL},
-    {0x100C, "SendObjectInfo", NULL},
-    {PTP_OC_SendObject, "SendObject", NULL},
-    {0x100E, "InitiateCapture", NULL},
-    {0x100F, "FormatStore", NULL},
-    {0x1010, "ResetDevice", NULL},
-    {0x1011, "SelfTest", NULL},
-    {0x1012, "SetObjectProtection", NULL},
-    {0x1013, "PowerDown", NULL},
-    {0x1014, "GetDevicePropDesc", NULL},
-    {0x1015, "GetDevicePropValue", NULL},
-    {0x1016, "SetDevicePropValue", NULL},
-    {0x1017, "ResetDevicePropValue", NULL},
-    {0x1018, "TerminateOpenCapture", NULL},
-    {0x1019, "MoveObject", NULL},
-    {0x101A, "CopyObject", NULL},
-    {0x101B, "GetPartialObject", NULL},
-    {0x101C, "InitiateOpenCapture", NULL},
-    {0x9801, "GetObjectPropsSupported", "same as Media Transfer Protocol v.1.1 Spec"},
-    {0x9802, "GetObjectPropDesc", "same as Media Transfer Protocol v.1.1 Spec"},
-    {0x9803, "GetObjectPropValue", "same as Media Transfer Protocol v.1.1 Spec"},
-    {0x9804, "SetObjectPropValue", "same as Media Transfer Protocol v.1.1 Spec"},
-    {0x9805, "GetObjectPropList", "same as Media Transfer Protocol v.1.1 Spec"},
-    {PTP_OC_SDIO_Connect, "SDIO_Connect", "This is for the authentication handshake."},
-    {PTP_OC_SDIO_GetExtDeviceInfo, "SDIO_GetExtDeviceInfo", "Get the protocol version and the supported properties "
-        "of the connected device."},
-    {PTP_OC_SDIO_SetExtDevicePropValue, "SDIO_SetExtDevicePropValue", "Set a DevicePropValue for a device property."},
-    {PTP_OC_SDIO_ControlDevice, "SDIO_ControlDevice", "Set the SDIControl value for the SDIControlCode."},
-    {PTP_OC_SDIO_GetAllExtDevicePropInfo, "SDIO_GetAllExtDevicePropInfo", "Obtain all support DevicePropDescs at one time. "
-        "The host will send this operation at regular intervals to obtain the latest (current) camera settings."},
-    {PTP_OC_SDIO_SetFTPSettingFilePassword, "SDIO_SetFTPSettingFilePassword", "Set the password for getting/setting a "
-        "FTP-Setting File."},
-    {PTP_OC_SDIO_OpenSession, "SDIO_OpenSession", "Open Session with Function Mode."},
-    {PTP_OC_SDIO_GetPartialLargeObject, "SDIO_GetPartialLargeObject", "Get partial object from the device."},
-    {PTP_OC_SDIO_SetContentsTransferMode, "SDIO_SetContentsTransferMode", "Turn on/off content transfer mode."},
-    {PTP_OC_SDIO_GetDisplayStringList, "SDIO_GetDisplayStringList", "Get Display String List."},
-    {PTP_OC_SDIO_GetVendorCodeVersion, "SDIO_GetVendorCodeVersion", "Get vendor code version."},
-    {PTP_OC_SDIO_GetFTPJobList, "SDIO_GetFTPJobList", "Get the FTP Job List."},
-    {PTP_OC_SDIO_ControlFTPJobList, "SDIO_ControlFTPJobList", "Control the FTP Job List."},
-    {PTP_OC_SDIO_UploadData, "SDIO_UploadData", "Upload data to Camera temporary storage."},
-    {PTP_OC_SDIO_ControlUploadData, "SDIO_ControlUploadData", "Control the Upload Data."},
-    {PTP_OC_SDIO_GetFTPSettingList, "SDIO_GetFTPSettingList", "Get FTP Setting List."},
-    {PTP_OC_SDIO_SetFTPSettingList, "SDIO_SetFTPSettingList", "Set FTP Setting List."},
-    {PTP_OC_SDIO_GetLensInformation, "SDIO_GetLensInformation", "Get Lens Information."},
-    {PTP_OC_SDIO_OperationResultsSupported, "SDIO_OperationResultsSupported", "Get the Operation Results Supported."},
-};
-
-char* PTP_GetOperationStr(u16 operationCode) {
-    for (int i = 0; i < MStaticArraySize(sPtpOperationMetadata); i++) {
-        if (sPtpOperationMetadata[i].code == operationCode) {
-            return sPtpOperationMetadata[i].name;
-        }
-    }
-
-    return NULL;
-}
-
-char* PTP_GetDataTypeStr(PTPDataType dataType) {
-    switch (dataType) {
-        case PTP_DT_UNDEF:
-            return "undef";
-        case PTP_DT_INT8:
-            return "i8";
-        case PTP_DT_UINT8:
-            return "u8";
-        case PTP_DT_INT16:
-            return "i16";
-        case PTP_DT_UINT16:
-            return "u16";
-        case PTP_DT_INT32:
-            return "i32";
-        case PTP_DT_UINT32:
-            return "u32";
-        case PTP_DT_INT64:
-            return "i64";
-        case PTP_DT_UINT64:
-            return "u64";
-        case PTP_DT_INT128:
-            return "i128";
-        case PTP_DT_UINT128:
-            return "u128";
-        case PTP_DT_AINT8:
-            return "[i8]";
-        case PTP_DT_AUINT8:
-            return "[u8]";
-        case PTP_DT_AINT16:
-            return "[i16]";
-        case PTP_DT_AUINT16:
-            return "[u16]";
-        case PTP_DT_AINT32:
-            return "[i32]";
-        case PTP_DT_AUINT32:
-            return "[u32]";
-        case PTP_DT_AINT64:
-            return "[i64]";
-        case PTP_DT_AUINT64:
-            return "[u64]";
-        case PTP_DT_AINT128:
-            return "[i128]";
-        case PTP_DT_AUINT128:
-            return "[u128]";
-        case PTP_DT_STR:
-            return "string";
-    }
-    return NULL;
-}
-
-char* PTP_GetFormFlagStr(PTPFormFlag formFlag) {
-    switch (formFlag) {
-        case PTP_FORM_FLAG_NONE:
-            return "";
-        case PTP_FORM_FLAG_RANGE:
-            return "Range";
-        case PTP_FORM_FLAG_ENUM:
-            return "Enum";
-    }
-    return NULL;
-}
-
-char* PTP_GetPropIsEnabledStr(u8 propIsEnabled) {
-    switch (propIsEnabled) {
-        case 0x0:
-            return "N/A";
-        case 0x1:
-            return "RW";
-        case 0x2:
-            return "RO";
-    }
-    return NULL;
-}
-
-void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen) {
-    switch (dataType) {
-        case PTP_DT_INT8:
-            snprintf(buffer, bufferLen, " %hhd (%02hhx)",  value.i8, value.i8);
-            break;
-        case PTP_DT_UINT8:
-            snprintf(buffer, bufferLen, " %hhu (%02hhx)",  value.u8, value.u8);
-            break;
-        case PTP_DT_INT16:
-            snprintf(buffer, bufferLen, " %hd (%04hx)", value.i16, value.i16);
-            break;
-        case PTP_DT_UINT16:
-            snprintf(buffer, bufferLen, " %hu (%04hx)", value.u16, value.u16);
-            break;
-        case PTP_DT_INT32:
-            snprintf(buffer, bufferLen, " %d (%08x)", value.i32, value.i32);
-            break;
-        case PTP_DT_UINT32:
-            snprintf(buffer, bufferLen, " %u (%08x)", value.u32, value.u32);
-            break;
-        case PTP_DT_INT64:
-            snprintf(buffer, bufferLen, " %lld (%016llx)", value.i64, value.i64);
-           break;
-        case PTP_DT_UINT64:
-            snprintf(buffer, bufferLen, " %llu (%016llx)", value.u64, value.u64);
-            break;
-        case PTP_DT_INT128:
-            break;
-        case PTP_DT_UINT128:
-            break;
-        case PTP_DT_AINT8:
-            break;
-        case PTP_DT_AUINT8:
-            break;
-        case PTP_DT_AINT16:
-            break;
-        case PTP_DT_AUINT16:
-            break;
-        case PTP_DT_AINT32:
-            break;
-        case PTP_DT_AUINT32:
-            break;
-        case PTP_DT_AINT64:
-            break;
-        case PTP_DT_AUINT64:
-            break;
-        case PTP_DT_AINT128:
-            break;
-        case PTP_DT_AUINT128:
-            break;
-        case PTP_DT_STR:
-            snprintf(buffer, bufferLen, " %s", value.str.str);
-            break;
-        default:
-            break;
-    }
-}
-
-b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2) {
-    switch (dataType) {
-        case PTP_DT_INT8:
-            return value1.i8 == value2.i8;
-        case PTP_DT_UINT8:
-            return value1.u8 == value2.u8;
-        case PTP_DT_INT16:
-            return value1.i16 == value2.i16;
-        case PTP_DT_UINT16:
-            return value1.u16 == value2.u16;
-        case PTP_DT_INT32:
-            return value1.i32 == value2.i32;
-        case PTP_DT_UINT32:
-            return value1.u32 == value2.u32;
-        case PTP_DT_INT64:
-            return value1.i64 == value2.i64;
-        case PTP_DT_UINT64:
-            return value1.u64 == value2.u64;
-        case PTP_DT_INT128:
-            return MCStrCmp(value1.i128, value2.i128) == 0;
-        case PTP_DT_UINT128:
-            return MCStrCmp(value1.i128, value2.i128) == 0;
-        case PTP_DT_AINT8:
-            break;
-        case PTP_DT_AUINT8:
-            break;
-        case PTP_DT_AINT16:
-            break;
-        case PTP_DT_AUINT16:
-            break;
-        case PTP_DT_AINT32:
-            break;
-        case PTP_DT_AUINT32:
-            break;
-        case PTP_DT_AINT64:
-            break;
-        case PTP_DT_AUINT64:
-            break;
-        case PTP_DT_AINT128:
-            break;
-        case PTP_DT_AUINT128:
-            break;
-        case PTP_DT_STR:
-            return MCStrCmp(value1.str.str, value2.str.str) == 0;
-        default:
-            break;
-    }
-    return FALSE;
-}
-
-b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value) {
-    return PTP_PropValueEq((PTPDataType)property->dataType, property->value, value);
-}
-
-size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
-    switch (dataType) {
-        case PTP_DT_INT8:
-        case PTP_DT_UINT8:
-            return 1;
-        case PTP_DT_INT16:
-        case PTP_DT_UINT16:
-            return 2;
-        case PTP_DT_INT32:
-        case PTP_DT_UINT32:
-            return 4;
-        case PTP_DT_INT64:
-        case PTP_DT_UINT64:
-            return 8;
-        case PTP_DT_INT128:
-        case PTP_DT_UINT128:
-            return 16;
-        case PTP_DT_AINT8:
-            break;
-        case PTP_DT_AUINT8:
-            break;
-        case PTP_DT_AINT16:
-            break;
-        case PTP_DT_AUINT16:
-            break;
-        case PTP_DT_AINT32:
-            break;
-        case PTP_DT_AUINT32:
-            break;
-        case PTP_DT_AINT64:
-            break;
-        case PTP_DT_AUINT64:
-            break;
-        case PTP_DT_AINT128:
-            break;
-        case PTP_DT_AUINT128:
-            break;
-        case PTP_DT_STR: {
-            size_t len = value.str.size;
-            if (len == 0) {
-                return 0;
-            } else {
-                return len + 2;
-            }
-            break;
-        }
-        default:
-            return 0;
-    }
-    return 0;
-}
-
-static void PropValueFree(MAllocator* mem, PTPDataType dataType, PTPPropValue* value) {
-    if (value == NULL) {
-        return;
-    }
-    if (dataType == PTP_DT_STR) {
-        MStrFree(mem, value->str);
-    }
-}
-
-typedef struct {
-    u32 storageID;
-    u16 objectFormat; // ObjectFormatMetadata
-    u16 protectionStatus;
-    u32 objectCompressedSize;
-    u16 thumbFormat;
-    u32 thumbCompressedSize;
-    u32 thumbPixWidth;
-    u32 thumbPixHeight;
-    u32 imagePixWidth;
-    u32 imagePixHeight;
-    u32 imagePixDepth;
-    u32 parentObject;
-    u16 associationType;
-    u32 associationDesc;
-    u32 sequenceNumber;
-
-    MStr filename;
-    MStr captureDateTime;
-    MStr modDateTime;
-    MStr keywords;
-} PTPObjectInfo;
-
-static void PTP_FreeObjectInfo(MAllocator* allocator, PTPObjectInfo *objectInfo) {
-    MStrFree(allocator, objectInfo->filename);
-    MStrFree(allocator, objectInfo->captureDateTime);
-    MStrFree(allocator, objectInfo->modDateTime);
-    MStrFree(allocator, objectInfo->keywords);
-}
-
-void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames) {
-    MArrayFree(self->allocator, liveViewFrames->focus.frames);
-    MArrayFree(self->allocator, liveViewFrames->face.frames);
-    MArrayFree(self->allocator, liveViewFrames->tracking.frames);
-}
-
-void PTP_FreePropValueEnums(MAllocator* allocator, PTPPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(outEnums->values); ++i) {
-        if (outEnums->values[i].str.capacity) {
-            MStrFree(allocator, outEnums->values[i].str);
-        }
-    }
-    MArrayFree(allocator, outEnums->values);
-}
-
-void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums) {
-    PTP_FreePropValueEnums(self->allocator, outEnums);
-}
-
-static int ReadPtpString8(MAllocator* allocator, MMemIO* memIo, MStr* r) {
-    u8 len = 0;
-    MMemReadU8(memIo, &len);
-
-    if (len) {
-        u16* buffer = (u16*) MMemReadAdvance(memIo, len * 2);
-        size_t utf8Len = UTF8_GetConvertUTF16Len(buffer, len);
-        if (utf8Len) {
-            if (r->capacity < utf8Len) {
-                r->str = MRealloc(allocator, r->str, r->capacity, utf8Len);
-                r->capacity = utf8Len;
-            }
-            if (UTF8_ConvertFromUTF16(buffer, len, r->str, r->capacity) == 0) {
-                MStrFree(allocator, *r);
-                return FALSE;
-            } else {
-                r->size = utf8Len;
-                return TRUE;
-            }
-        }
-    }
-    return TRUE;
-}
-
-static char* ReadPtpString16(MAllocator* allocator, MMemIO* memIo) {
-    u16 utf8Len = 0;
-    MMemReadU16(memIo, &utf8Len);
-    if (utf8Len) {
-        char* utf8 = MMalloc(allocator, utf8Len);
-        MMemReadCharCopyN(memIo, utf8, utf8Len);
-        return utf8;
-    }
-    return NULL;
-}
-
-static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, PTPPropValue* value) {
-    i32 r = 0;
-    switch (dataType) {
-        case PTP_DT_INT8:
-            r = MMemReadI8(memIo, &value->i8);
-            break;
-        case PTP_DT_UINT8:
-            r = MMemReadU8(memIo, &value->u8);
-            break;
-        case PTP_DT_INT16:
-            r = MMemReadI16LE(memIo, &value->i16);
-            break;
-        case PTP_DT_UINT16:
-            r = MMemReadU16LE(memIo, &value->u16);
-            break;
-        case PTP_DT_INT32:
-            r = MMemReadI32LE(memIo, &value->i32);
-            break;
-        case PTP_DT_UINT32:
-            r = MMemReadU32LE(memIo, &value->u32);
-            break;
-        case PTP_DT_INT64:
-            r = MMemReadI64LE(memIo, &value->i64);
-            break;
-        case PTP_DT_UINT64:
-            r = MMemReadU64LE(memIo, &value->u64);
-            break;
-        case PTP_DT_INT128:
-            break;
-        case PTP_DT_UINT128:
-            break;
-        case PTP_DT_AINT8:
-            break;
-        case PTP_DT_AUINT8:
-            break;
-        case PTP_DT_AINT16:
-            break;
-        case PTP_DT_AUINT16:
-            break;
-        case PTP_DT_AINT32:
-            break;
-        case PTP_DT_AUINT32:
-            break;
-        case PTP_DT_AINT64:
-            break;
-        case PTP_DT_AUINT64:
-            break;
-        case PTP_DT_AINT128:
-            break;
-        case PTP_DT_AUINT128:
-            break;
-        case PTP_DT_STR:
-            ReadPtpString8(allocator, memIo, &value->str);
-            break;
-        default:
-            break;
-    }
-    return r;
-}
-
-static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
-    switch (dataType) {
-        case PTP_DT_INT8:
-            MLogf(" %d (%02x)", value->i8, value->i8);
-            break;
-        case PTP_DT_UINT8:
-            MLogf(" %d (%02x)", value->u8, value->u8);
-            break;
-        case PTP_DT_INT16:
-            MLogf(" %d (%04x)", value->i16, value->i16);
-            break;
-        case PTP_DT_UINT16:
-            MLogf(" %d (%04x)", value->u16, value->u16);
-            break;
-        case PTP_DT_INT32:
-            MLogf(" %d (%08x)",  value->i32, value->i32);
-            break;
-        case PTP_DT_UINT32:
-            MLogf(" %d (%08x)", value->u32, value->u32);
-            break;
-        case PTP_DT_INT64:
-            MLogf(" %d (%016llx)",  value->i64, value->i64);
-            break;
-        case PTP_DT_UINT64:
-            MLogf(" %d (%016llx)", value->u64, value->i64);
-            break;
-        case PTP_DT_INT128:
-            MLogf(" %d (%03ll2x)", value->i128, value->i128);
-            break;
-        case PTP_DT_UINT128:
-            MLogf(" %d (%032llx)", value->u128, value->u128);
-            break;
-        case PTP_DT_AINT8:
-            break;
-        case PTP_DT_AUINT8:
-            break;
-        case PTP_DT_AINT16:
-            break;
-        case PTP_DT_AUINT16:
-            break;
-        case PTP_DT_AINT32:
-            break;
-        case PTP_DT_AUINT32:
-            break;
-        case PTP_DT_AINT64:
-            break;
-        case PTP_DT_AUINT64:
-            break;
-        case PTP_DT_AINT128:
-            break;
-        case PTP_DT_AUINT128:
-            break;
-        case PTP_DT_STR:
-            MLogf(" %s", value->str);
-           break;
-        default:
-            break;
-    }
-}
-
-static void PrintProperties(PTPControl* self) {
-    size_t numProperties = MArraySize(self->properties);
-    for (int i = 0; i < numProperties; i++) {
-        PTPProperty* p = self->properties + i;
-        MLogf("Property Code: %04x GetSet: %02x IsEnabled: %02x Type: %04x Form: %02x",
-            p->propCode, p->getSet, p->isEnabled, p->dataType, p->formFlag);
-
-        MLog("Default Value:");
-        PrintPropertyValue(p->dataType, &p->defaultValue);
-
-        MLog("Value:");
-        PrintPropertyValue(p->dataType, &p->value);
-
-        switch (p->formFlag) {
-            case PTP_FORM_FLAG_ENUM: {
-                    size_t numSetValues = MArraySize(p->form.enums.set);
-                    if (numSetValues > 0) {
-                        MLog("Set Values:");
-                        for (int j = 0; j < numSetValues; j++) {
-                            PrintPropertyValue(p->dataType, p->form.enums.set + j);
-                        }
-                    }
-                    size_t numGetSetValues = MArraySize(p->form.enums.getSet);
-                    if (numGetSetValues > 0) {
-                        MLog("Get/Set Values:");
-                        for (int j = 0; j < numGetSetValues; j++) {
-                            PrintPropertyValue(p->dataType, p->form.enums.getSet + j);
-                        }
-                    }
-                }
-                break;
-            case PTP_FORM_FLAG_RANGE:
-                MLog("Range Min:");
-                PrintPropertyValue(p->dataType, &p->form.range.min);
-                MLog("Range Max:");
-                PrintPropertyValue(p->dataType, &p->form.range.max);
-                MLog("Range Step Size:");
-                PrintPropertyValue(p->dataType, &p->form.range.step);
-                break;
-        }
-    }
-}
-
-void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t dataOutSize) {
-    if (dataInSize > self->dataInCapacity || self->dataInMem == NULL) {
-        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_IN,
-                                                          self->dataInMem, self->dataInCapacity,
-                                                          dataInSize);
-        self->dataInCapacity = dataInSize;
-        self->dataInMem = mem;
-    }
-
-    if (dataOutSize > self->dataOutCapacity || self->dataOutMem == NULL) {
-        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_OUT,
-                                                          self->dataOutMem, self->dataOutCapacity,
-                                                          dataOutSize);
-        self->dataOutCapacity = dataOutSize;
-        self->dataOutMem = mem;
-    }
-
-    self->dataInSize = dataInSize;
-    self->dataOutSize = dataOutSize;
-    memset(self->dataInMem, 0, dataInSize);
-    if (dataOutSize) {
-        memset(self->dataOutMem, 0, dataOutSize);
-    }
-}
-
-void PTPControl_FreeDataBuffers(PTPControl* self) {
-    self->device->transport.freeBuffer(self->device, PTP_BUFFER_IN, self->dataInMem, self->dataInCapacity);
-    self->dataInMem = NULL;
-    self->dataInCapacity = 0;
-    self->device->transport.freeBuffer(self->device, PTP_BUFFER_OUT, self->dataOutMem, self->dataOutCapacity);
-    self->dataOutMem = NULL;
-    self->dataOutCapacity = 0;
-}
-
-static PTPRequestHeader BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u16 opCode) {
-    u32 dataInSize = dataInExtra;
-    u32 dataOutSize = dataOutExtra;
-    PTPControl_InitDataBuffers(self, dataInSize, dataOutSize);
-    PTPRequestHeader r = {
-        .OpCode = opCode,
-        .NextPhase = PTP_NEXT_PHASE_READ_DATA,
-        .SessionId = self->sessionId,
-        .TransactionId = self->transactionId++
-    };
-    return r;
-}
-
-typedef struct {
-    PTPResult result;
-    PTPResponseHeader* dataOut;
-    MMemIO memIo;
-} PTPResponse;
-
-#define OK(a) ((a) == PTP_OK)
-#define RETURN_IF_FAIL(r) if ((r).result != PTP_OK || (r).memIo.mem == NULL) { return (r).result; }
-
-static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
-    size_t actualDataOutSize = 0;
-    PTPResult r = self->device->transport.sendAndRecvEx(self->device,
-        request, self->dataInMem, self->dataInSize,
-        &self->ptpResponse, self->dataOutMem, self->dataOutSize,
-        &actualDataOutSize);
-
-    PTPResponse response = {.result=r};
-    if (r != PTP_OK) {
-        return response;
-    }
-
-    response.dataOut = &self->ptpResponse;
-    response.result = response.dataOut->ResponseCode;
-    if (actualDataOutSize > sizeof(PTPResponseHeader)) {
-        MMemInitRead(&response.memIo, self->dataOutMem, actualDataOutSize);
-    } else {
-        response.memIo.mem = NULL;
-        response.memIo.size = 0;
-        response.memIo.capacity = 0;
-    }
-
-    return response;
-}
-
-static PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInExtra, size_t dataOutExtra, int numParams, ...) {
-    PTPRequestHeader req = BuildReq(self, dataInExtra, dataOutExtra, opCode);
-
-    va_list vargs;
-    va_start(vargs, numParams);
-    for (int i = 0; i < numParams; ++i) {
-        req.Params[i] = va_arg(vargs, int);
-    }
-    va_end(vargs);
-
-    req.NumParams = numParams;
-    return SendReq(self, &req);
-}
-
-static PTPResult OpenSession(PTPControl* self, u32 sessionId) {
-    PTPResponse r = DoRequest(self, PTP_OC_OpenSession, 0, 8, 1, sessionId);
-    RETURN_IF_FAIL(r);
-    return r.result;
-}
-
-static PTPResult CloseSession(PTPControl* self) {
-    PTPResponse r = DoRequest(self, PTP_OC_CloseSession, 0, 8, 0);
-    RETURN_IF_FAIL(r);
-    return r.result;
-}
-
-static PTPResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
-    PTPResponse r = DoRequest(self, PTP_OC_SDIO_Connect, 0, 8,
-                              3, phase, connectionId, connectionId);
-    RETURN_IF_FAIL(r);
-    return r.result;
-}
-
-static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
-    PTPResponse r = DoRequest(self, PTP_OC_GetDeviceInfo, 0, 0x1000, 0);
-    RETURN_IF_FAIL(r);
-
-    u16 standardVersion = 0;
-    MMemReadU16LE(&r.memIo, &standardVersion);
-    self->standardVersion = standardVersion;
-
-    u32 vendorExtensionId = 0;
-    MMemReadU32LE(&r.memIo, &vendorExtensionId);
-    self->vendorExtensionId = vendorExtensionId;
-
-    u16 vendorExtensionVersion = 0;
-    MMemReadU16LE(&r.memIo, &vendorExtensionVersion);
-    self->vendorExtensionVersion = vendorExtensionVersion;
-
-    ReadPtpString8(self->allocator, &r.memIo, &self->vendorExtension);
-
-    u16 functionalMode = 0;
-    MMemReadU16LE(&r.memIo, &functionalMode);
-
-    u32 operationsLen = 0;
-    MMemReadU32LE(&r.memIo, &operationsLen);
-    for (int i = 0; i < operationsLen; i++) {
-        u16 operation = 0;
-        MMemReadU16LE(&r.memIo, &operation);
-        MArrayAdd(self->allocator, self->supportedOperations, operation);
-    }
-
-    u32 eventsLen = 0;
-    MMemReadU32LE(&r.memIo, &eventsLen);
-    for (int i = 0; i < eventsLen; i++) {
-        u16 event = 0;
-        MMemReadU16LE(&r.memIo, &event);
-        MArrayAdd(self->allocator, self->supportedEvents, event);
-    }
-
-    u32 propertiesSupportedLen = 0;
-    MMemReadU32LE(&r.memIo, &propertiesSupportedLen);
-    for (int i = 0; i < propertiesSupportedLen; i++) {
-        u16 devicePropertyCode = 0;
-        MMemReadU16LE(&r.memIo, &devicePropertyCode);
-        MArrayAdd(self->allocator, self->supportedProperties, devicePropertyCode);
-    }
-
-    u32 captureFormatsLen = 0;
-    MMemReadU32LE(&r.memIo, &captureFormatsLen);
-    for (int i = 0; i < captureFormatsLen; i++) {
-        u16 captureFormat = 0;
-        MMemReadU16LE(&r.memIo, &captureFormat);
-        MArrayAdd(self->allocator, self->captureFormats, captureFormat);
-    }
-
-    u32 imageFormatsLen = 0;
-    MMemReadU32LE(&r.memIo, &imageFormatsLen);
-    for (int i = 0; i < imageFormatsLen; i++) {
-        u16 imageFormat = 0;
-        MMemReadU16LE(&r.memIo, &imageFormat);
-        MArrayAdd(self->allocator, self->imageFormats, imageFormat);
-    }
-
-    ReadPtpString8(self->allocator, &r.memIo, &self->manufacturer);
-    ReadPtpString8(self->allocator, &r.memIo, &self->model);
-    ReadPtpString8(self->allocator, &r.memIo, &self->deviceVersion);
-    ReadPtpString8(self->allocator, &r.memIo, &self->serialNumber);
-
-    return r.result;
-}
-
-static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
-    if (!incremental) {
-        MArrayInit(self->allocator, self->properties, 0);
-        MArrayInit(self->allocator, self->controls, 0);
-    }
-
-    for (int i = 0; i < numProperties; i++) {
-        u16 propCode = 0;
-        MMemReadU16LE(&r.memIo, &propCode);
-
-        if (PTPControl_SupportsControl(self, propCode)) {
-            // Handle control
-            PtpControl *control = NULL;
-            if (incremental) {
-                control = PTPControl_GetControl(self, propCode);
-            }
-            if (!control) {
-                control = MArrayAddPtr(self->allocator, self->controls);
-                memset(control, 0, sizeof(PtpControl));
-                control->controlCode = propCode;
-
-                size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
-                for (int j = 0; j < numControlsMeta; j++) {
-                    PtpControl* controlDesc = sPtpControlsMetadata + j;
-                    if (controlDesc->controlCode == propCode) {
-                        control->name = controlDesc->name;
-                        break;
-                    }
-                }
-            }
-
-            MMemReadU16LE(&r.memIo, &control->dataType);
-            u8 getSet = 0;
-            MMemReadU8(&r.memIo, &getSet);
-            u8 isEnabled = 0;
-            MMemReadU8(&r.memIo, &isEnabled);
-
-            PTPPropValue dummy;
-            ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
-            ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
-
-            MMemReadU8(&r.memIo, &control->formFlag);
-
-            if (control->formFlag == PTP_FORM_FLAG_ENUM) {
-                u16 numEnumSet = 0;
-                MMemReadU16LE(&r.memIo, &numEnumSet);
-                MArrayInit(self->allocator, control->form.enums.values, numEnumSet);
-                memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
-                for (int j = 0; j < numEnumSet; j++) {
-                    PTPPropValueEnum *value = MArrayAddPtr(self->allocator, control->form.enums.values);
-                    ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &value->propValue);
-                }
-                control->form.enums.size = numEnumSet;
-                control->form.enums.owned = TRUE;
-            } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
-                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.min);
-                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.max);
-                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.step);
-            }
-        } else {
-            // Handle property
-            PTPProperty *property = NULL;
-            if (incremental) {
-                property = PTPControl_GetProperty(self, propCode);
-            }
-            if (!property) {
-                property = MArrayAddPtr(self->allocator, self->properties);
-                memset(property, 0, sizeof(PTPProperty));
-                property->propCode = propCode;
-            }
-
-            MMemReadU16LE(&r.memIo, &property->dataType);
-            MMemReadU8(&r.memIo, &property->getSet);
-            MMemReadU8(&r.memIo, &property->isEnabled);
-
-            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->defaultValue);
-            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->value);
-
-            MMemReadU8(&r.memIo, &property->formFlag);
-
-            if (property->formFlag == PTP_FORM_FLAG_ENUM) {
-                u16 numEnumSet = 0;
-                MMemReadU16LE(&r.memIo, &numEnumSet);
-                MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
-                for (int j = 0; j < numEnumSet; j++) {
-                    PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
-                    ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
-                }
-            } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.min);
-                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.max);
-                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.step);
-            }
-
-            // On older pre-2020 cameras, some properties can only be adjusted up or down, mark them as such with
-            // 'isNotch', client code can change these properties with PTPControl_SetPropertyNotch()
-            switch (propCode) {
-                case DPC_F_NUMBER:
-                case DPC_EXPOSURE_COMPENSATION:
-                case DPC_FLASH_COMPENSATION:
-                case DPC_SHUTTER_SPEED:
-                case DPC_ISO:
-                    property->isNotch = TRUE;
-                    break;
-                default:
-                    property->isNotch = FALSE;
-                    break;
-            }
-        }
-    }
-}
-
-static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
-    if (!incremental) {
-        MArrayInit(self->allocator, self->properties, numProperties);
-        memset(self->properties, 0, numProperties * sizeof(PTPProperty));
-    }
-
-    for (int i = 0; i < numProperties; i++) {
-        u16 propCode = 0;
-        MMemReadU16LE(&r.memIo, &propCode);
-
-        PTPProperty *property = NULL;
-        if (incremental) {
-            property = PTPControl_GetProperty(self, propCode);
-        }
-        if (!property) {
-            property = MArrayAddPtr(self->allocator, self->properties);
-            property->propCode = propCode;
-        }
-
-        MMemReadU16LE(&r.memIo, &property->dataType);
-        MMemReadU8(&r.memIo, &property->getSet);
-        MMemReadU8(&r.memIo, &property->isEnabled);
-
-        ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->defaultValue);
-        ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->value);
-
-        MMemReadU8(&r.memIo, &property->formFlag);
-
-        if (property->formFlag == PTP_FORM_FLAG_ENUM) {
-            u16 numEnumSet = 0;
-            MMemReadU16LE(&r.memIo, &numEnumSet);
-            MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
-            for (int j = 0; j < numEnumSet; j++) {
-                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
-                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
-            }
-            u16 numEnumGetSet = 0;
-            MMemReadU16LE(&r.memIo, &numEnumGetSet);
-            MArrayInit(self->allocator, property->form.enums.getSet, numEnumGetSet);
-            for (int j = 0; j < numEnumGetSet; j++) {
-                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.getSet);
-                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
-            }
-        } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.min);
-            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.max);
-            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.step);
-        }
-    }
-}
-
-static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
-    PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
-    if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
-        req.Params[0] = incremental ? 0x1 : 0x0;
-        req.Params[1] = addExtended ? 0x1 : 0x0;
-        req.NumParams = 2;
-    } else {
-        req.NumParams = 0;
-    }
-
-    PTPResponse r = SendReq(self, &req);
-    RETURN_IF_FAIL(r);
-
-    u64 numProperties = 0;
-    MMemReadU64LE(&r.memIo, &numProperties);
-
-    if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
-        SDIO_ProcessDeviceProperties200(self, incremental, r, numProperties);
-    } else {
-        SDIO_ProcessDeviceProperties300(self, incremental, r, numProperties);
-    }
-
-    return r.result;
-}
-
-static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
-    size_t size = Ptp_PropValueSize(dataType, value);
-
-    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
-    req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
-    req.Params[0] = propCode;
-    req.NumParams = 1;
-
-    MMemIO memIo;
-    MMemInit(&memIo, self->allocator, self->dataInMem, size);
-    switch (dataType) {
-        case PTP_DT_UINT8:
-            MMemWriteU8(&memIo, value.u8);
-            break;
-        case PTP_DT_INT8:
-            MMemWriteI8(&memIo, value.i8);
-            break;
-        case PTP_DT_UINT16:
-            MMemWriteU16LE(&memIo, value.u16);
-            break;
-        case PTP_DT_INT16:
-            MMemWriteI16LE(&memIo, value.i16);
-            break;
-        case PTP_DT_UINT32:
-            MMemWriteU32LE(&memIo, value.u32);
-            break;
-        case PTP_DT_INT32:
-            MMemWriteI32LE(&memIo, value.i32);
-            break;
-        case PTP_DT_STR: {
-            u8 strSize = value.str.size;
-            MMemWriteU8(&memIo, strSize);
-            MMemWriteI8CopyN(&memIo, value.str.str, strSize);
-            break;
-        }
-    }
-
-    PTPResponse r = SendReq(self, &req);
-    return r.result;
-}
-
-static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
-    size_t size = Ptp_PropValueSize(dataType, value);
-
-    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
-    req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
-    req.Params[0] = propCode;
-    req.NumParams = 1;
-
-    MMemIO memIo;
-    MMemInit(&memIo, self->allocator, self->dataInMem, size);
-    switch (dataType) {
-        case PTP_DT_UINT8:
-            MMemWriteU8(&memIo, value.u8);
-            break;
-        case PTP_DT_INT8:
-            MMemWriteI8(&memIo, value.i8);
-            break;
-        case PTP_DT_UINT16:
-            MMemWriteU16LE(&memIo, value.u16);
-            break;
-        case PTP_DT_INT16:
-            MMemWriteI16LE(&memIo, value.i16);
-            break;
-        case PTP_DT_UINT32:
-            MMemWriteU32LE(&memIo, value.u32);
-            break;
-        case PTP_DT_INT32:
-            MMemWriteI32LE(&memIo, value.i32);
-            break;
-        case PTP_DT_STR: {
-            u8 strSize = value.str.size;
-            MMemWriteU8(&memIo, strSize);
-            MMemWriteI8CopyN(&memIo, value.str.str, strSize);
-            break;
-        }
-    }
-
-    PTPResponse r = SendReq(self, &req);
-    return r.result;
-}
-
-static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
-    PTPResponse r = DoRequest(self,
-                              PTP_OC_SDIO_GetDisplayStringList,
-                              0,
-                              0x1000,
-                              1,
-                              displayList);
-
-    RETURN_IF_FAIL(r);
-
-    u32 offset = 0;
-    MMemReadU32(&r.memIo, &offset);
-
-    u32 size = 0;
-    MMemReadU32(&r.memIo, &size);
-
-    // Skip to display lists
-    r.memIo.size += offset;
-
-    for (int i = 0; i < size; i++) {
-        u16 listTypeNum = 0;
-        MMemReadU16(&r.memIo, &listTypeNum);
-        r.memIo.size += 2;
-        for (int j = 0; j < listTypeNum; j++) {
-            u32 listType = 0;
-            MMemReadU32(&r.memIo, &listType);
-            u16 dataType = 0;
-            MMemReadU16(&r.memIo, &dataType);
-            u16 displayStringNum = 0;
-            MMemReadU16(&r.memIo, &displayStringNum);
-            MLogf("Display String List: %04x Data: %04x Num: %d", listType, dataType, displayStringNum);
-            for (int k = 0; k < displayStringNum; k++) {
-                PTPPropValue value;
-                ReadPropertyValue(self->allocator, &r.memIo, dataType, &value);
-                char* str = ReadPtpString16(self->allocator, &r.memIo);
-                MLogf(" -- %s", str);
-            }
-        }
-    }
-
-    return r.result;
-}
-
-static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
-    PTPResponse r = DoRequest(self,
-                              PTP_OC_SDIO_GetLensInformation,
-                              0,
-                              0x1000,
-                              1,
-                              focusUnits);
-
-    RETURN_IF_FAIL(r);
-
-    u32 offset = 0;
-    MMemReadU32(&r.memIo, &offset);
-
-    u32 size = 0;
-    MMemReadU32(&r.memIo, &size);
-
-    // Skip to display lists
-    r.memIo.size = offset;
-
-    u16 dataVersion = 0;
-    MMemReadU16(&r.memIo, &dataVersion);
-
-    u16 numTables = 0;
-    MMemReadU16(&r.memIo, &numTables);
-
-    for (int i = 0; i < numTables; i++) {
-        u16 listNums = 0;
-        MMemReadU16(&r.memIo, &listNums);
-        r.memIo.size += 2;
-        for (int j = 0; j < listNums; j++) {
-            u32 normalizedValue = 0;
-            MMemReadU32(&r.memIo, &normalizedValue);
-
-            u32 focusPosition = 0;
-            MMemReadU32(&r.memIo, &focusPosition);
-        }
-    }
-
-    return r.result;
-}
-
-static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
-    PTPResponse r = DoRequest(self,
-                              PTP_OC_SDIO_GetExtDeviceInfo,
-                              0,
-                              0x1000,
-                              2,
-                              protocolVersion,
-                              extended ? 1: 0);
-
-    RETURN_IF_FAIL(r);
-
-    u16 version = 0;
-    MMemReadU16LE(&r.memIo, &version);
-    self->protocolVersion = version;
-
-    u32 numProperties = 0;
-    MMemReadU32LE(&r.memIo, &numProperties);
-
-    for (int i = 0; i < numProperties; i++) {
-        u16 propCode = 0;
-        MMemReadU16LE(&r.memIo, &propCode);
-        MArrayAdd(self->allocator, self->supportedProperties, propCode);
-    }
-
-    u32 numControls = 0;
-    MMemReadU32LE(&r.memIo, &numControls);
-    for (int i = 0; i < numControls; i++) {
-        u16 controlCode = 0;
-        MMemReadU16LE(&r.memIo, &controlCode);
-        MArrayAdd(self->allocator, self->supportedControls, controlCode);
-    }
-
-    return r.result;
-}
-
-static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
-    PTPResponse r = DoRequest(self,
-                              PTP_OC_GetObjectInfo,
-                              0,
-                              0x1000,
-                              1,
-                              objectHandle);
-
-    RETURN_IF_FAIL(r);
-
-    MMemReadU32LE(&r.memIo, &objectInfo->storageID);
-    MMemReadU16LE(&r.memIo, &objectInfo->objectFormat);
-    MMemReadU16LE(&r.memIo, &objectInfo->protectionStatus);
-    MMemReadU32LE(&r.memIo, &objectInfo->objectCompressedSize);
-    MMemReadU16LE(&r.memIo, &objectInfo->thumbFormat);
-    MMemReadU32LE(&r.memIo, &objectInfo->thumbCompressedSize);
-    MMemReadU32LE(&r.memIo, &objectInfo->thumbPixWidth);
-    MMemReadU32LE(&r.memIo, &objectInfo->thumbPixHeight);
-    MMemReadU32LE(&r.memIo, &objectInfo->imagePixWidth);
-    MMemReadU32LE(&r.memIo, &objectInfo->imagePixHeight);
-    MMemReadU32LE(&r.memIo, &objectInfo->imagePixDepth);
-    MMemReadU32LE(&r.memIo, &objectInfo->parentObject);
-    MMemReadU16LE(&r.memIo, &objectInfo->associationType);
-    MMemReadU32LE(&r.memIo, &objectInfo->associationDesc);
-    MMemReadU32LE(&r.memIo, &objectInfo->sequenceNumber);
-
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->filename);
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->captureDateTime);
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->modDateTime);
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->keywords);
-
-    return r.result;
-}
-
-static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
-    fileOut->size = 0;
-
-    PTPResponse r = DoRequest(self,
-                              PTP_OC_GetObject,
-                              0,
-                              objectSize + 0x100,
-                              1,
-                              SD_OH_LIVE_VIEW_IMAGE);
-
-    RETURN_IF_FAIL(r);
-
-    b32 readFocalFrame = FALSE;
-    if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
-        readFocalFrame = TRUE;
-    }
-
-    u32 offsetImage = 0;
-    MMemReadU32LE(&r.memIo, &offsetImage);
-
-    u32 imageSize = 0;
-    MMemReadU32LE(&r.memIo, &imageSize);
-
-    if (readFocalFrame) {
-        u32 focalFrameOffset = 0;
-        MMemReadU32LE(&r.memIo, &focalFrameOffset);
-
-        u32 focalFrameSize = 0;
-        MMemReadU32LE(&r.memIo, &focalFrameSize);
-
-        if (focalFrameSize) {
-            r.memIo.size = focalFrameOffset;
-
-            MMemReadU16LE(&r.memIo, &liveViewFrames->version);
-            MMemReadSkipBytes(&r.memIo, 6 + 40);
-
-            u16 reservedArrayNum = 0;
-            MMemReadU16LE(&r.memIo, &reservedArrayNum);
-            MMemReadSkipBytes(&r.memIo, 6);
-            if (reservedArrayNum) {
-                MMemReadSkipBytes(&r.memIo, reservedArrayNum * 24);
-            }
-
-            FocusFrames* focusFrames = &liveViewFrames->focus;
-            MMemReadU32LE(&r.memIo, &focusFrames->xDenominator);
-            MMemReadU32LE(&r.memIo, &focusFrames->yDenominator);
-
-            u16 frameNum = 0;
-            MMemReadU16LE(&r.memIo, &frameNum);
-
-            MMemReadSkipBytes(&r.memIo, 6);
-
-            if (frameNum) {
-                MArrayInit(self->allocator, focusFrames->frames, frameNum);
-
-                for (int i = 0; i < frameNum; ++i) {
-                    FocusFrame* focusFrame = focusFrames->frames + i;
-                    MMemReadU16LE(&r.memIo, &focusFrame->frameType);
-                    MMemReadU16LE(&r.memIo, &focusFrame->focusFrameState);
-                    MMemReadU8(&r.memIo, &focusFrame->priority);
-                    MMemReadSkipBytes(&r.memIo, 3);
-                    MMemReadU32LE(&r.memIo, &focusFrame->width);
-                    MMemReadU32LE(&r.memIo, &focusFrame->height);
-                }
-            }
-
-            if (liveViewFrames->version > 101) {
-            }
-        }
-    }
-
-    fileOut->size = 0;
-    fileOut->allocator = self->allocator;
-    MMemWriteU8CopyN(fileOut, r.memIo.mem + offsetImage, imageSize);
-
-    return r.result;
-}
-
-PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
-    PTP_TRACE("PTP_GetObject");
-    fileOut->size = 0;
-    fileOut->allocator = self->allocator;
-
-    PTPResponse r = DoRequest(self,
-                              PTP_OC_GetObject,
-                              0,
-                              objectSize,
-                              1,
-                              objectHandle);
-
-    RETURN_IF_FAIL(r);
-
-    MMemReadCopy(&r.memIo, fileOut, r.memIo.capacity);
-
-    return r.result;
-}
-
-int PTPControl_GetPendingFiles(PTPControl* self) {
-    PTPProperty* property = PTPControl_GetProperty(self, DPC_PENDING_FILES);
-    if (property != NULL && property->dataType == PTP_DT_UINT16) {
-        u16 value = property->value.u16;
-        if (value & 0x8000) {
-            value = value & 0x7fff;
-        }
-        PTP_TRACE_F("PTPControl_GetPendingFiles -> %d", value);
-        return value;
-    }
-    return 0;
-}
-
-PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
-    PTP_TRACE("PTPControl_GetLiveViewImage");
-    PTPObjectInfo objectInfo = {};
-    PTPResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
-    if (r != PTP_OK) {
-        return r;
-    }
-    // Free strings - we dont use them
-    PTP_FreeObjectInfo(self->allocator, &objectInfo);
-    return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
-}
-
-PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
-    PTP_TRACE("PTPControl_GetCapturedImage");
-    PTPObjectInfo objectInfo = {};
-    PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
-    if (r != PTP_OK) {
-        return r;
-    }
-    if (objectInfo.objectCompressedSize == 0 || MStrIsEmpty(objectInfo.filename)) {
-        PTP_DEBUG_F("No image to download (size was %d, filename was %.*s)", objectInfo.objectCompressedSize,
-            objectInfo.filename.size, objectInfo.filename.str);
-        ciiOut->size = 0;
-        MStrZero(&ciiOut->filename);
-        return r;
-    }
-    PTP_DEBUG_F("Downloading image... (%.*s format: %s size: %d)", objectInfo.filename.size, objectInfo.filename.str,
-        PTP_GetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
-    ciiOut->filename = objectInfo.filename;
-    ciiOut->objectFormat = objectInfo.objectFormat;
-    ciiOut->size = objectInfo.objectCompressedSize;
-    MStrZero(&objectInfo.filename); // ownership has passed to ciiOut
-    PTP_FreeObjectInfo(self->allocator, &objectInfo); // Free any other strings
-    r = PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
-    PTP_DEBUG_F("Downloaded image size: %d", fileOut->size);
-    return r;
-}
-
-PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
-    PTP_TRACE("PTPControl_GetCameraSettingsFile");
-    PTPObjectInfo objectInfo = {};
-    PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
-    if (r != PTP_OK) {
-        return r;
-    }
-    PTP_FreeObjectInfo(self->allocator, &objectInfo);
-    return PTP_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
-}
-
-PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
-    PTPRequestHeader req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
-    req.Params[0] = objectHandle;
-    req.NumParams = 1;
-    req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
-
-    MMemIO memIo;
-    MMemInit(&memIo, self->allocator, self->dataInMem, fileIn->size);
-    MMemReadCopy(fileIn, &memIo, fileIn->size);
-
-    PTPResponse r = SendReq(self, &req);
-    return r.result;
-}
-
-PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
-    PTP_TRACE("PTPControl_PutCameraSettingsFile");
-    return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
-}
-
-PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator) {
-    if (!self || !device) {
-        return PTP_GENERAL_ERROR;
-    }
-
-    self->device = device;
-    self->device->transport.allocator = allocator;
-    self->logger = device->logger;
-    self->allocator = allocator;
-    return PTP_OK;
-}
-
-static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
-    for (int i = 0; i < numControls; i++) {
-        u16 controlCode = self->supportedControls[i];
-        PtpControl* control = PTPControl_GetControl(self, controlCode);
-        if (!control) {
-            control = MArrayAddPtr(self->allocator, self->controls);
-
-            b32 found = FALSE;
-            size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
-            for (int j = 0; j < numControlsMeta; j++) {
-                PtpControl *meta = sPtpControlsMetadata + j;
-                if (meta->controlCode == controlCode) {
-                    memcpy(control, meta, sizeof(PtpControl));
-                    found = TRUE;
-                    break;
-                }
-            }
-            if (!found) {
-                memset(control, 0, sizeof(PtpControl));
-                control->controlCode = controlCode;
-            }
-        }
-    }
-}
-
-static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
-    MArrayInit(self->allocator, self->controls, numControls);
-    for (int i = 0; i < numControls; i++) {
-        u16 controlCode = self->supportedControls[i];
-
-        PtpControl* control = MArrayAddPtr(self->allocator, self->controls);
-        b32 found = FALSE;
-        size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
-        for (int j = 0; j < numControlsMeta; j++) {
-            PtpControl* meta = sPtpControlsMetadata + j;
-            if (meta->controlCode == controlCode) {
-                memcpy(control, meta, sizeof(PtpControl));
-                found = TRUE;
-                break;
-            }
-        }
-        if (!found) {
-            memset(control, 0, sizeof(PtpControl));
-            control->controlCode = controlCode;
-        }
-    }
-}
-
-PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
-    PTP_TRACE_F("PTPControl_Connect 0x04%x", version);
-    PTPResult r;
-
-    ////////////////////////////////////////////
-    // Open Session (if not done by transport layer implicitly)
-    ////////////////////////////////////////////
-    if (self->device->transport.requiresSessionOpenClose) {
-        self->sessionId = 0;
-        self->transactionId = 0;
-        u32 sessionId = 0x1;
-        r = OpenSession(self, sessionId);
-        if (r != PTP_OK) {
-            return r;
-        }
-        self->sessionId = sessionId;
-    }
-
-    ////////////////////////////////////////////
-    // Authentication begin
-    ////////////////////////////////////////////
-    u32 connectionId = 0;
-
-    // 1. Authentication Packet 1
-    r = SDIO_Connect(self, 1, connectionId);
-    if (r != PTP_OK) {
-        return r;
-    }
-
-    // 2. Authentication Packet 2
-    r = SDIO_Connect(self, 2, connectionId);
-    if (r != PTP_OK) {
-        return r;
-    }
-
-    // 3. Authentication - Request available properties and controls
-    int retries = 10;
-    b32 gotExtDeviceInfo = FALSE;
-    for (int i = 0; i < retries; ++i) {
-        if (OK(SDIO_GetExtDeviceInfo(self, version, TRUE))) {
-            gotExtDeviceInfo = TRUE;
-            break;
-        }
-    }
-    if (!gotExtDeviceInfo) {
-        return PTP_GENERAL_ERROR;
-    }
-
-    // 4. Authentication Phase 3
-    r = SDIO_Connect(self, 3, connectionId);
-    if (r != PTP_OK) {
-        return r;
-    }
-
-    ////////////////////////////////////////////
-    // Authentication done
-    ////////////////////////////////////////////
-
-    // Get general device info
-    r = PTP_GetDeviceInfo(self);
-    if (r != PTP_OK) {
-        return r;
-    }
-
-    // Get property metadata & values
-    r = SDIO_GetAllExtDevicePropInfo(self, FALSE, TRUE);
-    if (r != PTP_OK) {
-        return r;
-    }
-
-    // SDIO_GetDisplayStringList(self, PTP_DL_ALL);
-
-    // SDIO_GetLensInformation(self, PTP_FOCUS_UNIT_FEET);
-
-    // Build controls list
-    size_t numControls = MArraySize(self->supportedControls);
-    PTP_INFO_F("Connected to device (protocol: %d)", self->protocolVersion);
-    if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
-        SDIO_InitControlsMetadata200(self, numControls);
-    } else {
-        SDIO_InitControlsMetadata300(self, numControls);
-    }
-
-    return PTP_OK;
-}
-
-PTPResult PTPControl_Cleanup(PTPControl* self) {
-    PTP_TRACE("PTPControl_Cleanup");
-
-    ////////////////////////////////////////////
-    // Close session (if not done by transport layer implicitly)
-    ////////////////////////////////////////////
-    if (self->device->transport.requiresSessionOpenClose) {
-        CloseSession(self);
-        self->sessionId = 0;
-        self->transactionId = 0;
-    }
-
-    PTPControl_FreeDataBuffers(self);
-
-    self->protocolVersion = 0;
-    self->standardVersion = 0;
-
-    MArrayFree(self->allocator, self->supportedProperties);
-    MArrayFree(self->allocator, self->supportedControls);
-    MArrayFree(self->allocator, self->supportedEvents);
-    MArrayFree(self->allocator, self->supportedOperations);
-    MArrayFree(self->allocator, self->captureFormats);
-    MArrayFree(self->allocator, self->imageFormats);
-    for (int i = 0; i < MArraySize(self->properties); ++i) {
-        PTPProperty* property = self->properties + i;
-        PropValueFree(self->allocator, property->dataType, &property->value);
-        PropValueFree(self->allocator, property->dataType, &property->defaultValue);
-        if (property->formFlag == PTP_FORM_FLAG_ENUM) {
-            MArrayFree(self->allocator, property->form.enums.set);
-            MArrayFree(self->allocator, property->form.enums.getSet);
-        } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-            PropValueFree(self->allocator, property->dataType, &property->form.range.min);
-            PropValueFree(self->allocator, property->dataType, &property->form.range.max);
-            PropValueFree(self->allocator, property->dataType, &property->form.range.step);
-        }
-    }
-    MArrayFree(self->allocator, self->properties);
-
-    for (int i = 0; i < MArraySize(self->controls); ++i) {
-        PtpControl* control = self->controls + i;
-        if (control->formFlag == PTP_FORM_FLAG_ENUM) {
-            if (control->form.enums.owned) {
-                MArrayFree(self->allocator, control->form.enums.values);
-            }
-        }
-    }
-    MArrayFree(self->allocator, self->controls);
-
-    MStrFree(self->allocator, self->manufacturer);
-    MStrFree(self->allocator, self->model);
-    MStrFree(self->allocator, self->deviceVersion);
-    MStrFree(self->allocator, self->serialNumber);
-    MStrFree(self->allocator, self->vendorExtension);
-
-    return PTP_OK;
-}
-
-b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode) {
-    for (int i = 0; i < MArraySize(self->supportedEvents); ++i) {
-        if (self->supportedEvents[i] == eventCode) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode) {
-    for (int i = 0; i < MArraySize(self->supportedControls); ++i) {
-        if (self->supportedControls[i] == controlCode) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-b32 PTPControl_SupportsProperty(PTPControl* self, u16 propertyCode) {
-    for (int i = 0; i < MArraySize(self->supportedProperties); ++i) {
-        if (self->supportedProperties[i] == propertyCode) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-b32 PTPControl_PropertyEnabled(PTPControl* self, u16 propertyCode) {
-    PTPProperty* prop = PTPControl_GetProperty(self, propertyCode);
-    if (!prop) {
-        return FALSE;
-    }
-    if (prop->dataType == PTP_DT_UINT8) {
-        return prop->value.u8 == SD_Enabled;
-    }
-    return FALSE;
-}
-
-PTPProperty* PTPControl_GetProperty(PTPControl* self, u16 propertyCode) {
-    for (int i = 0; i < MArraySize(self->properties); ++i) {
-        if (self->properties[i].propCode == propertyCode) {
-            return self->properties + i;
-        }
-    }
-    return NULL;
-}
-
-size_t PTPControl_NumProperties(PTPControl* self) {
-    return MArraySize(self->properties);
-}
-
-PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index) {
-    return self->properties + index;
-}
-
-PTPResult PTPControl_UpdateProperties(PTPControl* self) {
-    PTP_TRACE("PTPControl_UpdateProperties");
-    return SDIO_GetAllExtDevicePropInfo(self, TRUE, TRUE);
-}
 
 typedef struct {
     u8 value;
@@ -2233,164 +22,38 @@ typedef struct {
     char* str;
 } EnumValueU32;
 
-static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8 lookupValue) {
-    for (int j = 0; j < numEnumValues; j++) {
-        u8 enumValue = enumValues[j].value;
-        if (lookupValue == enumValue) {
-            return enumValues[j].str;
-        }
-    }
-    return NULL;
-}
+typedef union uFixedEnums {
+    EnumValueU8* u8;
+    EnumValueU16* u16;
+    EnumValueU32* u32;
+} FixedEnums;
+
+typedef b32 (*PTP_PropBuildEnumsFunc_t)(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValueEnums* outEnums);
+typedef MStr (*PTP_PropValueAsStringFunc_t)(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue value);
+
+typedef struct {
+    u16 code;
+    char* label;
+} PtpPropNames;
+
+typedef struct PTPPropertyMetadata {
+    char *id;
+    u16 propCode;
+    u16 type;
+
+    FixedEnums fixedEnums;
+    u32 fixedEnumsSize;
+
+    PTP_PropBuildEnumsFunc_t buildEnumsFunc;
+    PTP_PropValueAsStringFunc_t valueAsStringFunc;
+
+    char *desc; // TODO: Add descriptions
+} PTPPropertyMetadata;
 
 MINLINE void MStrSetStaticCStr(MStr* str, const char* cstr) {
     str->str = (char*)cstr;
     str->size = MCStrLen(cstr);
     str->capacity = 0;
-}
-
-static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProperty* property, EnumValueU8* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        u8 lookupValue = property->form.enums.getSet[i].u8;
-        char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-        propEnum->propValue.u8 = lookupValue;
-        MStrSetStaticCStr(&propEnum->str, str);
-    }
-
-    if (MArraySize(property->form.enums.set)) {
-        size_t getSetItems = MArraySize(outEnums->values);
-        for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
-        }
-        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            u8 lookupValue = property->form.enums.set[i].u8;
-            PTPPropValueEnum* prop = NULL;
-            for (int j = 0; j < getSetItems; j++) {
-                u8 enumValue = outEnums->values[j].propValue.u8;
-                if (lookupValue == enumValue) {
-                    prop = outEnums->values + j;
-                    break;
-                }
-            }
-            if (prop) {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-            } else {
-                char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-                propEnum->propValue.u8 = lookupValue;
-                MStrSetStaticCStr(&propEnum->str, str);
-            }
-        }
-    }
-
-    return TRUE;
-}
-
-static char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, u16 lookupValue) {
-    for (int j = 0; j < numEnumValues; j++) {
-        u16 enumValue = enumValues[j].value;
-        if (lookupValue == enumValue) {
-            return enumValues[j].str;
-        }
-    }
-    return NULL;
-}
-
-static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPProperty* property, EnumValueU16* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        u16 lookupValue = property->form.enums.getSet[i].u16;
-        char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-        propEnum->propValue.u16 = lookupValue;
-        MStrSetStaticCStr(&propEnum->str, str);
-    }
-
-    if (MArraySize(property->form.enums.set)) {
-        size_t getSetItems = MArraySize(outEnums->values);
-        for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
-        }
-        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            u16 lookupValue = property->form.enums.set[i].u16;
-            PTPPropValueEnum* prop = NULL;
-            for (int j = 0; j < getSetItems; j++) {
-                u16 enumValue = outEnums->values[j].propValue.u16;
-                if (lookupValue == enumValue) {
-                    prop = outEnums->values + j;
-                    break;
-                }
-            }
-            if (prop) {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-            } else {
-                char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-                propEnum->propValue.u16 = lookupValue;
-                MStrSetStaticCStr(&propEnum->str, str);
-            }
-        }
-    }
-
-    return TRUE;
-}
-
-static char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, u32 lookupValue) {
-    for (int j = 0; j < numEnumValues; j++) {
-        u32 enumValue = enumValues[j].value;
-        if (lookupValue == enumValue) {
-            return enumValues[j].str;
-        }
-    }
-    return NULL;
-}
-
-static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPProperty* property,
-                                 EnumValueU32* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        u32 lookupValue = property->form.enums.getSet[i].u32;
-        char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-        propEnum->propValue.u32 = lookupValue;
-        MStrSetStaticCStr(&propEnum->str, str);
-    }
-
-    if (MArraySize(property->form.enums.set)) {
-        size_t getSetItems = MArraySize(outEnums->values);
-        for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
-        }
-        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            u32 lookupValue = property->form.enums.set[i].u32;
-            PTPPropValueEnum* prop = NULL;
-            for (int j = 0; j < getSetItems; j++) {
-                u32 enumValue = outEnums->values[j].propValue.u32;
-                if (lookupValue == enumValue) {
-                    prop = outEnums->values + j;
-                    break;
-                }
-            }
-            if (prop) {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-            } else {
-                char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
-                propEnum->propValue.u32 = lookupValue;
-                MStrSetStaticCStr(&propEnum->str, str);
-            }
-        }
-    }
-
-    return TRUE;
 }
 
 static MStr GetFNumberAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
@@ -3956,29 +1619,6 @@ static MStr GetFocusSpotPos(PTPControl* self, MAllocator* allocator, PTPProperty
     return r;
 }
 
-typedef union uFixedEnums {
-    EnumValueU8* u8;
-    EnumValueU16* u16;
-    EnumValueU32* u32;
-} FixedEnums;
-
-typedef b32 (*PTP_PropBuildEnumsFunc_t)(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValueEnums* outEnums);
-typedef MStr (*PTP_PropValueAsStringFunc_t)(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue value);
-
-typedef struct {
-    char* name;
-    u16 propCode;
-    u16 type;
-
-    FixedEnums fixedEnums;
-    u32 fixedEnumsSize;
-
-    PTP_PropBuildEnumsFunc_t buildEnumsFunc;
-    PTP_PropValueAsStringFunc_t valueAsStringFunc;
-
-    char* desc; // TODO: Add descriptions
-} PropertyMetadata;
-
 #define META_ENUM_U8(n, c, e) {n, c, PTP_DT_UINT8, .fixedEnums.u8=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_I16(n, c, e) {n, c, PTP_DT_IINT16, .fixedEnums.i16=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_U16(n, c, e) {n, c, PTP_DT_UINT16, .fixedEnums.u16=(e), .fixedEnumsSize=MStaticArraySize(e)}
@@ -3990,7 +1630,7 @@ typedef struct {
 #define META_FUNC_I32(n, c, f, g) {n, c, PTP_DT_INT32, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
 #define META_FUNC_U32(n, c, f, g) {n, c, PTP_DT_UINT32, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
 
-static PropertyMetadata sPropertyMetadata[] = {
+static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("image-file-format", DPC_COMPRESSION_SETTING, sProp_CompressionSetting),
     META_ENUM_U8 ("image-file-format", DPC_IMAGE_FILE_FORMAT, sProp_ImageFileFormat),
     META_ENUM_U8 ("raw-file-type", DPC_RAW_FILE_TYPE, sProp_RawFileType),
@@ -4107,7 +1747,2399 @@ static PropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("camera-settings-read-enabled", DPC_CAMERA_SETTING_READ_ENABLED, sProp_EnabledDisabled),
 };
 
-b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* property, PropertyMetadata* meta, PTPPropValueEnums* outEnums) {
+static PtpPropNames sPtpPropertyLabels[] = {
+    {DPC_COMPRESSION_SETTING, "Compression Setting"},
+    {DPC_WHITE_BALANCE, "White Balance"},
+    {DPC_F_NUMBER, "F-Number"},
+    {DPC_FOCUS_MODE, "Focus Mode"},
+    {DPC_EXPOSURE_METERING_MODE, "Exposure Metering Mode"},
+    {DPC_FLASH_MODE, "Flash Mode"},
+    {DPC_EXPOSURE_PROGRAM_MODE, "Exposure Program Mode"},
+    {DPC_EXPOSURE_COMPENSATION, "Exposure Bias Compensation"},
+    {DPC_CAPTURE_MODE, "Capture Mode"},
+    {0xD000, "T-Number"},
+    {DPC_IRIS_MODE, "Iris Mode"},
+    {DPC_IRIS_DISPLAY_UNIT, "Iris Display Unit"},
+    {DPC_FOCAL_DISTANCE_METER, "Focal Distance (Meters)"},
+    {DPC_FOCAL_DISTANCE_FEET, "Focal Distance (Feet)"},
+    {DPC_FOCAL_DISTANCE_UNIT, "Focal Distance Unit Setting"},
+    {DPC_FOCUS_MODE_SETTING, "Focus Mode Setting"},
+    {DPC_FOCUS_SPEED_RANGE, "Focus Speed Range"},
+    {DPC_DIGITAL_ZOOM_SCALE, "Digital Zoom Scale"},
+    {DPC_ZOOM_DISTANCE, "Zoom Distance"},
+    {DPC_WHITE_BALANCE_MODE, "White Balance Mode Setting"},
+    {0xD00D, "White Balance Tint"},
+    {0xD00E, "Shutter Angle"},
+    {DPC_SHUTTER_SETTING, "Shutter Setting"},
+    {DPC_SHUTTER_MODE, "Shutter Mode"},
+    {DPC_SHUTTER_MODE_STATUS, "Shutter Mode Status"},
+    {DPC_SHUTTER_MODE_SETTING, "Shutter Mode Setting"},
+    {DPC_SHUTTER_SLOW, "Shutter Slow"},
+    {DPC_SHUTTER_SLOW_FRAMES, "Shutter Slow Frames"},
+    {DPC_SHUTTER_SPEED_VALUE, "Shutter Speed Value"},
+    {DPC_SHUTTER_SPEED_CURRENT, "Shutter Speed Current Value"},
+    {DPC_ND_FILTER, "ND Filter"},
+    {DPC_ND_FILTER_MODE, "ND Filter Mode"},
+    {DPC_ND_FILTER_MODE_SETTING, "ND Filter Mode Setting"},
+    {DPC_ND_FILTER_VALUE, "ND Filter Value"},
+    {DPC_GAIN_CONTROL, "Gain Control Setting"},
+    {DPC_GAIN_UNIT, "Gain Unit Setting"},
+    {DPC_GAIN_DB_VALUE, "Gain dB Value"},
+    {0xD01F, "Gain dB Current Value"},
+    {0xD020, "Gain Base ISO Sensitivity"},
+    {0xD021, "Gain Base Sensitivity"},
+    {DPC_EXPOSURE_INDEX, "Exposure Index"},
+    {DPC_ISO_CURRENT, "ISO Current"},
+    {0xD024, "Movie Recording Resolution"},
+    {0xD025, "Movie Recording Resolution Proxy"},
+    {DPC_MOVIE_FILE_FORMAT_PROXY, "Movie File Format Proxy"},
+    {0xD028, "Movie Frame Rate Proxy"},
+    {0xD029, "Zoom Distance Unit Setting"},
+    {0xD02E, "Select FTP ServerID"},
+    {0xD02F, "Movie Playing State"},
+    {0xD030, "Movie Playing Speed"},
+    {0xD031, "Media Slot 1 ProfileUrl"},
+    {0xD032, "Media Slot 2 ProfileUrl"},
+    {0xD035, "Media Slot 1 Player"},
+    {0xD036, "Media Slot 2 Player"},
+    {0xD037, "Battery Remain Display Unit"},
+    {0xD038, "Battery Remaining in Minutes"},
+    {0xD039, "Battery Remaining in Voltage"},
+    {0xD03A, "Power Source"},
+    {0xD03B, "AWB"},
+    {0xD03C, "BaseLook Value"},
+    {0xD03E, "DC Voltage"},
+    {0xD040, "Software Version"},
+    {0xD041, "FTP Function"},
+    {0xD02A, "Sync ID for FTP Job List"},
+    {DPC_PLAYBACK_MEDIA, "Playback Media"},
+    {0xD043, "Settings Reset Enabled"},
+    {0xD044, "Monitor DISP (Screen Display) Mode Candidates"},
+    {0xD045, "Monitor DISP (Screen Display) Mode Setting"},
+    {0xD046, "Monitor DISP (Screen Display) Mode"},
+    {DPC_TOUCH_OPERATION, "Touch Operation"},
+    {0xD048, "Select Finder/Monitor"},
+    {0xD049, "Auto Power OFF Temperature"},
+    {0xD04A, "Body Key Lock"},
+    {0xD04B, "Image ID (Numerical Value)"},
+    {0xD04C, "Image ID (String)"},
+    {0xD04D, "Monitor LUT Setting (All Line)"},
+    {0xD04E, "Auto FTP Transfer"},
+    {0xD04F, "Auto FTP Transfer Target"},
+    {0xD052, "S&Q Frame Rate"},
+    {0xD055, "Interval REC (Movie) Time"},
+    {0xD057, "Upload Dataset Version"},
+    {0xD059, "BaseLookImport Command Version"},
+    {0xD060, "Subject Recognition AF"},
+    {0xD061, "AF Transition Speed"},
+    {0xD062, "AF Subj Shift Sens"},
+    {0xD073, "ND Filter Switching Setting"},
+    {0xD079, "Monitoring Output Display HDMI"},
+    {0xD07B, "Lens Model Name"},
+    {0xD07D, "Lens Version Number"},
+    {0xD08B, "BaseLookImport Operation Enabled"},
+    {0xD092, "Image ID (Numerical Value) Setting"},
+    {0xD099, "Exposure Ctrl Type"},
+    {0xD09A, "FTPSettingList Operation Enabled"},
+    {0xD0AB, "Focus Bracket Shooting Status"},
+    {0xD0BC, "Camera Operating Mode"},
+    {0xD0BD, "Playback View Mode"},
+    {0xD0C5, "Type-C Accessory Mode"},
+    {0xD0C6, "Pixel Mapping Enabled"},
+    {0xD0C7, "Delete UserBaseLook"},
+    {0xD0C8, "Select UserBaseLook to Edit"},
+    {0xD0C9, "UserBaseLook Input"},
+    {0xD0CA, "UserBaseLook AE Level Offset"},
+    {0xD0CB, "Base ISO Switch EI"},
+    {0xD0CC, "Select BaseLook to Set in PPLUT"},
+    {0xD0CD, "E-framing Scale (Auto)"},
+    {0xD0CE, "E-framing Speed (Auto)"},
+    {0xD0CF, "Camera E-framing"},
+    {0xD0D0, "S&Q Rec Frame Rate"},
+    {0xD0D1, "S&Q Record Setting"},
+    {0xD0D2, "Audio Recording"},
+    {0xD0D3, "Time Code Preset"},
+    {0xD0D4, "User Bit Preset"},
+    {DPC_TIME_CODE_FORMAT, "Time Code Format"},
+    {0xD0D6, "Time Code Run"},
+    {0xD0D7, "Time Code Make"},
+    {0xD0D8, "User Bit Time Rec"},
+    {0xD0D9, "Image Stabilization Steady Shot"},
+    {0xD0DA, "Movie Stabilization Steady Shot"},
+    {DPC_SILENT_MODE, "Silent Mode"},
+    {DPC_SILENT_MODE_APERTURE_DRIVE_AF, "Aperture Drive AF"},
+    {DPC_SILENT_MODE_POWER_OFF, "Silent Mode Shutter Power Off"},
+    {DPC_SILENT_MODE_AUTO_PIXEL_MAPPING, "Silent Mode Auto Pixel Mapping"},
+    {DPC_SHUTTER_TYPE, "Shutter Type"},
+    {0xD0E0, "Picture Profile BlackLevel"},
+    {0xD0E1, "Picture Profile Gamma"},
+    {0xD0E2, "Picture Profile BlackGamma Range"},
+    {0xD0E3, "Picture Profile BlackGamma Level"},
+    {0xD0E4, "Picture Profile Knee Mode"},
+    {0xD0E5, "Picture Profile Knee AutoSet MaxPoint"},
+    {0xD0E6, "Picture Profile Knee AutoSet Sensitivity"},
+    {0xD0E7, "Picture Profile Knee ManualSet Point"},
+    {0xD0E8, "Picture Profile Knee ManualSet Slope"},
+    {0xD0E9, "Picture Profile Color Mode"},
+    {0xD0EA, "Picture Profile Saturation"},
+    {0xD0EB, "Picture Profile ColorPhase"},
+    {0xD0EC, "Picture Profile Color Depth Red"},
+    {0xD0ED, "Picture Profile Color Depth Green"},
+    {0xD0EE, "Picture Profile Color Depth Blue"},
+    {0xD0EF, "Picture Profile Color Depth Cyan"},
+    {0xD0F0, "Picture Profile Color Depth Magenta"},
+    {0xD0F1, "Picture Profile Color Depth Yellow"},
+    {0xD0F2, "Picture Profile Detail Level"},
+    {0xD0F3, "Picture Profile Detail Adjust Mode"},
+    {0xD0F4, "Picture Profile Detail Adjust V/H Balance"},
+    {0xD0F5, "Picture Profile Detail Adjust B/W Balance"},
+    {0xD0F6, "Picture Profile Detail Adjust Limit"},
+    {0xD0F7, "Picture Profile Detail Adjust Crispening"},
+    {0xD0F8, "Picture Profile Detail Adjust Highlight Detail"},
+    {0xD0F9, "Copy Picture Profile"},
+    {DPC_CREATIVE_LOOK, "Creative Look"},
+    {0xD0FB, "Creative Look Contrast"},
+    {0xD0FC, "Creative Look Highlights"},
+    {0xD0FD, "Creative Look Shadows"},
+    {0xD0FE, "Creative Look Fade"},
+    {0xD0FF, "Creative Look Saturation"},
+    {0xD100, "Creative Look Sharpness"},
+    {0xD101, "Creative Look Sharpness Range"},
+    {0xD102, "Creative Look Clarity"},
+    {0xD103, "Custom Look Image Style"},
+    {0xD104, "Time Code Preset Reset Enabled"},
+    {0xD105, "User Bit Preset Reset Enabled"},
+    {0xD106, "Sensor Cleaning Enabled"},
+    {0xD107, "Reset Picture Profile Enabled"},
+    {0xD108, "Reset Creative Look Enabled"},
+    {0xD109, "Proxy Record Setting"},
+    {0xD11F, "Interval REC (Movie) Count Down Interval Time"},
+    {0xD120, "Recording Duration"},
+    {0xD124, "E-framing Mode (Auto)"},
+    {0xD133, "Flicker Less Shooting"},
+    {0xD15B, "Long Exposure NR"},
+    {0xD15C, "High ISO NR"},
+    {0xD15D, "HLG Image"},
+    {0xD15E, "Color Space Image"},
+    {0xD166, "Bracket order"},
+    {0xD167, "Focus Bracket order"},
+    {0xD168, "Focus Bracket Exposure Lock 1st Img"},
+    {0xD169, "Focus Bracket Interval Until Next Shot"},
+    {0xD16A, "Interval REC Shooting Start Time"},
+    {0xD16B, "Interval REC Shooting Interval"},
+    {0xD16C, "Interval REC Number of Shots"},
+    {0xD16D, "Interval REC AE Tracking Sensitivity"},
+    {0xD16E, "Interval REC Shutter Type"},
+    {0xD16F, "Interval REC Shoot Interval Priority"},
+    {0xD171, "Wind Noise Reduction"},
+    {0xD173, "Auto Slow Shutter"},
+    {0xD14D, "ISO Auto Min Shutter Speed Mode"},
+    {0xD176, "ISO Auto Min Shutter Speed Manual"},
+    {0xD177, "ISO Auto Min Shutter Speed Preset"},
+    {0xD178, "Soft Skin Effect"},
+    {0xD179, "Priority Set in AF-S"},
+    {0xD17A, "Priority Set in AF-C"},
+    {0xD17B, "Focus Magnification Time"},
+    {0xD17C, "Playback Volume Settings"},
+    {0xD17D, "Auto Review"},
+    {0xD17E, "Audio Signals"},
+    {0xD17F, "HDMI Resolution (Still/Play)"},
+    {0xD180, "HDMI Output Rec Media (Movie)"},
+    {0xD181, "HDMI Output Resolution (Movie)"},
+    {0xD182, "HDMI Output 4K Set (Movie)"},
+    {0xD183, "HDMI Output RAW (Movie)"},
+    {0xD184, "HDMI Output Raw Setting (Movie)"},
+    {0xD186, "HDMI Output Time Code (Movie)"},
+    {0xD187, "HDMI Output REC Control (Movie)"},
+    {0xD18E, "Media Slot 3 Status"},
+    {0xD18F, "Media Slot 3 Remaining Shoot Time"},
+    {0xD190, "Media Slot 3 Rec Available Type"},
+    {0xD191, "Media Slot 3 ProfileUrl"},
+    {0xD192, "Image Stabilization Steady Shot Adjust"},
+    {0xD193, "Image Stabilization Steady Shot Focal Length"},
+    {0xD199, "Auto FTP Transfer Target (Movie)"},
+    {0xD19A, "FTP Transfer Target"},
+    {0xD14B, "FTP Transfer Target (Proxy)"},
+    {0xD14C, "FTP Power Save"},
+    {0xD14E, "ND Filter Unit Setting"},
+    {0xD14F, "ND Filter Optical Density Value"},
+    {0xD150, "USB Power Supply"},
+    {0xD151, "Interval REC (Movie) Frame Rate"},
+    {0xD152, "Interval REC (Movie) Record Setting"},
+    {0xD153, "E-framing Recording Image Crop"},
+    {0xD154, "E-framing HDMI Crop"},
+    {0xD157, "Subject Recognition in AF"},
+    {0xD158, "Recognition Target"},
+    {0xD159, "Right/Left Eye Select"},
+    {0xD15F, "Recording Media - Image"},
+    {0xD160, "Recording Media - Movie"},
+    {0xD161, "Auto Switch Media"},
+    {0xD194, "Camera Shake Status"},
+    {0xD195, "Update Body Status"},
+    {0xD197, "Media Slot 1 Writing State"},
+    {0xD198, "Media Slot 2 Writing State"},
+    {0xD19C, "Focus Driving Status (Absolute)"},
+    {0xD19D, "Zoom Driving Status (Absolute)"},
+    {0xD1B6, "ISO Auto Range Limit (min)"},
+    {0xD1B7, "ISO Auto Range Limit (max)"},
+    {DPC_FLASH_COMPENSATION, "Flash Compensation"},
+    {DPC_DRO_HDR_MODE, "Dynamic Range Optimizer"},
+    {DPC_IMAGE_SIZE, "Image Size"},
+    {DPC_SHUTTER_SPEED, "Shutter Speed"},
+    {DPC_BATTERY_LEVEL, "Battery Level Indicator"},
+    {DPC_COLOR_TEMPERATURE, "Color Temperature"},
+    {DPC_WHITE_BALANCE_GM, "White Balance - Fine-Tune G-M"},
+    {DPC_ASPECT_RATIO, "Aspect Ratio"},
+    {DPC_AUTO_FOCUS_STATUS, "Focus Indication"},
+    {DPC_PREDICTED_MAX_FILE_SIZE, "Predicted Maximum File Size"},
+    {DPC_PENDING_FILES, "Files Pending"},
+    {DPC_AE_LOCK_STATUS, "AELock Indication"},
+    {DPC_BATTERY_REMAINING, "Battery Remaining"},
+    {DPC_PICTURE_EFFECT, "Picture Effect"},
+    {DPC_WHITE_BALANCE_AB, "White Balance - Fine-Tune A-B"},
+    {DPC_MOVIE_REC_STATE, "Movie Recording State"},
+    {DPC_ISO, "ISO"},
+    {DPC_FEL_LOCK_STATUS, "FELock Indication"},
+    {DPC_LIVE_VIEW_STATUS, "Live View Status"},
+    {DPC_IMAGE_SAVE_DESTINATION, "Image Save Destination"},
+    {0xD223, "Date/Time Setting"},
+    {DPC_FOCUS_AREA, "Focus Area"},
+    {DPC_FOCUS_MAGNIFY_SCALE, "Focus Magnify Scale"},
+    {DPC_FOCUS_MAGNIFY_POS, "Focus Magnify Position"},
+    {DPC_LIVE_VIEW_SETTING_EFFECT, "Live View Display Effect"},
+    {DPC_FOCUS_AREA_POS_OLD, "Focus Area Position"},
+    {DPC_MANUAL_FOCUS_ADJUST_ENABLED, "Manual Focus Adjust Enabled"},
+    {DPC_PIXEL_SHIFT_SHOOTING_MODE, "Pixel Shift Shooting Mode"},
+    {DPC_PIXEL_SHIFT_SHOOTING_NUMBER, "Pixel Shift Shooting Shot Num"},
+    {DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, "Pixel Shift Shooting Interval"},
+    {DPC_PIXEL_SHIFT_SHOOTING_STATUS, "Pixel Shift Shooting Status"},
+    {DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, "Pixel Shift Shooting Progress"},
+    {DPC_PICTURE_PROFILE, "Picture Profile"},
+    {DPC_CREATIVE_STYLE, "Creative Style"},
+    {DPC_MOVIE_FILE_FORMAT, "Movie File Format"},
+    {DPC_MOVIE_QUALITY, "Movie Recording Setting"},
+    {DPC_MEDIA_SLOT1_STATUS, "Media Slot 1 Status"},
+    {0xD249, "Media Slot 1 Remaining Shots"},
+    {0xD24A, "Media Slot 1 Remaining Record Time"},
+    {DPC_FOCAL_POSITION, "Focal position"},
+    {DPC_AWB_LOCK_STATUS, "AWBLock Indication"},
+    {DPC_INTERVAL_RECORD_MODE, "Interval Record Mode"},
+    {DPC_INTERVAL_RECORD_STATUS, "Interval Record Status"},
+    {DPC_DEVICE_OVERHEATING_STATE, "Device Overheating State"},
+    {DPC_IMAGE_QUALITY, "Image Quality"},
+    {DPC_IMAGE_FILE_FORMAT, "Image File Format"},
+    {DPC_FOCUS_MAGNIFY, "Focus Magnifier"},
+    {DPC_AF_TRACKING_SENS, "AF Tracking Sensitivity"},
+    {DPC_MEDIA_SLOT2_STATUS, "Media Slot 2 Status"},
+    {0xD257, "Media Slot 2 Remaining Shots"},
+    {0xD258, "Media Slot 2 Remaining Record Time"},
+    {DPC_DIAL_MODE, "Dial Mode"},
+    {DPC_ZOOM_OPERATION_ENABLED, "Zoom Operation Enabled"},
+    {DPC_ZOOM_SCALE, "Zoom Scale"},
+    {DPC_ZOOM_BAR_INFO, "Zoom Bar Information"},
+    {0xD25E, "Zoom Speed Range"},
+    {DPC_ZOOM_SETTING, "Zoom Setting"},
+    {DPC_ZOOM_TYPE_STATUS, "Zoom Type Status"},
+    {DPC_WIRELESS_FLASH, "Wireless Flash Setting"},
+    {DPC_RED_EYE_REDUCTION, "Red Eye Reduction"},
+    {DPC_REMOTE_RESTRICT_STATUS, "Remote Control Restriction Status"},
+    {0xD267, "Live View Area (x, y)"},
+    {DPC_IMAGE_TRANSFER_SIZE, "Image Transfer Size"},
+    {DPC_PC_SAVE_IMAGE, "RAW+J PC Save Image"},
+    {DPC_LIVE_VIEW_QUALITY, "Live View Image Quality"},
+    {0xD26B, "Custom WB Capturable Area (x, y)"},
+    {0xD26C, "Custom WB Capture Frame Size (x, y)"},
+    {0xD26D, "Custom WB Capture Standby Operation"},
+    {0xD26E, "Custom WB Capture Standby Cancel Operation"},
+    {0xD26F, "Custom WB Capture Operation"},
+    {0xD270, "Custom WB Execution State"},
+    {DPC_CAMERA_SETTING_SAVE_ENABLED, "Camera-Setting Save Operation"},
+    {DPC_CAMERA_SETTING_READ_ENABLED, "Camera-Setting Read Operation"},
+    {DPC_CAMERA_SETTING_SAVE_READ_STATE, "Camera-Setting Save/Read State"},
+    {0xD274, "FTP-Setting Save Operation"},
+    {0xD275, "FTP-Setting Read Operation"},
+    {0xD276, "FTP-Setting Save/Read State"},
+    {DPC_FORMAT_MEDIA_SLOT1_ENABLED, "Format Media Slot 1 Enabled"},
+    {DPC_FORMAT_MEDIA_SLOT2_ENABLED, "Format Media Slot 2 Enabled"},
+    {DPC_FORMAT_MEDIA_PROGRESS, "Format Media Progress Rate"},
+    {0xD27C, "Select FTP Server"},
+    {0xD27F, "FTP Connection Status"},
+    {0xD280, "FTP Connection Error Info"},
+    {0xD281, "High Resolution SS Setting"},
+    {0xD282, "High Resolution Shutter Speed"},
+    {DPC_TOUCH_OPERATION_FUNCTION, "Touch Operation Function"},
+    {DPC_REMOTE_TOUCH_ENABLED, "Remote Touch Enabled"},
+    {DPC_REMOTE_TOUCH_CANCEL_ENABLED, "Remote Touch Cancel Enabled"},
+    {DPC_MOVIE_FRAME_RATE, "Movie Frame Rate"},
+    {DPC_COMPRESSED_IMAGE_FILE_FORMAT, "Image Compression File Format"},
+    {DPC_RAW_FILE_TYPE, "RAW File Type"},
+    {0xD289, "Media Slot 1 RAW File Type"},
+    {0xD28A, "Media Slot 2 RAW File Type"},
+    {0xD28B, "Media Slot 1 Image File Format"},
+    {0xD28C, "Media Slot 2 Image File Format"},
+    {0xD28D, "Media Slot 1 Image Quality"},
+    {0xD28E, "Media Slot 2 Image Quality"},
+    {0xD28F, "Media Slot 1 Image Size"},
+    {0xD290, "Media Slot 2 Image Size"},
+    {DPC_FORMAT_MEDIA_QUICK_SLOT1_ENABLED, "Format Media Quick Slot 1 Enabled"},
+    {DPC_FORMAT_MEDIA_QUICK_SLOT2_ENABLED, "Format Media Quick Slot 2 Enabled"},
+    {DPC_FORMAT_MEDIA_CANCEL_ENABLED, "Format Media Cancel Enabled"},
+    {DPC_CONTENTS_TRANSFER_ENABLED, "Contents Transfer Enabled"},
+    {0xD297, "Save Zoom and Focus Position"},
+    {0xD298, "Load Zoom and Focus Position"},
+    {0xD299, "Remote Control Zoom Speed Type"},
+    {0xD29A, "APS-C / Full Toggle Enabled"},
+    {0xD29B, "APS-C / Full Toggle State"},
+    {0xD29C, "Movie Record Self Timer"},
+    {0xD29D, "Movie Record Self Timer Count Time"},
+    {0xD29F, "Movie Record Self Timer Continuous"},
+    {0xD2A0, "Movie Record Self Timer Status"},
+    {0xD2A1, "Focus Bracket Shot Num"},
+    {0xD2A2, "Focus Bracket Focus Range"},
+    {0xD2A4, "Bulb Timer Setting"},
+    {0xD2A5, "Bulb Exposure Time Setting"},
+    {0xD2BA, "Flicker Scan Status"},
+    {0xD2BB, "Flicker Scan Enabled"},
+    {0xE000, "Movie Shooting Mode"},
+    {0xE001, "Movie Shooting Mode Color Gamut"},
+    {0xE002, "Movie Shooting Mode Target Display"},
+    {0xE004, "Focus TouchSpot Status"},
+    {0xE005, "Focus Tracking Status"},
+    {0xE006, "Shutter ECS Setting"},
+    {0xE007, "Shutter ECS Number"},
+    {0xE008, "Shutter ECS Frequency"},
+    {0xE009, "Depth of Field Adjustment Mode"},
+    {0xE00A, "Depth of Field Adjustment Interlocking Mode State"},
+    {0xE00B, "Recorder Clip Name"},
+    {0xE00C, "Recorder Control Main Setting"},
+    {0xE00D, "Recorder Control Proxy Setting"},
+    {0xE00E, "Recorder Start Main"},
+    {0xE00F, "Recorder Start Proxy"},
+    {0xE010, "Recorder Main Status"},
+    {0xE011, "Recorder Proxy Status"},
+    {0xE012, "Recorder Ext Raw Status"},
+    {0xE013, "Recorder Save Destination"},
+    {0xE014, "Button Assignment Assignable.1"},
+    {0xE015, "Button Assignment Assignable.2"},
+    {0xE016, "Button Assignment Assignable.3"},
+    {0xE017, "Button Assignment Assignable.4"},
+    {0xE018, "Button Assignment Assignable.5"},
+    {0xE019, "Button Assignment Assignable.6"},
+    {0xE01A, "Button Assignment Assignable.7"},
+    {0xE01B, "Button Assignment Assignable.8"},
+    {0xE01C, "Button Assignment Assignable.9"},
+    {0xE01D, "Button Assignment Assignable.10"},
+    {0xE01E, "Button Assignment LensAssignable.1"},
+    {0xE01F, "SceneFile Index"},
+    {0xE020, "Current SceneFile Edited"},
+    {0xE021, "Movie Play Button"},
+    {0xE022, "Movie Play Pause Button"},
+    {0xE023, "Movie Play Stop Button"},
+    {0xE024, "Movie Forward Button"},
+    {0xE025, "Movie Rewind Button"},
+    {0xE026, "Movie Next Button"},
+    {0xE027, "Movie Prev Button"},
+    {0xE028, "Movie RecReview Button"},
+    {0xE029, "Assignable Button 1"},
+    {0xE02A, "Assignable Button 2"},
+    {0xE02B, "Assignable Button 3"},
+    {0xE02C, "Assignable Button 4"},
+    {0xE02D, "Assignable Button 5"},
+    {0xE02E, "Assignable Button 6"},
+    {0xE02F, "Assignable Button 7"},
+    {0xE030, "Assignable Button 8"},
+    {0xE031, "Assignable Button 9"},
+    {0xE032, "Assignable Button 10"},
+    {0xE033, "LensAssignable Button 1"},
+    {0xE035, "Assignable Button Indicator 1"},
+    {0xE036, "Assignable Button Indicator 2"},
+    {0xE037, "Assignable Button Indicator 3"},
+    {0xE038, "Assignable Button Indicator 4"},
+    {0xE039, "Assignable Button Indicator 5"},
+    {0xE03A, "Assignable Button Indicator 6"},
+    {0xE03B, "Assignable Button Indicator 7"},
+    {0xE03C, "Assignable Button Indicator 8"},
+    {0xE03D, "Assignable Button Indicator 9"},
+    {0xE03E, "Assignable Button Indicator 10"},
+    {0xE03F, "LensAssignable Button Indicator 1"},
+    {0xE042, "Focus Position Setting"},
+    {0xE043, "Focus Position Current Value"},
+    {0xE050, "Audio Input Master Level"},
+    {0xE059, "Audio Output HDMI Monitor CH"},
+    {0xE061, "Movie Rec Button (Toggle) Enabled"},
+    {0xE080, "Movie Stabilization Level"},
+    {0xE082, "Movie Trimming Transfer Support Information"},
+    {0xE083, "Remote Touch Operation Function"},
+    {0xE084, "AF Assist"},
+    {DPC_LENS_INFORMATION_ENABLED, "Lens Information Enabled"},
+    {0xE088, "Follow Focus Position Setting"},
+    {0xE08F, "Assignable Button Indicator 11"},
+    {0xE089, "Follow Focus Position Current Value"},
+    {0xE08D, "Button Assignment Assignable.11"},
+    {0xE08E, "Assignable Button 11"},
+};
+
+typedef struct {
+    u16 code;
+    char* label;
+} PtpEventLabels;
+
+static PtpEventLabels sPtpEventLabels[] = {
+    {0x4004, "StoreAdded"},
+    {0x4005, "StoreRemoved"},
+    {0xC201, "SDIE_ObjectAdded"},
+    {0xC202, "SDIE_ObjectRemoved"},
+    {0xC203, "SDIE_DevicePropChanged"},
+    {0xC205, "SDIE_DateTimeSettingResult"},
+    {0xC206, "SDIE_CapturedEvent"},
+    {0xC208, "SDIE_CWBCapturedResult"},
+    {0xC209, "SDIE_CameraSettingReadResult"},
+    {0xC20A, "SDIE_FTPSettingReadResult"},
+    {0xC20B, "SDIE_MediaFormatResult"},
+    {0xC20C, "SDIE_FTPDisplayNameListChanged"},
+    {0xC20D, "SDIE_ContentsTransferEvent"},
+    {0xC20E, "SDIE_ZoomAndFocusPositionEvent"},
+    {0xC20F, "SDIE_DisplayListChangedEvent"},
+    {0xC210, "SDIE_MediaProfileChanged"},
+    {0xC211, "SDIE_ControlJobListEvent"},
+    {0xC214, "SDIE_ControlUploadDataResult"},
+    {0xC218, "SDIE_FocusPositionResult"},
+    {0xC21B, "SDIE_LensInformationChanged"},
+    {0xC222, "SDIE_OperationResults"},
+    {0xC223, "SDIE_AFStatus"},
+    {0xC224, "SDIE_MovieRecOperationResults"}
+};
+
+static PTPPropValueEnum sControl_UpDown[] = {
+    {.propValue.u16=0x0001, .str.str="Up", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0002, .str.str="Down", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+};
+
+static PTPPropValueEnum sControl_SelectMediaFormat[] = {
+    {.propValue.u16=0x0001, .str.str="Full Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0002, .str.str="Full Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0011, .str.str="Quick Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0012, .str.str="Quick Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+};
+
+#define PROP_ENUM_SET(a) .form.enums = {.values=(a), .size=MStaticArraySize(a)}
+
+static PtpControl sPtpControlsMetadata[] = {
+    {DPC_SHUTTER_HALF_PRESS,           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Press Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_AFL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AFL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_ONE_RESET,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter One Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_ONE,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter One", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_MOVIE_RECORD,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FEL_BUTTON,                   PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "FEL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_MEDIA_FORMAT,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_MAGNIFIER,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_MAGNIFIER_CANCEL,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_UP,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Up", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_DOWN,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Down", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_LEFT,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Left", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_KEY_RIGHT,             PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Magnifier Right", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_MANUAL_FOCUS_ADJUST,          PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Manual Focus Adjust", .form.range={.min.i16=-7,.max.i16=7,.step.i16=1}},
+    {DPC_AUTO_FOCUS_HOLD,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Autofocus Hold", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_PIXEL_SHIFT_SHOOT_CANCEL,     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_PIXEL_SHIFT_SHOOT,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Shift Shooting Mode", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_HFR_STANDBY,                  PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Standby", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_HFR_RECORD_CANCEL,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "HFR Record Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_STEP_NEAR,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Near", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_STEP_FAR,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Far", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_AWB_LOCK,                     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AWBL Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_AREA_X_Y,               PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "AF Area Position (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
+    {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Unknown Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_ZOOM,                         PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Zoom Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
+    {DPC_CUSTOM_WB_CAPTURE_STANDBY,    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Custom WB Capture Standby", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_CUSTOM_WB_CAPTURE_STANDBY_CANCEL, PTP_DT_UINT16, SDI_CONTROL_BUTTON, PTP_FORM_FLAG_ENUM, "Custom WB Capture Standby Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_CUSTOM_WB_CAPTURE,            PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Custom WB Capture", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
+    {DPC_FORMAT_MEDIA,                 PTP_DT_UINT16, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_ENUM,  "Format Media", PROP_ENUM_SET(sControl_SelectMediaFormat)},
+    {DPC_REMOTE_TOUCH_XY,              PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Remote Touch (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
+    {DPC_REMOTE_TOUCH_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Remote Touch Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_BOTH,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "S1 & S2 Button", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FORMAT_MEDIA_CANCEL,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Format Media Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SAVE_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Save Zoom and Focus Position"},
+    {DPC_LOAD_ZOOM_AND_FOCUS_POSITION, PTP_DT_UINT8,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Load Zoom and Focus Position"},
+    {DPC_APS_C_FULL_TOGGLE,            PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "APS-C / Full Toggle", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_COLOR_TEMPERATURE_STEP,       PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "Color Temperature Step", .form.range={.min.i16=-30,.max.i16=30,.step.i16=1}},
+    {DPC_WHITE_BALANCE_TINT_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "White Balance Tint Step", .form.range={.min.i16=-198,.max.i16=198,.step.i16=1}},
+    {DPC_FOCUS_OPERATION,              PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Focus Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
+    {DPC_FLICKER_SCAN,                 PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Flicker Scan", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SETTINGS_RESET,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Settings Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_PIXEL_MAPPING,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Mapping", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_POWER_OFF,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Power Off", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_TIME_CODE_PRESET_RESET,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Time Code Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_USER_BIT_PRESET_RESET,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "User Bit Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SENSOR_CLEANING,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Sensor Cleaning", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_RESET_PICTURE_PROFILE,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Picture Profile", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_RESET_CREATIVE_LOOK,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Creative Look", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_SHUTTER_ECS_NUMBER_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Shutter ECS Number Step", .form.range={.min.i16=-32768,.max.i16=32767,.step.i16=1}},
+    {DPC_MOVIE_RECORD_TOGGLE,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Toggle", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_FOCUS_POSITION_CANCEL,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Position Cancel", PROP_ENUM_SET(sControl_UpDown)},
+};
+
+char* PTP_GetPropertyLabel(u16 propCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpPropertyLabels); i++) {
+        if (sPtpPropertyLabels[i].code == propCode) {
+            return sPtpPropertyLabels[i].label;
+        }
+    }
+
+    return NULL;
+}
+
+char* PTP_GetControlLabel(u16 controlCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpControlsMetadata); i++) {
+        if (sPtpControlsMetadata[i].controlCode == controlCode) {
+            return sPtpControlsMetadata[i].label;
+        }
+    }
+
+    return NULL;
+}
+
+char* PTP_GetEventLabel(u16 eventCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpEventLabels); i++) {
+        if (sPtpEventLabels[i].code == eventCode) {
+            return sPtpEventLabels[i].label;
+        }
+    }
+
+    return NULL;
+}
+
+typedef struct {
+    u16 code;
+    char* name;
+} ObjectFormatMetadata;
+
+static ObjectFormatMetadata sPtpObjectFormatMetadata[] = {
+    {PTP_OFC_FOLDER, "Folder"},
+    {PTP_OFC_TEXT, "TEXT"},
+    {PTP_OFC_MPEG, "MPEG"},
+    {PTP_OFC_JPEG, "JPEG"},
+    {PTP_OFC_JFIF, "JFIF"},
+    {PTP_OFC_RAW, "RAW"},
+    {PTP_OFC_HEIF, "HEIF"},
+    {PTP_OFC_MPO, "MPO"},
+    {PTP_OFC_WMA, "WMA"},
+    {PTP_OFC_MP4, "MP4"},
+};
+
+char* PTP_GetObjectFormatStr(u16 objectFormatCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpObjectFormatMetadata); i++) {
+        if (sPtpObjectFormatMetadata[i].code == objectFormatCode) {
+            return sPtpObjectFormatMetadata[i].name;
+        }
+    }
+
+    return NULL;
+}
+
+typedef struct {
+    u16 code;
+    char* label;
+    char* description;
+} OperationMetadata;
+
+static OperationMetadata sPtpOperationMetadata[] = {
+    {PTP_OC_GetDeviceInfo, "GetDeviceInfo", NULL},
+    {PTP_OC_OpenSession, "OpenSession", NULL},
+    {PTP_OC_CloseSession, "CloseSession", NULL},
+    {PTP_OC_GetStorageID, "GetStorageIDs", NULL},
+    {PTP_OC_GetStorageInfo, "GetStorageInfo", NULL},
+    {PTP_OC_GetNumObjects, "GetNumObjects", NULL},
+    {PTP_OC_GetObjectHandles, "GetObjectHandles", NULL},
+    {PTP_OC_GetObjectInfo, "GetObjectInfo", NULL},
+    {PTP_OC_GetObject, "GetObject", NULL},
+    {PTP_OC_GetThumb, "GetThumb", NULL},
+    {PTP_OC_DeleteObject, "DeleteObject", NULL},
+    {0x100C, "SendObjectInfo", NULL},
+    {PTP_OC_SendObject, "SendObject", NULL},
+    {0x100E, "InitiateCapture", NULL},
+    {0x100F, "FormatStore", NULL},
+    {0x1010, "ResetDevice", NULL},
+    {0x1011, "SelfTest", NULL},
+    {0x1012, "SetObjectProtection", NULL},
+    {0x1013, "PowerDown", NULL},
+    {0x1014, "GetDevicePropDesc", NULL},
+    {0x1015, "GetDevicePropValue", NULL},
+    {0x1016, "SetDevicePropValue", NULL},
+    {0x1017, "ResetDevicePropValue", NULL},
+    {0x1018, "TerminateOpenCapture", NULL},
+    {0x1019, "MoveObject", NULL},
+    {0x101A, "CopyObject", NULL},
+    {0x101B, "GetPartialObject", NULL},
+    {0x101C, "InitiateOpenCapture", NULL},
+    {0x9801, "GetObjectPropsSupported", "same as Media Transfer Protocol v.1.1 Spec"},
+    {0x9802, "GetObjectPropDesc", "same as Media Transfer Protocol v.1.1 Spec"},
+    {0x9803, "GetObjectPropValue", "same as Media Transfer Protocol v.1.1 Spec"},
+    {0x9804, "SetObjectPropValue", "same as Media Transfer Protocol v.1.1 Spec"},
+    {0x9805, "GetObjectPropList", "same as Media Transfer Protocol v.1.1 Spec"},
+    {PTP_OC_SDIO_Connect, "SDIO_Connect", "This is for the authentication handshake."},
+    {PTP_OC_SDIO_GetExtDeviceInfo, "SDIO_GetExtDeviceInfo", "Get the protocol version and the supported properties "
+        "of the connected device."},
+    {PTP_OC_SDIO_SetExtDevicePropValue, "SDIO_SetExtDevicePropValue", "Set a DevicePropValue for a device property."},
+    {PTP_OC_SDIO_ControlDevice, "SDIO_ControlDevice", "Set the SDIControl value for the SDIControlCode."},
+    {PTP_OC_SDIO_GetAllExtDevicePropInfo, "SDIO_GetAllExtDevicePropInfo", "Obtain all support DevicePropDescs at one time. "
+        "The host will send this operation at regular intervals to obtain the latest (current) camera settings."},
+    {PTP_OC_SDIO_SetFTPSettingFilePassword, "SDIO_SetFTPSettingFilePassword", "Set the password for getting/setting a "
+        "FTP-Setting File."},
+    {PTP_OC_SDIO_OpenSession, "SDIO_OpenSession", "Open Session with Function Mode."},
+    {PTP_OC_SDIO_GetPartialLargeObject, "SDIO_GetPartialLargeObject", "Get partial object from the device."},
+    {PTP_OC_SDIO_SetContentsTransferMode, "SDIO_SetContentsTransferMode", "Turn on/off content transfer mode."},
+    {PTP_OC_SDIO_GetDisplayStringList, "SDIO_GetDisplayStringList", "Get Display String List."},
+    {PTP_OC_SDIO_GetVendorCodeVersion, "SDIO_GetVendorCodeVersion", "Get vendor code version."},
+    {PTP_OC_SDIO_GetFTPJobList, "SDIO_GetFTPJobList", "Get the FTP Job List."},
+    {PTP_OC_SDIO_ControlFTPJobList, "SDIO_ControlFTPJobList", "Control the FTP Job List."},
+    {PTP_OC_SDIO_UploadData, "SDIO_UploadData", "Upload data to Camera temporary storage."},
+    {PTP_OC_SDIO_ControlUploadData, "SDIO_ControlUploadData", "Control the Upload Data."},
+    {PTP_OC_SDIO_GetFTPSettingList, "SDIO_GetFTPSettingList", "Get FTP Setting List."},
+    {PTP_OC_SDIO_SetFTPSettingList, "SDIO_SetFTPSettingList", "Set FTP Setting List."},
+    {PTP_OC_SDIO_GetLensInformation, "SDIO_GetLensInformation", "Get Lens Information."},
+    {PTP_OC_SDIO_OperationResultsSupported, "SDIO_OperationResultsSupported", "Get the Operation Results Supported."},
+};
+
+char* PTP_GetOperationLabel(u16 operationCode) {
+    for (int i = 0; i < MStaticArraySize(sPtpOperationMetadata); i++) {
+        if (sPtpOperationMetadata[i].code == operationCode) {
+            return sPtpOperationMetadata[i].label;
+        }
+    }
+
+    return NULL;
+}
+
+char* PTP_GetDataTypeStr(PTPDataType dataType) {
+    switch (dataType) {
+        case PTP_DT_UNDEF:
+            return "undef";
+        case PTP_DT_INT8:
+            return "i8";
+        case PTP_DT_UINT8:
+            return "u8";
+        case PTP_DT_INT16:
+            return "i16";
+        case PTP_DT_UINT16:
+            return "u16";
+        case PTP_DT_INT32:
+            return "i32";
+        case PTP_DT_UINT32:
+            return "u32";
+        case PTP_DT_INT64:
+            return "i64";
+        case PTP_DT_UINT64:
+            return "u64";
+        case PTP_DT_INT128:
+            return "i128";
+        case PTP_DT_UINT128:
+            return "u128";
+        case PTP_DT_AINT8:
+            return "[i8]";
+        case PTP_DT_AUINT8:
+            return "[u8]";
+        case PTP_DT_AINT16:
+            return "[i16]";
+        case PTP_DT_AUINT16:
+            return "[u16]";
+        case PTP_DT_AINT32:
+            return "[i32]";
+        case PTP_DT_AUINT32:
+            return "[u32]";
+        case PTP_DT_AINT64:
+            return "[i64]";
+        case PTP_DT_AUINT64:
+            return "[u64]";
+        case PTP_DT_AINT128:
+            return "[i128]";
+        case PTP_DT_AUINT128:
+            return "[u128]";
+        case PTP_DT_STR:
+            return "string";
+    }
+    return NULL;
+}
+
+char* PTP_GetFormFlagStr(PTPFormFlag formFlag) {
+    switch (formFlag) {
+        case PTP_FORM_FLAG_NONE:
+            return "";
+        case PTP_FORM_FLAG_RANGE:
+            return "Range";
+        case PTP_FORM_FLAG_ENUM:
+            return "Enum";
+    }
+    return NULL;
+}
+
+char* PTP_GetPropIsEnabledStr(u8 propIsEnabled) {
+    switch (propIsEnabled) {
+        case 0x0:
+            return "N/A";
+        case 0x1:
+            return "RW";
+        case 0x2:
+            return "RO";
+    }
+    return NULL;
+}
+
+void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen) {
+    switch (dataType) {
+        case PTP_DT_INT8:
+            snprintf(buffer, bufferLen, " %hhd (%02hhx)",  value.i8, value.i8);
+            break;
+        case PTP_DT_UINT8:
+            snprintf(buffer, bufferLen, " %hhu (%02hhx)",  value.u8, value.u8);
+            break;
+        case PTP_DT_INT16:
+            snprintf(buffer, bufferLen, " %hd (%04hx)", value.i16, value.i16);
+            break;
+        case PTP_DT_UINT16:
+            snprintf(buffer, bufferLen, " %hu (%04hx)", value.u16, value.u16);
+            break;
+        case PTP_DT_INT32:
+            snprintf(buffer, bufferLen, " %d (%08x)", value.i32, value.i32);
+            break;
+        case PTP_DT_UINT32:
+            snprintf(buffer, bufferLen, " %u (%08x)", value.u32, value.u32);
+            break;
+        case PTP_DT_INT64:
+            snprintf(buffer, bufferLen, " %lld (%016llx)", value.i64, value.i64);
+           break;
+        case PTP_DT_UINT64:
+            snprintf(buffer, bufferLen, " %llu (%016llx)", value.u64, value.u64);
+            break;
+        case PTP_DT_INT128:
+            break;
+        case PTP_DT_UINT128:
+            break;
+        case PTP_DT_AINT8:
+            break;
+        case PTP_DT_AUINT8:
+            break;
+        case PTP_DT_AINT16:
+            break;
+        case PTP_DT_AUINT16:
+            break;
+        case PTP_DT_AINT32:
+            break;
+        case PTP_DT_AUINT32:
+            break;
+        case PTP_DT_AINT64:
+            break;
+        case PTP_DT_AUINT64:
+            break;
+        case PTP_DT_AINT128:
+            break;
+        case PTP_DT_AUINT128:
+            break;
+        case PTP_DT_STR:
+            snprintf(buffer, bufferLen, " %s", value.str.str);
+            break;
+        default:
+            break;
+    }
+}
+
+b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2) {
+    switch (dataType) {
+        case PTP_DT_INT8:
+            return value1.i8 == value2.i8;
+        case PTP_DT_UINT8:
+            return value1.u8 == value2.u8;
+        case PTP_DT_INT16:
+            return value1.i16 == value2.i16;
+        case PTP_DT_UINT16:
+            return value1.u16 == value2.u16;
+        case PTP_DT_INT32:
+            return value1.i32 == value2.i32;
+        case PTP_DT_UINT32:
+            return value1.u32 == value2.u32;
+        case PTP_DT_INT64:
+            return value1.i64 == value2.i64;
+        case PTP_DT_UINT64:
+            return value1.u64 == value2.u64;
+        case PTP_DT_INT128:
+            return MCStrCmp(value1.i128, value2.i128) == 0;
+        case PTP_DT_UINT128:
+            return MCStrCmp(value1.i128, value2.i128) == 0;
+        case PTP_DT_AINT8:
+            break;
+        case PTP_DT_AUINT8:
+            break;
+        case PTP_DT_AINT16:
+            break;
+        case PTP_DT_AUINT16:
+            break;
+        case PTP_DT_AINT32:
+            break;
+        case PTP_DT_AUINT32:
+            break;
+        case PTP_DT_AINT64:
+            break;
+        case PTP_DT_AUINT64:
+            break;
+        case PTP_DT_AINT128:
+            break;
+        case PTP_DT_AUINT128:
+            break;
+        case PTP_DT_STR:
+            return MCStrCmp(value1.str.str, value2.str.str) == 0;
+        default:
+            break;
+    }
+    return FALSE;
+}
+
+b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value) {
+    return PTP_PropValueEq((PTPDataType)property->dataType, property->value, value);
+}
+
+size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
+    switch (dataType) {
+        case PTP_DT_INT8:
+        case PTP_DT_UINT8:
+            return 1;
+        case PTP_DT_INT16:
+        case PTP_DT_UINT16:
+            return 2;
+        case PTP_DT_INT32:
+        case PTP_DT_UINT32:
+            return 4;
+        case PTP_DT_INT64:
+        case PTP_DT_UINT64:
+            return 8;
+        case PTP_DT_INT128:
+        case PTP_DT_UINT128:
+            return 16;
+        case PTP_DT_AINT8:
+            break;
+        case PTP_DT_AUINT8:
+            break;
+        case PTP_DT_AINT16:
+            break;
+        case PTP_DT_AUINT16:
+            break;
+        case PTP_DT_AINT32:
+            break;
+        case PTP_DT_AUINT32:
+            break;
+        case PTP_DT_AINT64:
+            break;
+        case PTP_DT_AUINT64:
+            break;
+        case PTP_DT_AINT128:
+            break;
+        case PTP_DT_AUINT128:
+            break;
+        case PTP_DT_STR: {
+            size_t len = value.str.size;
+            if (len == 0) {
+                return 0;
+            } else {
+                return len + 2;
+            }
+            break;
+        }
+        default:
+            return 0;
+    }
+    return 0;
+}
+
+static void PropValueFree(MAllocator* mem, PTPDataType dataType, PTPPropValue* value) {
+    if (value == NULL) {
+        return;
+    }
+    if (dataType == PTP_DT_STR) {
+        MStrFree(mem, value->str);
+    }
+}
+
+typedef struct {
+    u32 storageID;
+    u16 objectFormat; // ObjectFormatMetadata
+    u16 protectionStatus;
+    u32 objectCompressedSize;
+    u16 thumbFormat;
+    u32 thumbCompressedSize;
+    u32 thumbPixWidth;
+    u32 thumbPixHeight;
+    u32 imagePixWidth;
+    u32 imagePixHeight;
+    u32 imagePixDepth;
+    u32 parentObject;
+    u16 associationType;
+    u32 associationDesc;
+    u32 sequenceNumber;
+
+    MStr filename;
+    MStr captureDateTime;
+    MStr modDateTime;
+    MStr keywords;
+} PTPObjectInfo;
+
+static void PTP_FreeObjectInfo(MAllocator* allocator, PTPObjectInfo *objectInfo) {
+    MStrFree(allocator, objectInfo->filename);
+    MStrFree(allocator, objectInfo->captureDateTime);
+    MStrFree(allocator, objectInfo->modDateTime);
+    MStrFree(allocator, objectInfo->keywords);
+}
+
+void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames) {
+    MArrayFree(self->allocator, liveViewFrames->focus.frames);
+    MArrayFree(self->allocator, liveViewFrames->face.frames);
+    MArrayFree(self->allocator, liveViewFrames->tracking.frames);
+}
+
+void PTP_FreePropValueEnums(MAllocator* allocator, PTPPropValueEnums* outEnums) {
+    for (int i = 0; i < MArraySize(outEnums->values); ++i) {
+        if (outEnums->values[i].str.capacity) {
+            MStrFree(allocator, outEnums->values[i].str);
+        }
+    }
+    MArrayFree(allocator, outEnums->values);
+}
+
+void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums) {
+    PTP_FreePropValueEnums(self->allocator, outEnums);
+}
+
+static int ReadPtpString8(MAllocator* allocator, MMemIO* memIo, MStr* r) {
+    u8 len = 0;
+    MMemReadU8(memIo, &len);
+
+    if (len) {
+        u16* buffer = (u16*) MMemReadAdvance(memIo, len * 2);
+        size_t utf8Len = UTF8_GetConvertUTF16Len(buffer, len);
+        if (utf8Len) {
+            if (r->capacity < utf8Len) {
+                r->str = MRealloc(allocator, r->str, r->capacity, utf8Len);
+                r->capacity = utf8Len;
+            }
+            if (UTF8_ConvertFromUTF16(buffer, len, r->str, r->capacity) == 0) {
+                MStrFree(allocator, *r);
+                return FALSE;
+            } else {
+                r->size = utf8Len;
+                return TRUE;
+            }
+        }
+    }
+    return TRUE;
+}
+
+static char* ReadPtpString16(MAllocator* allocator, MMemIO* memIo) {
+    u16 utf8Len = 0;
+    MMemReadU16(memIo, &utf8Len);
+    if (utf8Len) {
+        char* utf8 = MMalloc(allocator, utf8Len);
+        MMemReadCharCopyN(memIo, utf8, utf8Len);
+        return utf8;
+    }
+    return NULL;
+}
+
+static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, PTPPropValue* value) {
+    i32 r = 0;
+    switch (dataType) {
+        case PTP_DT_INT8:
+            r = MMemReadI8(memIo, &value->i8);
+            break;
+        case PTP_DT_UINT8:
+            r = MMemReadU8(memIo, &value->u8);
+            break;
+        case PTP_DT_INT16:
+            r = MMemReadI16LE(memIo, &value->i16);
+            break;
+        case PTP_DT_UINT16:
+            r = MMemReadU16LE(memIo, &value->u16);
+            break;
+        case PTP_DT_INT32:
+            r = MMemReadI32LE(memIo, &value->i32);
+            break;
+        case PTP_DT_UINT32:
+            r = MMemReadU32LE(memIo, &value->u32);
+            break;
+        case PTP_DT_INT64:
+            r = MMemReadI64LE(memIo, &value->i64);
+            break;
+        case PTP_DT_UINT64:
+            r = MMemReadU64LE(memIo, &value->u64);
+            break;
+        case PTP_DT_INT128:
+            break;
+        case PTP_DT_UINT128:
+            break;
+        case PTP_DT_AINT8:
+            break;
+        case PTP_DT_AUINT8:
+            break;
+        case PTP_DT_AINT16:
+            break;
+        case PTP_DT_AUINT16:
+            break;
+        case PTP_DT_AINT32:
+            break;
+        case PTP_DT_AUINT32:
+            break;
+        case PTP_DT_AINT64:
+            break;
+        case PTP_DT_AUINT64:
+            break;
+        case PTP_DT_AINT128:
+            break;
+        case PTP_DT_AUINT128:
+            break;
+        case PTP_DT_STR:
+            ReadPtpString8(allocator, memIo, &value->str);
+            break;
+        default:
+            break;
+    }
+    return r;
+}
+
+static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
+    switch (dataType) {
+        case PTP_DT_INT8:
+            MLogf(" %d (%02x)", value->i8, value->i8);
+            break;
+        case PTP_DT_UINT8:
+            MLogf(" %d (%02x)", value->u8, value->u8);
+            break;
+        case PTP_DT_INT16:
+            MLogf(" %d (%04x)", value->i16, value->i16);
+            break;
+        case PTP_DT_UINT16:
+            MLogf(" %d (%04x)", value->u16, value->u16);
+            break;
+        case PTP_DT_INT32:
+            MLogf(" %d (%08x)",  value->i32, value->i32);
+            break;
+        case PTP_DT_UINT32:
+            MLogf(" %d (%08x)", value->u32, value->u32);
+            break;
+        case PTP_DT_INT64:
+            MLogf(" %d (%016llx)",  value->i64, value->i64);
+            break;
+        case PTP_DT_UINT64:
+            MLogf(" %d (%016llx)", value->u64, value->i64);
+            break;
+        case PTP_DT_INT128:
+            MLogf(" %d (%03ll2x)", value->i128, value->i128);
+            break;
+        case PTP_DT_UINT128:
+            MLogf(" %d (%032llx)", value->u128, value->u128);
+            break;
+        case PTP_DT_AINT8:
+            break;
+        case PTP_DT_AUINT8:
+            break;
+        case PTP_DT_AINT16:
+            break;
+        case PTP_DT_AUINT16:
+            break;
+        case PTP_DT_AINT32:
+            break;
+        case PTP_DT_AUINT32:
+            break;
+        case PTP_DT_AINT64:
+            break;
+        case PTP_DT_AUINT64:
+            break;
+        case PTP_DT_AINT128:
+            break;
+        case PTP_DT_AUINT128:
+            break;
+        case PTP_DT_STR:
+            MLogf(" %s", value->str);
+           break;
+        default:
+            break;
+    }
+}
+
+static void PrintProperties(PTPControl* self) {
+    size_t numProperties = MArraySize(self->properties);
+    for (int i = 0; i < numProperties; i++) {
+        PTPProperty* p = self->properties + i;
+        MLogf("Property Code: %04x GetSet: %02x IsEnabled: %02x Type: %04x Form: %02x",
+            p->propCode, p->getSet, p->isEnabled, p->dataType, p->formFlag);
+
+        MLog("Default Value:");
+        PrintPropertyValue(p->dataType, &p->defaultValue);
+
+        MLog("Value:");
+        PrintPropertyValue(p->dataType, &p->value);
+
+        switch (p->formFlag) {
+            case PTP_FORM_FLAG_ENUM: {
+                    size_t numSetValues = MArraySize(p->form.enums.set);
+                    if (numSetValues > 0) {
+                        MLog("Set Values:");
+                        for (int j = 0; j < numSetValues; j++) {
+                            PrintPropertyValue(p->dataType, p->form.enums.set + j);
+                        }
+                    }
+                    size_t numGetSetValues = MArraySize(p->form.enums.getSet);
+                    if (numGetSetValues > 0) {
+                        MLog("Get/Set Values:");
+                        for (int j = 0; j < numGetSetValues; j++) {
+                            PrintPropertyValue(p->dataType, p->form.enums.getSet + j);
+                        }
+                    }
+                }
+                break;
+            case PTP_FORM_FLAG_RANGE:
+                MLog("Range Min:");
+                PrintPropertyValue(p->dataType, &p->form.range.min);
+                MLog("Range Max:");
+                PrintPropertyValue(p->dataType, &p->form.range.max);
+                MLog("Range Step Size:");
+                PrintPropertyValue(p->dataType, &p->form.range.step);
+                break;
+        }
+    }
+}
+
+void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t dataOutSize) {
+    if (dataInSize > self->dataInCapacity || self->dataInMem == NULL) {
+        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_IN,
+                                                          self->dataInMem, self->dataInCapacity,
+                                                          dataInSize);
+        self->dataInCapacity = dataInSize;
+        self->dataInMem = mem;
+    }
+
+    if (dataOutSize > self->dataOutCapacity || self->dataOutMem == NULL) {
+        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_OUT,
+                                                          self->dataOutMem, self->dataOutCapacity,
+                                                          dataOutSize);
+        self->dataOutCapacity = dataOutSize;
+        self->dataOutMem = mem;
+    }
+
+    self->dataInSize = dataInSize;
+    self->dataOutSize = dataOutSize;
+    memset(self->dataInMem, 0, dataInSize);
+    if (dataOutSize) {
+        memset(self->dataOutMem, 0, dataOutSize);
+    }
+}
+
+void PTPControl_FreeDataBuffers(PTPControl* self) {
+    self->device->transport.freeBuffer(self->device, PTP_BUFFER_IN, self->dataInMem, self->dataInCapacity);
+    self->dataInMem = NULL;
+    self->dataInCapacity = 0;
+    self->device->transport.freeBuffer(self->device, PTP_BUFFER_OUT, self->dataOutMem, self->dataOutCapacity);
+    self->dataOutMem = NULL;
+    self->dataOutCapacity = 0;
+}
+
+static PTPRequestHeader BuildReq(PTPControl* self, size_t dataInExtra, size_t dataOutExtra, u16 opCode) {
+    u32 dataInSize = dataInExtra;
+    u32 dataOutSize = dataOutExtra;
+    PTPControl_InitDataBuffers(self, dataInSize, dataOutSize);
+    PTPRequestHeader r = {
+        .OpCode = opCode,
+        .NextPhase = PTP_NEXT_PHASE_READ_DATA,
+        .SessionId = self->sessionId,
+        .TransactionId = self->transactionId++
+    };
+    return r;
+}
+
+typedef struct {
+    PTPResult result;
+    PTPResponseHeader* dataOut;
+    MMemIO memIo;
+} PTPResponse;
+
+#define OK(a) ((a) == PTP_OK)
+#define RETURN_IF_FAIL(r) if ((r).result != PTP_OK || (r).memIo.mem == NULL) { return (r).result; }
+
+static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
+    size_t actualDataOutSize = 0;
+    PTPResult r = self->device->transport.sendAndRecvEx(self->device,
+        request, self->dataInMem, self->dataInSize,
+        &self->ptpResponse, self->dataOutMem, self->dataOutSize,
+        &actualDataOutSize);
+
+    PTPResponse response = {.result=r};
+    if (r != PTP_OK) {
+        return response;
+    }
+
+    response.dataOut = &self->ptpResponse;
+    response.result = response.dataOut->ResponseCode;
+    if (actualDataOutSize > sizeof(PTPResponseHeader)) {
+        MMemInitRead(&response.memIo, self->dataOutMem, actualDataOutSize);
+    } else {
+        response.memIo.mem = NULL;
+        response.memIo.size = 0;
+        response.memIo.capacity = 0;
+    }
+
+    return response;
+}
+
+static PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInExtra, size_t dataOutExtra, int numParams, ...) {
+    PTPRequestHeader req = BuildReq(self, dataInExtra, dataOutExtra, opCode);
+
+    va_list vargs;
+    va_start(vargs, numParams);
+    for (int i = 0; i < numParams; ++i) {
+        req.Params[i] = va_arg(vargs, int);
+    }
+    va_end(vargs);
+
+    req.NumParams = numParams;
+    return SendReq(self, &req);
+}
+
+static PTPResult OpenSession(PTPControl* self, u32 sessionId) {
+    PTPResponse r = DoRequest(self, PTP_OC_OpenSession, 0, 8, 1, sessionId);
+    RETURN_IF_FAIL(r);
+    return r.result;
+}
+
+static PTPResult CloseSession(PTPControl* self) {
+    PTPResponse r = DoRequest(self, PTP_OC_CloseSession, 0, 8, 0);
+    RETURN_IF_FAIL(r);
+    return r.result;
+}
+
+static PTPResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
+    PTPResponse r = DoRequest(self, PTP_OC_SDIO_Connect, 0, 8,
+                              3, phase, connectionId, connectionId);
+    RETURN_IF_FAIL(r);
+    return r.result;
+}
+
+static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
+    PTPResponse r = DoRequest(self, PTP_OC_GetDeviceInfo, 0, 0x1000, 0);
+    RETURN_IF_FAIL(r);
+
+    u16 standardVersion = 0;
+    MMemReadU16LE(&r.memIo, &standardVersion);
+    self->standardVersion = standardVersion;
+
+    u32 vendorExtensionId = 0;
+    MMemReadU32LE(&r.memIo, &vendorExtensionId);
+    self->vendorExtensionId = vendorExtensionId;
+
+    u16 vendorExtensionVersion = 0;
+    MMemReadU16LE(&r.memIo, &vendorExtensionVersion);
+    self->vendorExtensionVersion = vendorExtensionVersion;
+
+    ReadPtpString8(self->allocator, &r.memIo, &self->vendorExtension);
+
+    u16 functionalMode = 0;
+    MMemReadU16LE(&r.memIo, &functionalMode);
+
+    u32 operationsLen = 0;
+    MMemReadU32LE(&r.memIo, &operationsLen);
+    for (int i = 0; i < operationsLen; i++) {
+        u16 operation = 0;
+        MMemReadU16LE(&r.memIo, &operation);
+        MArrayAdd(self->allocator, self->supportedOperations, operation);
+    }
+
+    u32 eventsLen = 0;
+    MMemReadU32LE(&r.memIo, &eventsLen);
+    for (int i = 0; i < eventsLen; i++) {
+        u16 event = 0;
+        MMemReadU16LE(&r.memIo, &event);
+        MArrayAdd(self->allocator, self->supportedEvents, event);
+    }
+
+    u32 propertiesSupportedLen = 0;
+    MMemReadU32LE(&r.memIo, &propertiesSupportedLen);
+    for (int i = 0; i < propertiesSupportedLen; i++) {
+        u16 devicePropertyCode = 0;
+        MMemReadU16LE(&r.memIo, &devicePropertyCode);
+        MArrayAdd(self->allocator, self->supportedProperties, devicePropertyCode);
+    }
+
+    u32 captureFormatsLen = 0;
+    MMemReadU32LE(&r.memIo, &captureFormatsLen);
+    for (int i = 0; i < captureFormatsLen; i++) {
+        u16 captureFormat = 0;
+        MMemReadU16LE(&r.memIo, &captureFormat);
+        MArrayAdd(self->allocator, self->captureFormats, captureFormat);
+    }
+
+    u32 imageFormatsLen = 0;
+    MMemReadU32LE(&r.memIo, &imageFormatsLen);
+    for (int i = 0; i < imageFormatsLen; i++) {
+        u16 imageFormat = 0;
+        MMemReadU16LE(&r.memIo, &imageFormat);
+        MArrayAdd(self->allocator, self->imageFormats, imageFormat);
+    }
+
+    ReadPtpString8(self->allocator, &r.memIo, &self->manufacturer);
+    ReadPtpString8(self->allocator, &r.memIo, &self->model);
+    ReadPtpString8(self->allocator, &r.memIo, &self->deviceVersion);
+    ReadPtpString8(self->allocator, &r.memIo, &self->serialNumber);
+
+    return r.result;
+}
+
+static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
+    if (!incremental) {
+        MArrayInit(self->allocator, self->properties, 0);
+        MArrayInit(self->allocator, self->controls, 0);
+    }
+
+    for (int i = 0; i < numProperties; i++) {
+        u16 propCode = 0;
+        MMemReadU16LE(&r.memIo, &propCode);
+
+        if (PTPControl_SupportsControl(self, propCode)) {
+            // Handle control
+            PtpControl *control = NULL;
+            if (incremental) {
+                control = PTPControl_GetControl(self, propCode);
+            }
+            if (!control) {
+                control = MArrayAddPtr(self->allocator, self->controls);
+                memset(control, 0, sizeof(PtpControl));
+                control->controlCode = propCode;
+
+                size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+                for (int j = 0; j < numControlsMeta; j++) {
+                    PtpControl* controlDesc = sPtpControlsMetadata + j;
+                    if (controlDesc->controlCode == propCode) {
+                        control->label = controlDesc->label;
+                        break;
+                    }
+                }
+            }
+
+            MMemReadU16LE(&r.memIo, &control->dataType);
+            u8 getSet = 0;
+            MMemReadU8(&r.memIo, &getSet);
+            u8 isEnabled = 0;
+            MMemReadU8(&r.memIo, &isEnabled);
+
+            PTPPropValue dummy;
+            ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
+            ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
+
+            MMemReadU8(&r.memIo, &control->formFlag);
+
+            if (control->formFlag == PTP_FORM_FLAG_ENUM) {
+                u16 numEnumSet = 0;
+                MMemReadU16LE(&r.memIo, &numEnumSet);
+                MArrayInit(self->allocator, control->form.enums.values, numEnumSet);
+                memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
+                for (int j = 0; j < numEnumSet; j++) {
+                    PTPPropValueEnum *value = MArrayAddPtr(self->allocator, control->form.enums.values);
+                    ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &value->propValue);
+                }
+                control->form.enums.size = numEnumSet;
+                control->form.enums.owned = TRUE;
+            } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
+                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.min);
+                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.max);
+                ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &control->form.range.step);
+            }
+        } else {
+            // Handle property
+            PTPProperty *property = NULL;
+            if (incremental) {
+                property = PTPControl_GetPropertyByCode(self, propCode);
+            }
+            if (!property) {
+                property = MArrayAddPtr(self->allocator, self->properties);
+                memset(property, 0, sizeof(PTPProperty));
+                property->propCode = propCode;
+            }
+
+            MMemReadU16LE(&r.memIo, &property->dataType);
+            MMemReadU8(&r.memIo, &property->getSet);
+            MMemReadU8(&r.memIo, &property->isEnabled);
+
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->defaultValue);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->value);
+
+            MMemReadU8(&r.memIo, &property->formFlag);
+
+            if (property->formFlag == PTP_FORM_FLAG_ENUM) {
+                u16 numEnumSet = 0;
+                MMemReadU16LE(&r.memIo, &numEnumSet);
+                MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
+                for (int j = 0; j < numEnumSet; j++) {
+                    PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
+                    ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
+                }
+            } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.min);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.max);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.step);
+            }
+
+            // On older pre-2020 cameras, some properties can only be adjusted up or down, mark them as such with
+            // 'isNotch', client code can change these properties with PTPControl_SetPropertyNotch()
+            switch (propCode) {
+                case DPC_F_NUMBER:
+                case DPC_EXPOSURE_COMPENSATION:
+                case DPC_FLASH_COMPENSATION:
+                case DPC_SHUTTER_SPEED:
+                case DPC_ISO:
+                    property->isNotch = TRUE;
+                    break;
+                default:
+                    property->isNotch = FALSE;
+                    break;
+            }
+        }
+    }
+}
+
+static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
+    if (!incremental) {
+        MArrayInit(self->allocator, self->properties, numProperties);
+        memset(self->properties, 0, numProperties * sizeof(PTPProperty));
+    }
+
+    for (int i = 0; i < numProperties; i++) {
+        u16 propCode = 0;
+        MMemReadU16LE(&r.memIo, &propCode);
+
+        PTPProperty *property = NULL;
+        if (incremental) {
+            property = PTPControl_GetPropertyByCode(self, propCode);
+        }
+        if (!property) {
+            property = MArrayAddPtr(self->allocator, self->properties);
+            property->propCode = propCode;
+        }
+
+        MMemReadU16LE(&r.memIo, &property->dataType);
+        MMemReadU8(&r.memIo, &property->getSet);
+        MMemReadU8(&r.memIo, &property->isEnabled);
+
+        ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->defaultValue);
+        ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->value);
+
+        MMemReadU8(&r.memIo, &property->formFlag);
+
+        if (property->formFlag == PTP_FORM_FLAG_ENUM) {
+            u16 numEnumSet = 0;
+            MMemReadU16LE(&r.memIo, &numEnumSet);
+            MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
+            for (int j = 0; j < numEnumSet; j++) {
+                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
+            }
+            u16 numEnumGetSet = 0;
+            MMemReadU16LE(&r.memIo, &numEnumGetSet);
+            MArrayInit(self->allocator, property->form.enums.getSet, numEnumGetSet);
+            for (int j = 0; j < numEnumGetSet; j++) {
+                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.getSet);
+                ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
+            }
+        } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.min);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.max);
+            ReadPropertyValue(self->allocator, &r.memIo, property->dataType, &property->form.range.step);
+        }
+    }
+}
+
+static void SetMetadataForProperties(PTPControl* self) {
+    MArrayEachPtr(self->properties, i) {
+        if (i.p->meta) {
+            continue;
+        }
+        for (int j = 0; j < MStaticArraySize(sPropertyMetadata); j++) {
+            PTPPropertyMetadata* meta = sPropertyMetadata + j;
+            if (i.p->propCode == meta->propCode && meta->type == i.p->dataType) {
+                i.p->meta = meta;
+                break;
+            }
+        }
+    }
+}
+
+static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
+    PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
+    if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
+        req.Params[0] = incremental ? 0x1 : 0x0;
+        req.Params[1] = addExtended ? 0x1 : 0x0;
+        req.NumParams = 2;
+    } else {
+        req.NumParams = 0;
+    }
+
+    PTPResponse r = SendReq(self, &req);
+    RETURN_IF_FAIL(r);
+
+    u64 numProperties = 0;
+    MMemReadU64LE(&r.memIo, &numProperties);
+
+    if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
+        SDIO_ProcessDeviceProperties200(self, incremental, r, numProperties);
+    } else {
+        SDIO_ProcessDeviceProperties300(self, incremental, r, numProperties);
+    }
+
+    SetMetadataForProperties(self);
+
+    return r.result;
+}
+
+static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
+    size_t size = Ptp_PropValueSize(dataType, value);
+
+    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
+    req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
+    req.Params[0] = propCode;
+    req.NumParams = 1;
+
+    MMemIO memIo;
+    MMemInit(&memIo, self->allocator, self->dataInMem, size);
+    switch (dataType) {
+        case PTP_DT_UINT8:
+            MMemWriteU8(&memIo, value.u8);
+            break;
+        case PTP_DT_INT8:
+            MMemWriteI8(&memIo, value.i8);
+            break;
+        case PTP_DT_UINT16:
+            MMemWriteU16LE(&memIo, value.u16);
+            break;
+        case PTP_DT_INT16:
+            MMemWriteI16LE(&memIo, value.i16);
+            break;
+        case PTP_DT_UINT32:
+            MMemWriteU32LE(&memIo, value.u32);
+            break;
+        case PTP_DT_INT32:
+            MMemWriteI32LE(&memIo, value.i32);
+            break;
+        case PTP_DT_STR: {
+            u8 strSize = value.str.size;
+            MMemWriteU8(&memIo, strSize);
+            MMemWriteI8CopyN(&memIo, value.str.str, strSize);
+            break;
+        }
+    }
+
+    PTPResponse r = SendReq(self, &req);
+    return r.result;
+}
+
+static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
+    size_t size = Ptp_PropValueSize(dataType, value);
+
+    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
+    req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
+    req.Params[0] = propCode;
+    req.NumParams = 1;
+
+    MMemIO memIo;
+    MMemInit(&memIo, self->allocator, self->dataInMem, size);
+    switch (dataType) {
+        case PTP_DT_UINT8:
+            MMemWriteU8(&memIo, value.u8);
+            break;
+        case PTP_DT_INT8:
+            MMemWriteI8(&memIo, value.i8);
+            break;
+        case PTP_DT_UINT16:
+            MMemWriteU16LE(&memIo, value.u16);
+            break;
+        case PTP_DT_INT16:
+            MMemWriteI16LE(&memIo, value.i16);
+            break;
+        case PTP_DT_UINT32:
+            MMemWriteU32LE(&memIo, value.u32);
+            break;
+        case PTP_DT_INT32:
+            MMemWriteI32LE(&memIo, value.i32);
+            break;
+        case PTP_DT_STR: {
+            u8 strSize = value.str.size;
+            MMemWriteU8(&memIo, strSize);
+            MMemWriteI8CopyN(&memIo, value.str.str, strSize);
+            break;
+        }
+    }
+
+    PTPResponse r = SendReq(self, &req);
+    return r.result;
+}
+
+static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_SDIO_GetDisplayStringList,
+                              0,
+                              0x1000,
+                              1,
+                              displayList);
+
+    RETURN_IF_FAIL(r);
+
+    u32 offset = 0;
+    MMemReadU32(&r.memIo, &offset);
+
+    u32 size = 0;
+    MMemReadU32(&r.memIo, &size);
+
+    // Skip to display lists
+    r.memIo.size += offset;
+
+    for (int i = 0; i < size; i++) {
+        u16 listTypeNum = 0;
+        MMemReadU16(&r.memIo, &listTypeNum);
+        r.memIo.size += 2;
+        for (int j = 0; j < listTypeNum; j++) {
+            u32 listType = 0;
+            MMemReadU32(&r.memIo, &listType);
+            u16 dataType = 0;
+            MMemReadU16(&r.memIo, &dataType);
+            u16 displayStringNum = 0;
+            MMemReadU16(&r.memIo, &displayStringNum);
+            MLogf("Display String List: %04x Data: %04x Num: %d", listType, dataType, displayStringNum);
+            for (int k = 0; k < displayStringNum; k++) {
+                PTPPropValue value;
+                ReadPropertyValue(self->allocator, &r.memIo, dataType, &value);
+                char* str = ReadPtpString16(self->allocator, &r.memIo);
+                MLogf(" -- %s", str);
+            }
+        }
+    }
+
+    return r.result;
+}
+
+static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_SDIO_GetLensInformation,
+                              0,
+                              0x1000,
+                              1,
+                              focusUnits);
+
+    RETURN_IF_FAIL(r);
+
+    u32 offset = 0;
+    MMemReadU32(&r.memIo, &offset);
+
+    u32 size = 0;
+    MMemReadU32(&r.memIo, &size);
+
+    // Skip to display lists
+    r.memIo.size = offset;
+
+    u16 dataVersion = 0;
+    MMemReadU16(&r.memIo, &dataVersion);
+
+    u16 numTables = 0;
+    MMemReadU16(&r.memIo, &numTables);
+
+    for (int i = 0; i < numTables; i++) {
+        u16 listNums = 0;
+        MMemReadU16(&r.memIo, &listNums);
+        r.memIo.size += 2;
+        for (int j = 0; j < listNums; j++) {
+            u32 normalizedValue = 0;
+            MMemReadU32(&r.memIo, &normalizedValue);
+
+            u32 focusPosition = 0;
+            MMemReadU32(&r.memIo, &focusPosition);
+        }
+    }
+
+    return r.result;
+}
+
+static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_SDIO_GetExtDeviceInfo,
+                              0,
+                              0x1000,
+                              2,
+                              protocolVersion,
+                              extended ? 1: 0);
+
+    RETURN_IF_FAIL(r);
+
+    u16 version = 0;
+    MMemReadU16LE(&r.memIo, &version);
+    self->protocolVersion = version;
+
+    u32 numProperties = 0;
+    MMemReadU32LE(&r.memIo, &numProperties);
+
+    for (int i = 0; i < numProperties; i++) {
+        u16 propCode = 0;
+        MMemReadU16LE(&r.memIo, &propCode);
+        MArrayAdd(self->allocator, self->supportedProperties, propCode);
+    }
+
+    u32 numControls = 0;
+    MMemReadU32LE(&r.memIo, &numControls);
+    for (int i = 0; i < numControls; i++) {
+        u16 controlCode = 0;
+        MMemReadU16LE(&r.memIo, &controlCode);
+        MArrayAdd(self->allocator, self->supportedControls, controlCode);
+    }
+
+    return r.result;
+}
+
+static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_GetObjectInfo,
+                              0,
+                              0x1000,
+                              1,
+                              objectHandle);
+
+    RETURN_IF_FAIL(r);
+
+    MMemReadU32LE(&r.memIo, &objectInfo->storageID);
+    MMemReadU16LE(&r.memIo, &objectInfo->objectFormat);
+    MMemReadU16LE(&r.memIo, &objectInfo->protectionStatus);
+    MMemReadU32LE(&r.memIo, &objectInfo->objectCompressedSize);
+    MMemReadU16LE(&r.memIo, &objectInfo->thumbFormat);
+    MMemReadU32LE(&r.memIo, &objectInfo->thumbCompressedSize);
+    MMemReadU32LE(&r.memIo, &objectInfo->thumbPixWidth);
+    MMemReadU32LE(&r.memIo, &objectInfo->thumbPixHeight);
+    MMemReadU32LE(&r.memIo, &objectInfo->imagePixWidth);
+    MMemReadU32LE(&r.memIo, &objectInfo->imagePixHeight);
+    MMemReadU32LE(&r.memIo, &objectInfo->imagePixDepth);
+    MMemReadU32LE(&r.memIo, &objectInfo->parentObject);
+    MMemReadU16LE(&r.memIo, &objectInfo->associationType);
+    MMemReadU32LE(&r.memIo, &objectInfo->associationDesc);
+    MMemReadU32LE(&r.memIo, &objectInfo->sequenceNumber);
+
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->filename);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->captureDateTime);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->modDateTime);
+    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->keywords);
+
+    return r.result;
+}
+
+static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
+    fileOut->size = 0;
+
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_GetObject,
+                              0,
+                              objectSize + 0x100,
+                              1,
+                              SD_OH_LIVE_VIEW_IMAGE);
+
+    RETURN_IF_FAIL(r);
+
+    b32 readFocalFrame = FALSE;
+    if (self->protocolVersion >= SDI_EXTENSION_VERSION_300 && liveViewFrames != NULL) {
+        readFocalFrame = TRUE;
+    }
+
+    u32 offsetImage = 0;
+    MMemReadU32LE(&r.memIo, &offsetImage);
+
+    u32 imageSize = 0;
+    MMemReadU32LE(&r.memIo, &imageSize);
+
+    if (readFocalFrame) {
+        u32 focalFrameOffset = 0;
+        MMemReadU32LE(&r.memIo, &focalFrameOffset);
+
+        u32 focalFrameSize = 0;
+        MMemReadU32LE(&r.memIo, &focalFrameSize);
+
+        if (focalFrameSize) {
+            r.memIo.size = focalFrameOffset;
+
+            MMemReadU16LE(&r.memIo, &liveViewFrames->version);
+            MMemReadSkipBytes(&r.memIo, 6 + 40);
+
+            u16 reservedArrayNum = 0;
+            MMemReadU16LE(&r.memIo, &reservedArrayNum);
+            MMemReadSkipBytes(&r.memIo, 6);
+            if (reservedArrayNum) {
+                MMemReadSkipBytes(&r.memIo, reservedArrayNum * 24);
+            }
+
+            FocusFrames* focusFrames = &liveViewFrames->focus;
+            MMemReadU32LE(&r.memIo, &focusFrames->xDenominator);
+            MMemReadU32LE(&r.memIo, &focusFrames->yDenominator);
+
+            u16 frameNum = 0;
+            MMemReadU16LE(&r.memIo, &frameNum);
+
+            MMemReadSkipBytes(&r.memIo, 6);
+
+            if (frameNum) {
+                MArrayInit(self->allocator, focusFrames->frames, frameNum);
+
+                for (int i = 0; i < frameNum; ++i) {
+                    FocusFrame* focusFrame = focusFrames->frames + i;
+                    MMemReadU16LE(&r.memIo, &focusFrame->frameType);
+                    MMemReadU16LE(&r.memIo, &focusFrame->focusFrameState);
+                    MMemReadU8(&r.memIo, &focusFrame->priority);
+                    MMemReadSkipBytes(&r.memIo, 3);
+                    MMemReadU32LE(&r.memIo, &focusFrame->width);
+                    MMemReadU32LE(&r.memIo, &focusFrame->height);
+                }
+            }
+
+            if (liveViewFrames->version > 101) {
+            }
+        }
+    }
+
+    fileOut->size = 0;
+    fileOut->allocator = self->allocator;
+    MMemWriteU8CopyN(fileOut, r.memIo.mem + offsetImage, imageSize);
+
+    return r.result;
+}
+
+PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
+    PTP_TRACE("PTP_GetObject");
+    fileOut->size = 0;
+    fileOut->allocator = self->allocator;
+
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_GetObject,
+                              0,
+                              objectSize,
+                              1,
+                              objectHandle);
+
+    RETURN_IF_FAIL(r);
+
+    MMemReadCopy(&r.memIo, fileOut, r.memIo.capacity);
+
+    return r.result;
+}
+
+int PTPControl_GetPendingFiles(PTPControl* self) {
+    PTPProperty* property = PTPControl_GetPropertyByCode(self, DPC_PENDING_FILES);
+    if (property != NULL && property->dataType == PTP_DT_UINT16) {
+        u16 value = property->value.u16;
+        if (value & 0x8000) {
+            value = value & 0x7fff;
+        }
+        PTP_TRACE_F("PTPControl_GetPendingFiles -> %d", value);
+        return value;
+    }
+    return 0;
+}
+
+PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
+    PTP_TRACE("PTPControl_GetLiveViewImage");
+    PTPObjectInfo objectInfo = {};
+    PTPResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
+    if (r != PTP_OK) {
+        return r;
+    }
+    // Free strings - we dont use them
+    PTP_FreeObjectInfo(self->allocator, &objectInfo);
+    return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
+}
+
+PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
+    PTP_TRACE("PTPControl_GetCapturedImage");
+    PTPObjectInfo objectInfo = {};
+    PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
+    if (r != PTP_OK) {
+        return r;
+    }
+    if (objectInfo.objectCompressedSize == 0 || MStrIsEmpty(objectInfo.filename)) {
+        PTP_DEBUG_F("No image to download (size: %d filename: '%.*s')", objectInfo.objectCompressedSize,
+            objectInfo.filename.size, objectInfo.filename.str);
+        ciiOut->size = 0;
+        MStrZero(&ciiOut->filename);
+        return r;
+    }
+    PTP_DEBUG_F("Downloading image... (%.*s format: %s size: %d)", objectInfo.filename.size, objectInfo.filename.str,
+        PTP_GetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
+    ciiOut->filename = objectInfo.filename;
+    ciiOut->objectFormat = objectInfo.objectFormat;
+    ciiOut->size = objectInfo.objectCompressedSize;
+    MStrZero(&objectInfo.filename); // ownership has passed to ciiOut
+    PTP_FreeObjectInfo(self->allocator, &objectInfo); // Free any other strings
+    r = PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
+    PTP_DEBUG_F("Downloaded image size: %d", fileOut->size);
+    return r;
+}
+
+PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
+    PTP_TRACE("PTPControl_GetCameraSettingsFile");
+    PTPObjectInfo objectInfo = {};
+    PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
+    if (r != PTP_OK) {
+        return r;
+    }
+    PTP_FreeObjectInfo(self->allocator, &objectInfo);
+    return PTP_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
+}
+
+PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
+    PTPRequestHeader req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
+    req.Params[0] = objectHandle;
+    req.NumParams = 1;
+    req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
+
+    MMemIO memIo;
+    MMemInit(&memIo, self->allocator, self->dataInMem, fileIn->size);
+    MMemReadCopy(fileIn, &memIo, fileIn->size);
+
+    PTPResponse r = SendReq(self, &req);
+    return r.result;
+}
+
+PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
+    PTP_TRACE("PTPControl_PutCameraSettingsFile");
+    return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
+}
+
+PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator) {
+    if (!self || !device) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    self->device = device;
+    self->device->transport.allocator = allocator;
+    self->logger = device->logger;
+    self->allocator = allocator;
+    return PTP_OK;
+}
+
+static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
+    for (int i = 0; i < numControls; i++) {
+        u16 controlCode = self->supportedControls[i];
+        PtpControl* control = PTPControl_GetControl(self, controlCode);
+        if (!control) {
+            control = MArrayAddPtr(self->allocator, self->controls);
+
+            b32 found = FALSE;
+            size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+            for (int j = 0; j < numControlsMeta; j++) {
+                PtpControl *meta = sPtpControlsMetadata + j;
+                if (meta->controlCode == controlCode) {
+                    memcpy(control, meta, sizeof(PtpControl));
+                    found = TRUE;
+                    break;
+                }
+            }
+            if (!found) {
+                memset(control, 0, sizeof(PtpControl));
+                control->controlCode = controlCode;
+            }
+        }
+    }
+}
+
+static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
+    MArrayInit(self->allocator, self->controls, numControls);
+    for (int i = 0; i < numControls; i++) {
+        u16 controlCode = self->supportedControls[i];
+
+        PtpControl* control = MArrayAddPtr(self->allocator, self->controls);
+        b32 found = FALSE;
+        size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+        for (int j = 0; j < numControlsMeta; j++) {
+            PtpControl* meta = sPtpControlsMetadata + j;
+            if (meta->controlCode == controlCode) {
+                memcpy(control, meta, sizeof(PtpControl));
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found) {
+            memset(control, 0, sizeof(PtpControl));
+            control->controlCode = controlCode;
+        }
+    }
+}
+
+PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
+    PTP_TRACE_F("PTPControl_Connect 0x04%x", version);
+    PTPResult r;
+
+    ////////////////////////////////////////////
+    // Open Session (if not done by transport layer implicitly)
+    ////////////////////////////////////////////
+    if (self->device->transport.requiresSessionOpenClose) {
+        self->sessionId = 0;
+        self->transactionId = 0;
+        u32 sessionId = 0x1;
+        r = OpenSession(self, sessionId);
+        if (r != PTP_OK) {
+            return r;
+        }
+        self->sessionId = sessionId;
+    }
+
+    ////////////////////////////////////////////
+    // Authentication begin
+    ////////////////////////////////////////////
+    u32 connectionId = 0;
+
+    // 1. Authentication Packet 1
+    r = SDIO_Connect(self, 1, connectionId);
+    if (r != PTP_OK) {
+        return r;
+    }
+
+    // 2. Authentication Packet 2
+    r = SDIO_Connect(self, 2, connectionId);
+    if (r != PTP_OK) {
+        return r;
+    }
+
+    // 3. Authentication - Request available properties and controls
+    int retries = 10;
+    b32 gotExtDeviceInfo = FALSE;
+    for (int i = 0; i < retries; ++i) {
+        if (OK(SDIO_GetExtDeviceInfo(self, version, TRUE))) {
+            gotExtDeviceInfo = TRUE;
+            break;
+        }
+    }
+    if (!gotExtDeviceInfo) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    // 4. Authentication Phase 3
+    r = SDIO_Connect(self, 3, connectionId);
+    if (r != PTP_OK) {
+        return r;
+    }
+
+    ////////////////////////////////////////////
+    // Authentication done
+    ////////////////////////////////////////////
+
+    // Get general device info
+    r = PTP_GetDeviceInfo(self);
+    if (r != PTP_OK) {
+        return r;
+    }
+
+    // Get property metadata & values
+    r = SDIO_GetAllExtDevicePropInfo(self, FALSE, TRUE);
+    if (r != PTP_OK) {
+        return r;
+    }
+
+    // SDIO_GetDisplayStringList(self, PTP_DL_ALL);
+
+    // SDIO_GetLensInformation(self, PTP_FOCUS_UNIT_FEET);
+
+    // Build controls list
+    size_t numControls = MArraySize(self->supportedControls);
+    PTP_INFO_F("Connected to device (protocol: %d)", self->protocolVersion);
+    if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
+        SDIO_InitControlsMetadata200(self, numControls);
+    } else {
+        SDIO_InitControlsMetadata300(self, numControls);
+    }
+
+    SetMetadataForProperties(self);
+
+    return PTP_OK;
+}
+
+PTPResult PTPControl_Cleanup(PTPControl* self) {
+    PTP_TRACE("PTPControl_Cleanup");
+
+    ////////////////////////////////////////////
+    // Close session (if not done by transport layer implicitly)
+    ////////////////////////////////////////////
+    if (self->device->transport.requiresSessionOpenClose) {
+        CloseSession(self);
+        self->sessionId = 0;
+        self->transactionId = 0;
+    }
+
+    PTPControl_FreeDataBuffers(self);
+
+    self->protocolVersion = 0;
+    self->standardVersion = 0;
+
+    MArrayFree(self->allocator, self->supportedProperties);
+    MArrayFree(self->allocator, self->supportedControls);
+    MArrayFree(self->allocator, self->supportedEvents);
+    MArrayFree(self->allocator, self->supportedOperations);
+    MArrayFree(self->allocator, self->captureFormats);
+    MArrayFree(self->allocator, self->imageFormats);
+    for (int i = 0; i < MArraySize(self->properties); ++i) {
+        PTPProperty* property = self->properties + i;
+        PropValueFree(self->allocator, property->dataType, &property->value);
+        PropValueFree(self->allocator, property->dataType, &property->defaultValue);
+        if (property->formFlag == PTP_FORM_FLAG_ENUM) {
+            MArrayFree(self->allocator, property->form.enums.set);
+            MArrayFree(self->allocator, property->form.enums.getSet);
+        } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
+            PropValueFree(self->allocator, property->dataType, &property->form.range.min);
+            PropValueFree(self->allocator, property->dataType, &property->form.range.max);
+            PropValueFree(self->allocator, property->dataType, &property->form.range.step);
+        }
+    }
+    MArrayFree(self->allocator, self->properties);
+
+    for (int i = 0; i < MArraySize(self->controls); ++i) {
+        PtpControl* control = self->controls + i;
+        if (control->formFlag == PTP_FORM_FLAG_ENUM) {
+            if (control->form.enums.owned) {
+                MArrayFree(self->allocator, control->form.enums.values);
+            }
+        }
+    }
+    MArrayFree(self->allocator, self->controls);
+
+    MStrFree(self->allocator, self->manufacturer);
+    MStrFree(self->allocator, self->model);
+    MStrFree(self->allocator, self->deviceVersion);
+    MStrFree(self->allocator, self->serialNumber);
+    MStrFree(self->allocator, self->vendorExtension);
+
+    return PTP_OK;
+}
+
+b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode) {
+    for (int i = 0; i < MArraySize(self->supportedEvents); ++i) {
+        if (self->supportedEvents[i] == eventCode) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode) {
+    for (int i = 0; i < MArraySize(self->supportedControls); ++i) {
+        if (self->supportedControls[i] == controlCode) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+b32 PTPControl_SupportsProperty(PTPControl* self, PTPProperty* property) {
+    if (!property) return FALSE;
+    for (int i = 0; i < MArraySize(self->supportedProperties); ++i) {
+        if (self->supportedProperties[i] == property->propCode) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property) {
+    if (!property) {
+        return FALSE;
+    }
+    if (property->dataType == PTP_DT_UINT8) {
+        return property->value.u8 == SD_Enabled;
+    }
+    return FALSE;
+}
+
+PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode) {
+    for (int i = 0; i < MArraySize(self->properties); ++i) {
+        if (self->properties[i].propCode == propertyCode) {
+            return self->properties + i;
+        }
+    }
+    return NULL;
+}
+
+PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* id) {
+    MArrayEachPtr(self->properties, it) {
+        if (!it.p->meta) {
+            continue;
+        }
+        char* propId = it.p->meta->id;
+        if (propId && MCStrCmp(propId, id) == 0) {
+            return it.p;
+        }
+    }
+    return NULL;
+}
+
+size_t PTPControl_NumProperties(PTPControl* self) {
+    return MArraySize(self->properties);
+}
+
+PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index) {
+    return self->properties + index;
+}
+
+PTPResult PTPControl_UpdateProperties(PTPControl* self) {
+    PTP_TRACE("PTPControl_UpdateProperties");
+    return SDIO_GetAllExtDevicePropInfo(self, TRUE, TRUE);
+}
+
+static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8 lookupValue) {
+    for (int j = 0; j < numEnumValues; j++) {
+        u8 enumValue = enumValues[j].value;
+        if (lookupValue == enumValue) {
+            return enumValues[j].str;
+        }
+    }
+    return NULL;
+}
+
+static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProperty* property, EnumValueU8* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
+    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+        u8 lookupValue = property->form.enums.getSet[i].u8;
+        char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        propEnum->propValue.u8 = lookupValue;
+        MStrSetStaticCStr(&propEnum->str, str);
+    }
+
+    if (MArraySize(property->form.enums.set)) {
+        size_t getSetItems = MArraySize(outEnums->values);
+        for (int j = 0; j < getSetItems; j++) {
+            PTPPropValueEnum* prop = outEnums->values + j;
+            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
+        }
+        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
+            u8 lookupValue = property->form.enums.set[i].u8;
+            PTPPropValueEnum* prop = NULL;
+            for (int j = 0; j < getSetItems; j++) {
+                u8 enumValue = outEnums->values[j].propValue.u8;
+                if (lookupValue == enumValue) {
+                    prop = outEnums->values + j;
+                    break;
+                }
+            }
+            if (prop) {
+                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+            } else {
+                char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                propEnum->propValue.u8 = lookupValue;
+                MStrSetStaticCStr(&propEnum->str, str);
+            }
+        }
+    }
+
+    return TRUE;
+}
+
+static char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, u16 lookupValue) {
+    for (int j = 0; j < numEnumValues; j++) {
+        u16 enumValue = enumValues[j].value;
+        if (lookupValue == enumValue) {
+            return enumValues[j].str;
+        }
+    }
+    return NULL;
+}
+
+static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPProperty* property, EnumValueU16* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
+    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+        u16 lookupValue = property->form.enums.getSet[i].u16;
+        char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        propEnum->propValue.u16 = lookupValue;
+        MStrSetStaticCStr(&propEnum->str, str);
+    }
+
+    if (MArraySize(property->form.enums.set)) {
+        size_t getSetItems = MArraySize(outEnums->values);
+        for (int j = 0; j < getSetItems; j++) {
+            PTPPropValueEnum* prop = outEnums->values + j;
+            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
+        }
+        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
+            u16 lookupValue = property->form.enums.set[i].u16;
+            PTPPropValueEnum* prop = NULL;
+            for (int j = 0; j < getSetItems; j++) {
+                u16 enumValue = outEnums->values[j].propValue.u16;
+                if (lookupValue == enumValue) {
+                    prop = outEnums->values + j;
+                    break;
+                }
+            }
+            if (prop) {
+                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+            } else {
+                char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                propEnum->propValue.u16 = lookupValue;
+                MStrSetStaticCStr(&propEnum->str, str);
+            }
+        }
+    }
+
+    return TRUE;
+}
+
+static char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, u32 lookupValue) {
+    for (int j = 0; j < numEnumValues; j++) {
+        u32 enumValue = enumValues[j].value;
+        if (lookupValue == enumValue) {
+            return enumValues[j].str;
+        }
+    }
+    return NULL;
+}
+
+static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPProperty* property,
+                                 EnumValueU32* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
+    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+        u32 lookupValue = property->form.enums.getSet[i].u32;
+        char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
+        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        propEnum->propValue.u32 = lookupValue;
+        MStrSetStaticCStr(&propEnum->str, str);
+    }
+
+    if (MArraySize(property->form.enums.set)) {
+        size_t getSetItems = MArraySize(outEnums->values);
+        for (int j = 0; j < getSetItems; j++) {
+            PTPPropValueEnum* prop = outEnums->values + j;
+            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
+        }
+        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
+            u32 lookupValue = property->form.enums.set[i].u32;
+            PTPPropValueEnum* prop = NULL;
+            for (int j = 0; j < getSetItems; j++) {
+                u32 enumValue = outEnums->values[j].propValue.u32;
+                if (lookupValue == enumValue) {
+                    prop = outEnums->values + j;
+                    break;
+                }
+            }
+            if (prop) {
+                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+            } else {
+                char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
+                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                propEnum->propValue.u32 = lookupValue;
+                MStrSetStaticCStr(&propEnum->str, str);
+            }
+        }
+    }
+
+    return TRUE;
+}
+
+b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropertyMetadata* meta, PTPPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         PTPPropValue propValue = property->form.enums.getSet[i];
@@ -4139,7 +4171,7 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* 
             }
 
             if (!prop) {
-                prop = MArrayAddPtr(self->allocator, outEnums->values);
+                prop = MArrayAddPtr(allocator, outEnums->values);
                 prop->propValue = lookupValue;
                 prop->str = meta->valueAsStringFunc(self, allocator, property, lookupValue);
             }
@@ -4155,125 +4187,129 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* 
     return TRUE;
 }
 
-b32 PTPControl_GetEnumsForProperty(PTPControl* self, u16 propertyCode, MAllocator* allocator, PTPPropValueEnums* outEnums) {
-    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
-    if (property->formFlag != PTP_FORM_FLAG_ENUM) {
+b32 PTPControl_GetEnumsForProperty(PTPControl* self, PTPProperty* property, MAllocator* allocator, PTPPropValueEnums* outEnums) {
+    if (!property || property->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
-    for (int i = 0; i < MStaticArraySize(sPropertyMetadata); i++) {
-        PropertyMetadata* meta = sPropertyMetadata + i;
-        if (propertyCode == meta->propCode && meta->type == property->dataType) {
-            if (meta->fixedEnumsSize) {
-                switch (meta->type) {
-                    case PTP_DT_UINT8:
-                        return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8, meta->fixedEnumsSize, outEnums);
-                    case PTP_DT_UINT16:
-                        return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16, meta->fixedEnumsSize, outEnums);
-                    case PTP_DT_UINT32:
-                        return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32, meta->fixedEnumsSize, outEnums);
-                }
-            } else if (meta->buildEnumsFunc) {
-                return meta->buildEnumsFunc(self, allocator, property, outEnums);
-            } else if (meta->valueAsStringFunc) {
-                return BuildEnumsFromGetFunc(self, allocator, property, meta, outEnums);
-            }
+    PTPPropertyMetadata* meta = property->meta;
+    if (!meta) {
+        return FALSE;
+    }
+
+    if (meta->fixedEnumsSize) {
+        switch (meta->type) {
+            case PTP_DT_UINT8:
+                return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8, meta->fixedEnumsSize, outEnums);
+            case PTP_DT_UINT16:
+                return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16, meta->fixedEnumsSize, outEnums);
+            case PTP_DT_UINT32:
+                return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32, meta->fixedEnumsSize, outEnums);
         }
+    } else if (meta->buildEnumsFunc) {
+        return meta->buildEnumsFunc(self, allocator, property, outEnums);
+    } else if (meta->valueAsStringFunc) {
+        return BuildEnumsFromGetFunc(self, allocator, property, meta, outEnums);
     }
     return FALSE;
 }
 
-b32 PTPControl_GetPropertyAsStr(PTPControl* self, u16 propertyCode, MAllocator* allocator, MStr* strOut) {
-    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* strOut) {
     if (property == NULL) {
         return FALSE;
     }
     char* str = NULL;
-    for (int i = 0; i < MStaticArraySize(sPropertyMetadata); i++) {
-        PropertyMetadata* meta = sPropertyMetadata + i;
-        if (propertyCode == meta->propCode && meta->type == property->dataType) {
-            if (meta->fixedEnumsSize) {
-                switch (meta->type) {
-                    case PTP_DT_UINT8:
-                        str = EnumValue8_Lookup(meta->fixedEnums.u8, meta->fixedEnumsSize, property->value.u8);
-                        break;
-                    case PTP_DT_UINT16:
-                        str = EnumValue16_Lookup(meta->fixedEnums.u16, meta->fixedEnumsSize, property->value.u16);
-                        break;
-                    case PTP_DT_UINT32:
-                        str = EnumValue32_Lookup(meta->fixedEnums.u32, meta->fixedEnumsSize, property->value.u32);
-                        break;
-                }
-            } else if (meta->valueAsStringFunc) {
-                *strOut = meta->valueAsStringFunc(self, allocator, property, property->value);
-            }
-
-            if (!strOut->str) {
-                strOut->str = str;
-                strOut->size = MCStrLen(str);
-                strOut->capacity = 0;
-            }
-
-            return strOut->str != NULL;
-        }
+    PTPPropertyMetadata* meta = property->meta;
+    if (!meta) {
+        return FALSE;
     }
 
-    return FALSE;
+    if (meta->fixedEnumsSize) {
+        switch (meta->type) {
+            case PTP_DT_UINT8:
+                str = EnumValue8_Lookup(meta->fixedEnums.u8, meta->fixedEnumsSize, property->value.u8);
+                break;
+            case PTP_DT_UINT16:
+                str = EnumValue16_Lookup(meta->fixedEnums.u16, meta->fixedEnumsSize, property->value.u16);
+                break;
+            case PTP_DT_UINT32:
+                str = EnumValue32_Lookup(meta->fixedEnums.u32, meta->fixedEnumsSize, property->value.u32);
+                break;
+        }
+    } else if (meta->valueAsStringFunc) {
+        *strOut = meta->valueAsStringFunc(self, allocator, property, property->value);
+    }
+
+    if (!strOut->str) {
+        strOut->str = str;
+        strOut->size = MCStrLen(str);
+        strOut->capacity = 0;
+    }
+
+    return strOut->str != NULL;
 }
 
-PTPResult PTPControl_SetProperty(PTPControl* self, u16 propertyCode, PTPPropValue value) {
-    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value) {
     if (!property) {
         return PTP_GENERAL_ERROR;
     }
-    PTPResult r = SDIO_SetExtDevicePropValue(self, propertyCode, property->dataType, value);
+    PTPResult r = SDIO_SetExtDevicePropValue(self, property->propCode, property->dataType, value);
     if (r == PTP_OK) {
         property->value = value; // TODO : Copy func so we dont steal string ptr
     }
     return r;
 }
 
-b32 PTPControl_SetPropertyU16(PTPControl* self, u16 propertyCode, u16 value) {
+b32 PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
     return FALSE;
 }
 
-b32 PTPControl_SetPropertyU32(PTPControl* self, u16 propertyCode, u32 value) {
+b32 PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
     return FALSE;
 }
 
-b32 PTPControl_SetPropertyU64(PTPControl* self, u16 propertyCode, u64 value) {
+b32 PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
     return FALSE;
 }
 
-b32 PTPControl_SetPropertyStr(PTPControl* self, u16 propertyCode, MStr value) {
+b32 PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value) {
     // Set from string directly
     return FALSE;
 }
 
-b32 PTPControl_SetPropertyFancy(PTPControl* self, u16 propertyCode, MStr value) {
+b32 PTPControl_SetPropertyFancy(PTPControl* self, PTPProperty* property, MStr value) {
     // Parse string
     return FALSE;
 }
 
-PTPResult PTPControl_SetPropertyNotch(PTPControl* self, u16 propertyCode, i8 notch) {
-    PTP_TRACE_F("PTPControl_SetPropertyNotch(%x, %d)", propertyCode, notch);
-    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+PTPResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch) {
     if (!property) {
         return PTP_GENERAL_ERROR;
     }
+    PTP_TRACE_F("PTPControl_SetPropertyNotch(%x, %d)", property->propCode, notch);
     if (!property->isNotch) {
-        PTP_ERROR_F("Property %d is not a notch property", propertyCode);
+        PTP_ERROR_F("Property %d is not a notch property", property->propCode);
         return PTP_GENERAL_ERROR;
     }
-    return SDIO_ControlDevice(self, propertyCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
+    return SDIO_ControlDevice(self, property->propCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
 }
 
-b32 PTPControl_IsPropertyWritable(PTPControl* self, u16 propertyCode) {
-    PTP_TRACE_F("PTPControl_IsPropertyWritable(%x)", propertyCode);
-    PTPProperty* property = PTPControl_GetProperty(self, propertyCode);
+b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property) {
     if (!property) {
         return FALSE;
     }
+    PTP_TRACE_F("PTPControl_IsPropertyWritable(%x)", property->propCode);
     return property->getSet == 1 && property->isEnabled == 1;
+}
+
+PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut) {
+    if (!property->meta) {
+        return FALSE;
+    }
+    MStr str = {};
+    str.str = property->meta->id;
+    str.size = MCStrLen(str.str);
+    *strOut = str;
+    return TRUE;
 }
 
 size_t PTPControl_NumControls(PTPControl* self) {

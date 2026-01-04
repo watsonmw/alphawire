@@ -5,6 +5,7 @@
 #include "ptp/ptp-backend.h"
 
 #include "Wia.h"
+struct IWiaItemExtras;
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,7 @@ typedef struct {
     b32 deviceListUpToDate;
     PTPDeviceWia* openDevices;
     MAllocator* allocator;
+    b32 comInitialized;
     PTPLog logger;
 } PTPWiaDeviceList;
 

@@ -10,3 +10,7 @@ void PTP_MemIOFree(MMemIO* memIO) {
     memIO->size = 0;
     memIO->capacity = 0;
 }
+
+void PTP_StrFree(MAllocator* allocator, MStr* str) {
+    MStrFree(allocator, *str);
+}

@@ -215,11 +215,30 @@ cleanup:
 b32 PTPWiaDeviceList_Open(PTPWiaDeviceList* self) {
     HRESULT hr = 0;
 
+    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    if (FAILED(hr)) {
+        if (hr == RPC_E_CHANGED_MODE) {
+            // Already initialized with a different mode.
+            // We proceed and hope for the best, but we MUST NOT call CoUninitialize later.
+            self->comInitialized = FALSE;
+        } else {
+            PTP_ERROR_F("Failed to initialize COM: %08x", hr);
+            return FALSE;
+        }
+    } else {
+        // hr is S_OK or S_FALSE, meaning we successfully incremented the COM ref count.
+        self->comInitialized = TRUE;
+    }
+
     // Create WIA Device Manager instance
     hr = CoCreateInstance(&CLSID_WiaDevMgr, NULL, CLSCTX_LOCAL_SERVER,&IID_IWiaDevMgr,
         (void**)&self->deviceMgr);
 
-    RegisterForDeviceConnectDisconnectEvents(self);
+    if (SUCCEEDED(hr) && self->deviceMgr) {
+        RegisterForDeviceConnectDisconnectEvents(self);
+    } else {
+        PTP_ERROR_F("Failed to create WIA Device Manager: %08x", hr);
+    }
 
     return SUCCEEDED(hr);
 }
@@ -254,6 +273,11 @@ b32 PTPWiaDeviceList_Close(PTPWiaDeviceList* self) {
     if (self->openDevices) {
         MArrayFree(self->allocator, self->openDevices);
     }
+    if (self->comInitialized) {
+        CoUninitialize();
+        self->comInitialized = FALSE;
+    }
+
     return TRUE;
 }
 
@@ -408,6 +432,7 @@ PTPResult PTPDeviceWia_SendAndRecvEx(void* self, PTPRequestHeader* request, u8* 
         }
         return PTP_OK;
     } else {
+        WinUtils_LogLastError(&wia->logger, "Error sending WIA request");
         return PTP_GENERAL_ERROR;
     }
 }

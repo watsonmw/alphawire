@@ -120,6 +120,8 @@ typedef struct {
     // isNotch properties can only be changed by 'notching' i.e. up / down rotating through settings
     // needed for some properties on older pre-2020 cameras
     u8 isNotch;
+
+    struct PTPPropertyMetadata* meta;
 } PTPProperty;
 
 typedef enum {
@@ -133,7 +135,7 @@ typedef struct {
     u16 dataType;
     u8 controlType;
     u8 formFlag;
-    char* name;
+    char* label;
 
     union {
         PTPRange range;

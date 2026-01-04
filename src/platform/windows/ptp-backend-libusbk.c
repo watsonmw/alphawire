@@ -182,7 +182,7 @@ b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMi
             PTP_LOG_INFO_F(&deviceUsbk->logger, "Length: %d", event->length);
             PTP_LOG_INFO_F(&deviceUsbk->logger, "Transferred: %d", transferred);
             PTP_LOG_INFO_F(&deviceUsbk->logger, "Type: 0x%04X", event->type);
-            PTP_LOG_INFO_F(&deviceUsbk->logger, "Event Code: %s (0x%04X)", PTP_GetEventStr(event->code), event->code);
+            PTP_LOG_INFO_F(&deviceUsbk->logger, "Event Code: %s (0x%04X)", PTP_GetEventLabel(event->code), event->code);
             PTP_LOG_INFO_F(&deviceUsbk->logger, "Transaction: 0x%08X", event->transactionId);
             size_t headerSize = sizeof(PTPContainerHeader);
             if (event->length > headerSize) {

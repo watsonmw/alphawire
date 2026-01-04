@@ -24,7 +24,7 @@ extern "C" {
  *    ...
  *    PTPDeviceList ptpDeviceList{};
  *    // Open device list
- *    PTPDeviceList_Open(&ptpDeviceList);
+ *    PTPDeviceList_Open(&ptpDeviceList, allocator);
  *    // Poll for devices
  *    PTPDeviceList_RefreshList(&ptpDeviceList);
  *    // If one or more devices
@@ -60,6 +60,7 @@ typedef struct PTPDeviceList {
  * and WIA.
  *
  * @param self A pointer to the PTPDeviceList to be initialized.
+ * @param allocator Allocator to use for device list enumeration
  * @return TRUE if at least one backend was initialized
  */
 PTP_EXPORT b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);

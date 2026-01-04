@@ -17,21 +17,21 @@
 
 struct UiPtpProperty {
     char propCode[32];
-    char *propName;
+    char* propLabel;
     PTPProperty *prop;
 
     UiPtpProperty() {
         memset(propCode, 0, 32);
-        propName = NULL;
+        propLabel = NULL;
         prop = NULL;
     }
 
     void copy(const UiPtpProperty &other) noexcept {
         memcpy(this->propCode, other.propCode, 32);
-        if (other.propName == other.propCode) {
-            this->propName = this->propCode;
+        if (MCStrCmp(other.propLabel, other.propCode) == 0) {
+            this->propLabel = this->propCode;
         } else {
-            this->propName = other.propName;
+            this->propLabel = other.propLabel;
         }
         this->prop = other.prop;
     }
@@ -74,7 +74,7 @@ struct PropTable {
                     delta = strcmp(a.propCode, b.propCode);
                     break;
                 case 1: // Name
-                    delta = UTF8_StrCmp(a.propName, b.propName);
+                    delta = UTF8_StrCmp(a.propLabel, b.propLabel);
                     break;
                 case 2: // Type
                     delta = (int) a.prop->dataType - (int) b.prop->dataType;
@@ -107,9 +107,9 @@ struct PropTable {
 
             UiPtpProperty uiPtpProperty{};
             snprintf(uiPtpProperty.propCode,  sizeof(uiPtpProperty.propCode), "0x%04x", property->propCode);
-            uiPtpProperty.propName = PTP_GetPropertyStr(property->propCode);
-            if (uiPtpProperty.propName == NULL) {
-                uiPtpProperty.propName = uiPtpProperty.propCode;
+            uiPtpProperty.propLabel = PTP_GetPropertyLabel(property->propCode);
+            if (uiPtpProperty.propLabel == NULL) {
+                uiPtpProperty.propLabel = uiPtpProperty.propCode;
             }
             uiPtpProperty.prop = property;
 
@@ -117,7 +117,7 @@ struct PropTable {
                 items.emplace_back(uiPtpProperty);
             } else {
                 std::string propCode = uiPtpProperty.propCode;
-                std::string propName = uiPtpProperty.propName;
+                std::string propName = uiPtpProperty.propLabel;
                 if (findStringCaseInsensitive(propCode, searchText) ||
                     findStringCaseInsensitive(propName, searchText)) {
                     items.emplace_back(uiPtpProperty);
@@ -221,8 +221,8 @@ struct AppContext {
         }
         propTable.reset();
         if (connected) {
-            cameraSettingsSaveEnabled = PTPControl_PropertyEnabled(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
-            cameraSettingsReadEnabled = PTPControl_PropertyEnabled(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
+            cameraSettingsSaveEnabled = PTPControl_PropertyEnabled(&ptp, PTPControl_GetPropertyByCode(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED));
+            cameraSettingsReadEnabled = PTPControl_PropertyEnabled(&ptp, PTPControl_GetPropertyByCode(&ptp, DPC_CAMERA_SETTING_READ_ENABLED));
         }
     }
 

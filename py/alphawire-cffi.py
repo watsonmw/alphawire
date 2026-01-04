@@ -1,19 +1,22 @@
 import os
 import sys
+import time
 import typing
 
 sys.path.append(os.path.dirname(os.getcwd()) + "/build")
 
 from _alphawire_cffi import ffi, lib as awire_lib
 
-
 def _convert_c_str(c_str) -> str:
     return ffi.string(c_str).decode('utf-8')
 
+def _convert_m_str(m_str) -> str:
+    return ffi.string(m_str.str, m_str.size).decode('utf-8')
 
 def _USB_BcdVersionAsString(usbVersion) -> str:
     return f"{(usbVersion >> 8) & 0xFF}.{usbVersion & 0xFF:02d}"
 
+# Hide PTPProperty and PTPControl pointers - should only give handles to the python side
 
 class PTPDevice:
     def __init__(self, awire_lib, device):
@@ -42,7 +45,9 @@ class PTPControl:
         self.awire_lib.PTPControl_Connect(self.control, sonyProtocolVersion)
 
     def cleanup(self):
-        self.awire_lib.PTPControl_Cleanup(self.control)
+        if self.control is not None:
+            self.awire_lib.PTPControl_Cleanup(self.control)
+            self.control = None
 
     def get_num_properties(self) -> int:
         return self.awire_lib.PTPControl_NumProperties(self.control)
@@ -53,16 +58,22 @@ class PTPControl:
     def get_property_by_code(self, code: int):
         return self.awire_lib.PTPControl_GetPropertyByCode(self.control, code)
 
-    def get_property_value_as_str(self, code: int) -> typing.Optional[str]:
+    def get_property_by_name(self, name: str):
+        c_name = ffi.new("char[]", name.encode('utf-8'))
+        return self.awire_lib.PTPControl_GetPropertyByName(self.control, c_name)
+
+    def get_property_value_as_str(self, property) -> typing.Optional[str]:
         mstr = ffi.new("MStr[1]")
-        r = self.awire_lib.PTPControl_GetPropertyAsStr(self.control, code, mstr)
+        r = self.awire_lib.PTPControl_GetPropertyValueAsStr(self.control, property, self.allocator, mstr)
         if r:
-            return _convert_c_str(mstr[0].str)
+            s = _convert_m_str(mstr[0])
+            self.awire_lib.PTP_StrFree(self.allocator, ffi.addressof(mstr[0]))
+            return s
         else:
             return None
 
-    def get_property_name(self, code: int) -> typing.Optional[str]:
-        cstr = self.awire_lib.PTP_GetPropertyStr(code)
+    def get_property_label(self, code: int) -> typing.Optional[str]:
+        cstr = self.awire_lib.PTP_GetPropertyLabel(code)
         if cstr == ffi.NULL:
             return None
         else:
@@ -83,8 +94,9 @@ class PTPControl:
         live_view_frames = ffi.new("LiveViewFrames[1]")
         p_live_view_frames = ffi.addressof(live_view_frames[0])
 
-        if self.awire_lib.PTPControl_GetLiveViewImage(self.control, p_mem_io, p_live_view_frames):
-            self.awire_lib.PTP_FreeLiveViewFrames(self.allocator, live_view_frames)
+        self.awire_lib.PTPControl_GetLiveViewImage(self.control, p_mem_io, p_live_view_frames)
+        if self.live_view_image.size:
+            self.awire_lib.PTPControl_FreeLiveViewFrames(self.control, live_view_frames)
             buffer_obj = ffi.buffer(self.live_view_image.mem, self.live_view_image.size)
             return memoryview(buffer_obj)
 
@@ -99,9 +111,9 @@ class PTPControl:
 
 class PTPDeviceInfo:
     def __init__(self, dev: ffi.CData):
-        self.manufacturer = _convert_c_str(dev.manufacturer.str)
-        self.product = _convert_c_str(dev.product.str)
-        self.serial = _convert_c_str(dev.serial.str)
+        self.manufacturer = _convert_m_str(dev.manufacturer)
+        self.product = _convert_m_str(dev.product)
+        self.serial = _convert_m_str(dev.serial)
         self.usb_vid = dev.usbVID
         self.usb_pid =  dev.usbPID
         self.usb_version = _USB_BcdVersionAsString(dev.usbVersion)
@@ -178,6 +190,10 @@ class PTPDeviceList:
 
 
 def _run_tests(awire_lib):
+    # TODO: List devices
+    # TODO: Capture image
+    # TODO: Modify some shot parameters
+    # TODO: Allow device to be specified
     deviceList = PTPDeviceList(awire_lib)
     ok = deviceList.open()
     if ok:
@@ -193,9 +209,9 @@ def _run_tests(awire_lib):
             print(f"        Properties: {num_properties}")
             for i in range(num_properties):
                 property = control.get_property_at_index(i)
-                property_name = control.get_property_name(property.propCode)
+                property_name = control.get_property_label(property.propCode)
                 if property_name is not None:
-                    property_value = control.get_property_value_as_str(property.propCode)
+                    property_value = control.get_property_value_as_str(property)
                     print(f"            '{property_name}': {property_value}")
 
             # Print Controls
@@ -203,23 +219,32 @@ def _run_tests(awire_lib):
             print(f"        Controls: {num_controls}")
             for i in range(num_controls):
                 ctrl = control.get_control_at_index(i)
-                control_name = _convert_c_str(ctrl.name)
+                control_name = _convert_c_str(ctrl.label)
                 if control_name is not None:
                     print(f"            '{control_name}' [0x{ctrl.controlCode:04x}]")
 
             # Save Live View image
-            live_view_image = control.get_live_view_image()
-            if live_view_image is not None:
-                filename = "live_view.jpg"
-                print(f"Saving live view image to {filename}...")
-                with open(filename, "wb") as f:
-                    f.write(live_view_image)
+            live_view_image = None
+            tries = 0
+            while live_view_image is None:
+                live_view_image = control.get_live_view_image()
+                if live_view_image is not None:
+                    filename = "live_view.jpg"
+                    print(f"Saving live view image to {filename}...")
+                    with open(filename, "wb") as f:
+                        f.write(live_view_image)
+                    break
+                time.sleep(.5)
+                tries += 1
+                if tries >= 10:
+                    break
 
             # Capture Image & Download
-
             control.cleanup()
         deviceList.close()
 
 
 if __name__ == "__main__":
     _run_tests(awire_lib)
+    print("Done.")
+    exit(0)
