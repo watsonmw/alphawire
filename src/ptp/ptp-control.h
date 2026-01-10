@@ -239,6 +239,8 @@ PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, 
 /**
  * Get the number of image files queued for download on camera.
  *
+ * Call PTPControl_UpdateProperties() before calling this function to ensure local properties are uptodate.
+ *
  * Pre-2020 camera behavior depends on the camera model, sometimes the camera will return 0 but there are actually files
  * available to download.  Other times the value can go negative if you attempt to download when no images are pending.
  * Requires testing for your specific camera / firmware.  2020 and on cameras seem to be better behaved.

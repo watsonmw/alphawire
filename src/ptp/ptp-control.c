@@ -3779,6 +3779,15 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         self->transactionId = 0;
         u32 sessionId = 0x1;
         r = OpenSession(self, sessionId);
+        if (r == PTP_AW_TIMEOUT) {
+            // Maybe we should just always call Reset() or do it by default, since it can't really do much harm and can
+            // only help avoid a timeout on initial connection.
+            if (self->device->transport.reset) {
+                PTP_WARNING("Timeout while calling OpenSession() - will transport reset and retry...");
+                self->device->transport.reset(self->device);
+            }
+            r = OpenSession(self, sessionId);
+        }
         if (r != PTP_OK) {
             return r;
         }
@@ -3860,8 +3869,9 @@ PTPResult PTPControl_Cleanup(PTPControl* self) {
 
     ////////////////////////////////////////////
     // Close session (if not done by transport layer implicitly)
+    // Check for self->sessionId to ensure the session was successfully opened
     ////////////////////////////////////////////
-    if (self->device->transport.requiresSessionOpenClose) {
+    if (self->device->transport.requiresSessionOpenClose && self->sessionId) {
         CloseSession(self);
         self->sessionId = 0;
         self->transactionId = 0;

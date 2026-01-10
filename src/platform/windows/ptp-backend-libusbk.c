@@ -194,8 +194,8 @@ b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMi
                 MMemReadU32BE(&memIO, &outEvent->param1);
                 MMemReadU32BE(&memIO, &outEvent->param2);
                 MMemReadU32BE(&memIO, &outEvent->param3);
-                // MLogfNoNewLine("Payload: 0x");
-                // MLogBytes(eventBuffer + headerSize, payloadSize);
+                MLogfNoNewLine("Payload: 0x");
+                MLogBytes(eventBuffer + headerSize, payloadSize);
             }
             return TRUE;
         }
@@ -288,6 +288,11 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
         }
     }
 
+    DWORD winRrr = GetLastError();
+    if (winRrr != ERROR_SUCCESS && winRrr != ERROR_NO_MORE_ITEMS) {
+        WinUtils_LogLastError(&self->logger, "Failed to enumerate USB devices");
+    }
+
     return TRUE;
 }
 
@@ -376,7 +381,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
         UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
         CloseHandle(overlapped.hEvent);
         PTP_ERROR("Timeout or error while sending PTP request");
-        return PTP_GENERAL_ERROR;
+        return PTP_AW_TIMEOUT;
     }
 
     // 2. Write additional data, if provided
@@ -402,7 +407,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
             UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
             CloseHandle(overlapped.hEvent);
             PTP_ERROR("Timeout or error while sending PTP data");
-            return PTP_GENERAL_ERROR;
+            return PTP_AW_TIMEOUT;
         }
     }
 
@@ -423,7 +428,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
         UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
         CloseHandle(overlapped.hEvent);
         PTP_ERROR("Timeout or error while reading PTP response");
-        return PTP_GENERAL_ERROR;
+        return PTP_AW_TIMEOUT;
     }
 
     if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
@@ -485,7 +490,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
             UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
             CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger,"Timeout or error while reading final PTP response");
-            return PTP_GENERAL_ERROR;
+            return PTP_AW_TIMEOUT;
         }
 
         if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {

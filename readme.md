@@ -44,6 +44,8 @@ Downsides to alphawire:
 
 Use [Zadig](https://zadig.akeo.ie/) to switch drivers on Windows.
 
+If your device is not showing up, try updating the libusbk driver with Zadig.
+
 ### OSX Backend Support
 - IOKit
 
