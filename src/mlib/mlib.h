@@ -85,7 +85,11 @@ extern "C" {
 
 // Get type of variable. Useful in macros to get the type of a parameter
 #ifdef _MSC_VER
+#ifdef __cplusplus
+    #define M_TYPEOF(a) decltype(a)
+#else
     #define M_TYPEOF(a) __typeof__(a)
+#endif
 #else
     #define M_TYPEOF(a) typeof(a)
 #endif
