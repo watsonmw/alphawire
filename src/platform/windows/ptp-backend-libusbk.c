@@ -289,7 +289,7 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkDeviceList* self, PTPDeviceInfo** devic
     }
 
     DWORD winRrr = GetLastError();
-    if (winRrr != ERROR_SUCCESS && winRrr != ERROR_NO_MORE_ITEMS) {
+    if (winRrr != ERROR_SUCCESS && winRrr != ERROR_EMPTY && winRrr != ERROR_NO_MORE_ITEMS) {
         WinUtils_LogLastError(&self->logger, "Failed to enumerate USB devices");
     }
 
