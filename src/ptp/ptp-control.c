@@ -3089,8 +3089,8 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     return r.result;
 }
 
-static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
-    if (!incremental) {
+static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPResponse r, u64 numProperties) {
+    if (initial) {
         MArrayInit(self->allocator, self->properties, 0);
         MArrayInit(self->allocator, self->controls, 0);
     }
@@ -3102,7 +3102,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
         if (PTPControl_SupportsControl(self, propCode)) {
             // Handle control
             PtpControl *control = NULL;
-            if (incremental) {
+            if (!initial) {
                 control = PTPControl_GetControl(self, propCode);
             }
             if (!control) {
@@ -3151,7 +3151,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
         } else {
             // Handle property
             PTPProperty *property = NULL;
-            if (incremental) {
+            if (!initial) {
                 property = PTPControl_GetPropertyByCode(self, propCode);
             }
             if (!property) {
@@ -3201,8 +3201,8 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 incremental, P
     }
 }
 
-static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, PTPResponse r, u64 numProperties) {
-    if (!incremental) {
+static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 initial, PTPResponse r, u64 numProperties) {
+    if (initial) {
         MArrayInit(self->allocator, self->properties, numProperties);
         memset(self->properties, 0, numProperties * sizeof(PTPProperty));
     }
@@ -3212,11 +3212,11 @@ static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 incremental, P
         MMemReadU16LE(&r.memIo, &propCode);
 
         PTPProperty *property = NULL;
-        if (incremental) {
+        if (!initial) {
             property = PTPControl_GetPropertyByCode(self, propCode);
         }
         if (!property) {
-            property = MArrayAddPtr(self->allocator, self->properties);
+            property = MArrayAddPtrZ(self->allocator, self->properties);
             property->propCode = propCode;
         }
 
@@ -3267,7 +3267,13 @@ static void SetMetadataForProperties(PTPControl* self) {
     }
 }
 
-static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental, b32 addExtended) {
+enum GetAllExtDevicePropInfoUpdateMode {
+    INITIAL,
+    INCREMENTAL,
+    UPDATE_ALL
+};
+
+static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 initial, b32 incremental, b32 addExtended) {
     PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
     if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
         req.Params[0] = incremental ? 0x1 : 0x0;
@@ -3284,9 +3290,9 @@ static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 incremental,
     MMemReadU64LE(&r.memIo, &numProperties);
 
     if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
-        SDIO_ProcessDeviceProperties200(self, incremental, r, numProperties);
+        SDIO_ProcessDeviceProperties200(self, initial, r, numProperties);
     } else {
-        SDIO_ProcessDeviceProperties300(self, incremental, r, numProperties);
+        SDIO_ProcessDeviceProperties300(self, initial, r, numProperties);
     }
 
     SetMetadataForProperties(self);
@@ -3583,20 +3589,26 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
 
             if (frameNum) {
                 MArrayInit(self->allocator, focusFrames->frames, frameNum);
+                MArrayClear(focusFrames->frames);
 
                 for (int i = 0; i < frameNum; ++i) {
-                    FocusFrame* focusFrame = focusFrames->frames + i;
+                    FocusFrame* focusFrame = MArrayAddPtr(self->allocator, focusFrames->frames);
                     MMemReadU16LE(&r.memIo, &focusFrame->frameType);
                     MMemReadU16LE(&r.memIo, &focusFrame->focusFrameState);
                     MMemReadU8(&r.memIo, &focusFrame->priority);
                     MMemReadSkipBytes(&r.memIo, 3);
+                    MMemReadU32LE(&r.memIo, &focusFrame->x);
+                    MMemReadU32LE(&r.memIo, &focusFrame->y);
                     MMemReadU32LE(&r.memIo, &focusFrame->width);
                     MMemReadU32LE(&r.memIo, &focusFrame->height);
                 }
+            } else if (focusFrames->frames) {
+                MArrayClear(focusFrames->frames);
             }
 
-            if (liveViewFrames->version > 101) {
-            }
+            // Parse Face & tracking frames
+            // if (liveViewFrames->version > 101) {
+            // }
         }
     }
 
@@ -3779,11 +3791,15 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         self->transactionId = 0;
         u32 sessionId = 0x1;
         r = OpenSession(self, sessionId);
-        if (r == PTP_AW_TIMEOUT) {
+        if (r == PTP_AW_TIMEOUT || r == PTP_SESSION_ALREADY_OPEN) {
             // Maybe we should just always call Reset() or do it by default, since it can't really do much harm and can
             // only help avoid a timeout on initial connection.
             if (self->device->transport.reset) {
-                PTP_WARNING("Timeout while calling OpenSession() - will transport reset and retry...");
+                if (r == PTP_AW_TIMEOUT) {
+                    PTP_WARNING("Timeout while calling OpenSession() - will transport reset and retry...");
+                } else {
+                    PTP_WARNING("Session already open while calling OpenSession() - will transport reset and retry...");
+                }
                 self->device->transport.reset(self->device);
             }
             r = OpenSession(self, sessionId);
@@ -3841,7 +3857,7 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     }
 
     // Get property metadata & values
-    r = SDIO_GetAllExtDevicePropInfo(self, FALSE, TRUE);
+    r = SDIO_GetAllExtDevicePropInfo(self, TRUE, FALSE, TRUE);
     if (r != PTP_OK) {
         return r;
     }
@@ -3990,9 +4006,9 @@ PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index) {
     return self->properties + index;
 }
 
-PTPResult PTPControl_UpdateProperties(PTPControl* self) {
+PTPResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh) {
     PTP_TRACE("PTPControl_UpdateProperties");
-    return SDIO_GetAllExtDevicePropInfo(self, TRUE, TRUE);
+    return SDIO_GetAllExtDevicePropInfo(self, FALSE, !fullRefresh, TRUE);
 }
 
 static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8 lookupValue) {
@@ -4309,6 +4325,14 @@ b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property) {
     }
     PTP_TRACE_F("PTPControl_IsPropertyWritable(%x)", property->propCode);
     return property->getSet == 1 && property->isEnabled == 1;
+}
+
+b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* property) {
+    if (!property) {
+        return FALSE;
+    }
+    PTP_TRACE_F("PTPControl_IsPropertyNotch(%x)", property->propCode);
+    return property->isNotch && property->isEnabled == 1;
 }
 
 PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut) {

@@ -154,9 +154,12 @@ PTP_EXPORT PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 inde
 
 /**
  * Pull latest property values from device
+ * @param fullRefresh When set to TRUE: Refresh all properties, FALSE: Refresh only changed properties
+ *                    NOTE: Most property changes are correctly tracked by the camera, but PTPControl_GetPendingFiles()
+ *                    may not update when 'fullRefresh' is set to FALSE.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT PTPResult PTPControl_UpdateProperties(PTPControl* self);
+PTP_EXPORT PTPResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh);
 
 /**
  * Get property by property code
@@ -196,6 +199,7 @@ PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outE
 
 PTP_EXPORT b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* strOut);
 PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property);
+PTP_EXPORT b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* property);
 PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut);
 
 PTP_EXPORT PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value);
@@ -239,11 +243,9 @@ PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, 
 /**
  * Get the number of image files queued for download on camera.
  *
- * Call PTPControl_UpdateProperties() before calling this function to ensure local properties are uptodate.
- *
- * Pre-2020 camera behavior depends on the camera model, sometimes the camera will return 0 but there are actually files
- * available to download.  Other times the value can go negative if you attempt to download when no images are pending.
- * Requires testing for your specific camera / firmware.  2020 and on cameras seem to be better behaved.
+ * Call PTPControl_UpdateProperties(TRUE) before calling this function to ensure local properties are uptodate.
+ * 'TRUE' is needed as a partial/incremental refresh of properties may not include the updated count for pending files
+ * for some cameras.
  */
 PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
 

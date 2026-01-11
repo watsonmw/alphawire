@@ -33,7 +33,6 @@
 //     - Click to zoom
 //   Events API
 //   Log window to IMGUI
-//   Pre-2020 notch setter for ISO, fstop etc
 //   Settings apply
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
@@ -534,10 +533,12 @@ void ShowDebugPropertyListTab(AppContext& c) {
         }
 
         if (ImGui::Button("Refresh")) {
-            c.propAutoRefresh = true;
+            c.propRefresh = true;
         }
 
         ImGui::Checkbox("Auto Refresh", &c.propAutoRefresh);
+        ImGui::SameLine();
+        ImGui::Checkbox("Incremental", &c.propAutoRefreshIncremental);
 
         ImGuiTableFlags flags =
                 ImGuiTableFlags_Sortable |
@@ -672,17 +673,17 @@ static void ImGuiControlButton(AppContext &c, const char* buttonName, u16 proper
     }
 }
 
-void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* label) {
+static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* label) {
     if (PTPProperty* property = PTPControl_GetPropertyByCode(&c.ptp, propCode)) {
         MStr currentValAsStr = {};
         PTPControl_GetPropertyValueAsStr(&c.ptp, property, c.autoReleasePool, &currentValAsStr);
         if (PTPControl_IsPropertyWritable(&c.ptp, property)) {
-            PTPPropValueEnums captureModes = {};
-            if (PTPControl_GetEnumsForProperty(&c.ptp, property, c.autoReleasePool, &captureModes) &&
-                MArraySize(captureModes.values)) {
+            PTPPropValueEnums options = {};
+            if (PTPControl_GetEnumsForProperty(&c.ptp, property, c.autoReleasePool, &options) &&
+                MArraySize(options.values)) {
                 if (ImGui::BeginCombo(label, currentValAsStr.str)) {
-                    for (size_t i = 0; i < MArraySize(captureModes.values); ++i) {
-                        PTPPropValueEnum* valueEnum = captureModes.values + i;
+                    for (size_t i = 0; i < MArraySize(options.values); ++i) {
+                        PTPPropValueEnum* valueEnum = options.values + i;
                         bool isSelected = PTPProperty_Equals(property, valueEnum->propValue);
                         if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
                             PTPControl_SetPropertyValue(&c.ptp, property, valueEnum->propValue);
@@ -695,6 +696,18 @@ void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* label) {
         }
 
         ImGui::Text("%s: %.*s", label, currentValAsStr.size, currentValAsStr.str);
+        if (PTPControl_IsPropertyNotch(&c.ptp, property)) {
+            ImGui::PushID(propCode);
+            ImGui::SameLine();
+            if (ImGui::Button("Notch Down")) {
+                PTPControl_SetPropertyNotch(&c.ptp, property, -1);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Notch Up")) {
+                PTPControl_SetPropertyNotch(&c.ptp, property, 1);
+            }
+            ImGui::PopID();
+        }
     }
 }
 
@@ -745,6 +758,9 @@ void ShowCameraControlsWindow(AppContext& c) {
                 ImGui::EndCombo();
             }
         }
+
+        // Focus Area
+        ImGuiBuildPropertyCombo(c, DPC_FOCUS_AREA, "Focus Area");
 
         MStr afStatus = {};
         PTPProperty* propAfStatus = PTPControl_GetPropertyByCode(&c.ptp, DPC_AUTO_FOCUS_STATUS);
@@ -1002,18 +1018,23 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::End();
 }
 
-const float AUTO_REFRESH_INTERVAL_SECS = 2.0f;
+const float AUTO_REFRESH_INTERVAL_SECS = 1.0f;
 
 static void RefreshProperties(AppContext& c) {
+    bool fullRefresh = TRUE;
+    bool propRefresh =  c.propRefresh;
+
     if (c.propAutoRefresh) {
         double currentTime = ImGui::GetTime();
         if (currentTime - c.propertyLastRefreshTime >= AUTO_REFRESH_INTERVAL_SECS) {
-            c.propRefresh = true;
+            propRefresh = true;
+            fullRefresh = !c.propAutoRefreshIncremental;
         }
     }
 
-    if (c.propRefresh) {
-        PTPControl_UpdateProperties(&c.ptp);
+    if (propRefresh) {
+        PTPControl_UpdateProperties(&c.ptp, fullRefresh);
+        c.propRefresh = false;
         c.propertyLastRefreshTime = ImGui::GetTime();
         c.propTable.needsRebuild = true;
     }

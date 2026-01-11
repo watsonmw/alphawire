@@ -522,6 +522,8 @@ typedef struct {
     u16 frameType; // SD_FocusFrameType
     u16 focusFrameState; // SD_FocusFrameState
     u8 priority;
+    u32 x;
+    u32 y;
     u32 height;
     u32 width;
 } FocusFrame;

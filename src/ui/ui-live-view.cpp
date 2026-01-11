@@ -12,6 +12,26 @@
 
 #include "mlib/mlib.h"
 
+// Helper function to draw corner angles for small rectangles
+static void DrawRectCorners(ImDrawList *drawList, const ImVec2 &rectMin, const ImVec2 &rectMax, ImU32 color,
+                            float thickness, float cornerLength) {
+    // Top-left corner
+    drawList->AddLine(ImVec2(rectMin.x, rectMin.y), ImVec2(rectMin.x + cornerLength, rectMin.y), color, thickness);
+    drawList->AddLine(ImVec2(rectMin.x, rectMin.y), ImVec2(rectMin.x, rectMin.y + cornerLength), color, thickness);
+
+    // Top-right corner
+    drawList->AddLine(ImVec2(rectMax.x - cornerLength, rectMin.y), ImVec2(rectMax.x, rectMin.y), color, thickness);
+    drawList->AddLine(ImVec2(rectMax.x, rectMin.y), ImVec2(rectMax.x, rectMin.y + cornerLength), color, thickness);
+
+    // Bottom-left corner
+    drawList->AddLine(ImVec2(rectMin.x, rectMax.y - cornerLength), ImVec2(rectMin.x, rectMax.y), color, thickness);
+    drawList->AddLine(ImVec2(rectMin.x, rectMax.y), ImVec2(rectMin.x + cornerLength, rectMax.y), color, thickness);
+
+    // Bottom-right corner
+    drawList->AddLine(ImVec2(rectMax.x, rectMax.y - cornerLength), ImVec2(rectMax.x, rectMax.y), color, thickness);
+    drawList->AddLine(ImVec2(rectMax.x - cornerLength, rectMax.y), ImVec2(rectMax.x, rectMax.y), color, thickness);
+}
+
 // Simple helper function to load an image into a OpenGL texture with common settings
 bool LoadTextureFromMemory(const MMemIO* memIo, ImTextureID* out_texture, i32* out_width, i32* out_height)
 {
@@ -60,8 +80,6 @@ void UiPtpLiveViewShow(AppContext& c) {
     if (refresh) {
         c.liveViewLastTime = currentTime;
         if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames) == PTP_OK) {
-            PTPControl_FreeLiveViewFrames(&c.ptp, &c.liveViewFrames);
-
             LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId,
                                   &c.liveViewImageWidth, &c.liveViewImageHeight);
         }
@@ -91,6 +109,45 @@ void UiPtpLiveViewShow(AppContext& c) {
                 (windowSize.y - renderHeight) * 0.5f);
         ImGui::SetCursorPos(imagePos);
         ImGui::Image(c.liveViewImageGLId, ImVec2(renderWidth, renderHeight));
+
+        // Indicate detected focus frames
+        if (MArraySize(c.liveViewFrames.focus.frames)) {
+            ImDrawList *drawList = ImGui::GetWindowDrawList();
+            ImVec2 windowPos = ImGui::GetWindowPos();
+
+            MArrayEachPtr(c.liveViewFrames.focus.frames, it) {
+                const auto& frame = it.p;
+
+                f32 x = frame->x / (f32)c.liveViewFrames.focus.xDenominator;
+                f32 y = frame->y / (f32)c.liveViewFrames.focus.yDenominator;
+                f32 w = frame->width / (f32)c.liveViewFrames.focus.xDenominator;
+                f32 h = frame->height / (f32)c.liveViewFrames.focus.yDenominator;
+
+                x *= renderWidth;
+                y *= renderHeight;
+                w *= renderWidth * .5;
+                h *= renderHeight * .5;
+
+                ImVec2 rectMin(windowPos.x + imagePos.x + x - w,windowPos.y + imagePos.y + y - h);
+                ImVec2 rectMax(windowPos.x + imagePos.x + x + w, windowPos.y + imagePos.y + y + h);
+
+                ImU32 colour = IM_COL32(0, 255, 0, 255);
+                if (frame->focusFrameState == SD_Focused) {
+                    colour = IM_COL32(0, 255, 0, 255);
+                } else if (frame->focusFrameState == SD_NotFocused) {
+                    colour = IM_COL32(255, 0, 0, 255);
+                } else {
+                    colour = IM_COL32(255, 255, 255, 255);
+                }
+
+                float cornerLength = 10.0f;
+                if (w > cornerLength && h > cornerLength) {
+                    DrawRectCorners(drawList, rectMin, rectMax, colour, 2.0f, cornerLength);
+                } else {
+                    drawList->AddRect(rectMin, rectMax, colour, 0.0f, 0, 2.0f);
+                }
+            }
+        }
     }
 
     ImGui::End();

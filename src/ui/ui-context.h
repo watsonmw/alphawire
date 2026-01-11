@@ -162,6 +162,7 @@ struct AppContext {
     // Properties refresh
     double propertyLastRefreshTime = 0.;
     bool propAutoRefresh = true;
+    bool propAutoRefreshIncremental = false;
     bool propRefresh = true;
 
     // Property & Controls Debug
@@ -248,9 +249,10 @@ struct AppContext {
 
     void DisconnectDevice() {
         if (device != NULL) {
+            MMemFree(&this->liveViewImage);
+            PTPControl_FreeLiveViewFrames(&ptp, &liveViewFrames);
             PTPControl_Cleanup(&ptp);
             PTPDeviceList_CloseDevice(&ptpDeviceList, device);
-            MMemFree(&this->liveViewImage);
 #ifdef M_MEM_DEBUG
             MMemDebugDeinit(&deviceAllocator);
 #endif
