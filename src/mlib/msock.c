@@ -2,6 +2,14 @@
 
 #include <string.h>
 
+#ifndef _WIN32
+    #include <sys/fcntl.h>
+    #include <arpa/inet.h>
+    #include <netdb.h>
+    #include <unistd.h>
+    #include <errno.h>
+#endif
+
 int MSockInit() {
 #ifdef _WIN32
     WSADATA wsa;
@@ -136,7 +144,7 @@ int MSockConnectHost(MSock sock, MStrView host, u16 port, MSockAddress* outAddr)
         addr->sin6_port = htons(port);
     }
 
-    if (connect(sock, res->ai_addr, (int)res->ai_addrlen) == SOCKET_ERROR) {
+    if (connect(sock, res->ai_addr, (int)res->ai_addrlen) == MSOCK_ERROR) {
         freeaddrinfo(res);
         return -3;
     }

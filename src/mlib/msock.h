@@ -7,10 +7,6 @@
     #include <ws2tcpip.h>
 #else
     #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <errno.h>
 #endif
 
 #ifdef __cplusplus

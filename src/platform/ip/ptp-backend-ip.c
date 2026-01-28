@@ -10,6 +10,12 @@
 #include "platform/usb-const.h"
 #include "ptp/ptp-device-list.h"
 
+#ifndef _WIN32
+    #include <arpa/inet.h>
+    #include <netdb.h>
+    #include <unistd.h>
+#endif
+
 typedef enum PTPIpPacketTypes {
     PTPIP_TYPE_INIT_COMMAND_REQUEST = 0x1,
     PTPIP_TYPE_INIT_COMMAND_ACK = 0x2,
@@ -110,7 +116,7 @@ void PTPDeviceIp_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMem,
     }
 }
 
-static int TcpReadBytesIntoBuffer(SOCKET socket, MMemIO* in, MMemIO* inRead, u32 bytesToRead) {
+static int TcpReadBytesIntoBuffer(MSock socket, MMemIO* in, MMemIO* inRead, u32 bytesToRead) {
     i32 bytesRead = in->size - inRead->size;
     while (bytesToRead > bytesRead) {
         i32 memSize = in->capacity - in->size;
@@ -131,11 +137,11 @@ static int TcpReadBytesIntoBuffer(SOCKET socket, MMemIO* in, MMemIO* inRead, u32
     return bytesRead;
 }
 
-static int TcpSendAllBytes(SOCKET socket, const void* data, size_t dataSize) {
+static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
     int totalSent = 0;
     while (totalSent < dataSize) {
         int s = send(socket, (char *) data + totalSent, (int) (dataSize - totalSent), 0);
-        if (s == SOCKET_ERROR || s == 0) {
+        if (s == MSOCK_ERROR || s == 0) {
             return s;
         }
         totalSent += s;
@@ -179,7 +185,7 @@ static PTPResult PTPDeviceIp_SendAndRecvEx(void* deviceSelf, PTPRequestHeader* r
         MMemWriteU32LE(&out, request->Params[i]);
     }
     int s = TcpSendAllBytes(dev->dataSock, out.mem, out.size);
-    if (s == SOCKET_ERROR) {
+    if (s == MSOCK_ERROR) {
         error = PTP_AW_TIMEOUT;
         goto exitWithError;
     } else if (s == 0) {
@@ -203,7 +209,7 @@ static PTPResult PTPDeviceIp_SendAndRecvEx(void* deviceSelf, PTPRequestHeader* r
         MMemWriteU32LE(&out, PTPIP_TYPE_DATA_PACKET_END);
         MMemWriteU32LE(&out, request->TransactionId);
         s = TcpSendAllBytes(dev->dataSock, out.mem, out.size);
-        if (s == SOCKET_ERROR) {
+        if (s == MSOCK_ERROR) {
             goto exitWithError;
         } else if (s == 0) {
             goto exitWithError;
@@ -223,7 +229,7 @@ static PTPResult PTPDeviceIp_SendAndRecvEx(void* deviceSelf, PTPRequestHeader* r
 
     while (TRUE) {
         int r = TcpReadBytesIntoBuffer(dev->dataSock, &in, &inRead, 8);
-        if (r == SOCKET_ERROR) {
+        if (r == MSOCK_ERROR) {
             error = PTP_AW_TIMEOUT;
             goto exitWithError;
         } else if (r == 0) {
@@ -242,7 +248,7 @@ static PTPResult PTPDeviceIp_SendAndRecvEx(void* deviceSelf, PTPRequestHeader* r
         u32 payloadLen = responseLen - 8;
         r = TcpReadBytesIntoBuffer(dev->dataSock, &in, &inRead, payloadLen);
         inRead.mem = in.mem;
-        if (r == SOCKET_ERROR) {
+        if (r == MSOCK_ERROR) {
             error = PTP_AW_TIMEOUT;
             goto exitWithError;
         } else if (r == 0) {
@@ -343,7 +349,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     PTPResult error = PTP_OK;
 
     PTPIpDevice dev = {};
-    dev.eventSock = INVALID_SOCKET;
+    dev.eventSock = MSOCK_INVALID;
     dev.dataSock = MSockMakeTcpSocket();
 
     MSockSetSocketTimeout(dev.dataSock, 60000);
@@ -371,7 +377,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     MMemWriteU32LE(&out, 0x00010000); // Protocol version
     
     int s = TcpSendAllBytes(dev.dataSock, out.mem, out.size);
-    if (s == SOCKET_ERROR) {
+    if (s == MSOCK_ERROR) {
         error = PTP_AW_TIMEOUT;
         goto exitWithError;
     } else if (s == 0) {
@@ -387,7 +393,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
 
     // Wait for Init Command Ack
     int r = TcpReadBytesIntoBuffer(dev.dataSock, &in, &inRead, 8);
-    if (r == SOCKET_ERROR) {
+    if (r == MSOCK_ERROR) {
         error = PTP_AW_TIMEOUT;
         goto exitWithError;
     } else if (r == 0) {
@@ -405,7 +411,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
 
     u32 payloadLen = responseLen - 8;
     r = TcpReadBytesIntoBuffer(dev.dataSock, &in, &inRead, payloadLen);
-    if (r == SOCKET_ERROR) {
+    if (r == MSOCK_ERROR) {
         error = PTP_AW_TIMEOUT;
         goto exitWithError;
     } else if (r == 0) {
@@ -430,7 +436,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
 
     // Setup Event Socket
     dev.eventSock = MSockMakeTcpSocket();
-    if (dev.eventSock == INVALID_SOCKET) {
+    if (dev.eventSock == MSOCK_INVALID) {
         goto exitWithError;
     }
 
@@ -446,7 +452,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     MMemWriteU32LE(&out, dev.sessionId);
 
     s = TcpSendAllBytes(dev.eventSock, out.mem, out.size);
-    if (s == SOCKET_ERROR) {
+    if (s == MSOCK_ERROR) {
         error = PTP_AW_TIMEOUT;
         goto exitWithError;
     } else if (s == 0) {
@@ -460,7 +466,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
 
     // Wait for Init Event Ack
     r = TcpReadBytesIntoBuffer(dev.eventSock, &in, &inRead, 8);
-    if (r == SOCKET_ERROR) {
+    if (r == MSOCK_ERROR) {
         error = PTP_AW_TIMEOUT;
         goto exitWithError;
     } else if (r == 0) {
@@ -568,12 +574,12 @@ static b32 PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
                 PTP_INFO_F("Sending M-SEARCH on interface: %s", ipStr);
                 
                 if (setsockopt(self->discoverySock, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip->sin_addr,
-                    sizeof(ip->sin_addr)) == SOCKET_ERROR) {
+                    sizeof(ip->sin_addr)) == MSOCK_ERROR) {
                     PTP_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastError());
                 }
 
                 int sent = sendto(self->discoverySock, msg, msgSize, 0, (struct sockaddr*)&addr, sizeof(addr));
-                if (sent == SOCKET_ERROR) {
+                if (sent == MSOCK_ERROR) {
                     PTP_ERROR_F("PTPIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastError());
                 }
             }
