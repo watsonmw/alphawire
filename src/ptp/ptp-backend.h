@@ -29,6 +29,7 @@ typedef enum {
     PTP_BACKEND_LIBUSBK,
     PTP_BACKEND_IOKIT,
     PTP_BACKEND_LIBUSB,
+    PTP_BACKEND_IP,
 } PTPBackendType;
 
 // Generic device info - describing an available device
@@ -37,6 +38,7 @@ typedef struct PTPDeviceInfo {
     MStr manufacturer;
     MStr product;
     MStr serial;
+    MStr ipAddress;
     u16 usbVID;
     u16 usbPID;
     u16 usbVersion;
@@ -56,8 +58,9 @@ typedef struct PTPDevice {
 struct PTPBackend;
 
 typedef b32 (*PTPBackend_Close_Func)(struct PTPBackend* backend);
-typedef b32 (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
 typedef b32 (*PTPBackend_NeedsRefresh_Func)(struct PTPBackend* backend);
+typedef b32 (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
+typedef b32 (*PTPBackend_PollListUpdates_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
 typedef void (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
@@ -65,8 +68,10 @@ typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice
 // Generic backend
 typedef struct PTPBackend {
     PTPBackend_Close_Func close;
-    PTPBackend_RefreshList_Func refreshList;
     PTPBackend_NeedsRefresh_Func needsRefresh;
+    PTPBackend_RefreshList_Func refreshList;
+    PTPBackend_NeedsRefresh_Func isRefreshingList;
+    PTPBackend_PollListUpdates_Func pollListUpdates;
     PTPBackend_ReleaseList_Func releaseList;
     PTPBackend_OpenDevice_Func openDevice;
     PTPBackend_CloseDevice_Func closeDevice;

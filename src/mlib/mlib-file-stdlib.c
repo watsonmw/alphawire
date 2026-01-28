@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 MReadFileRet MFileReadWithOffset(MAllocator* allocator, const char* filePath, u32 offset, u32 readSize) {
-    MReadFileRet ret = {};
+    MReadFileRet ret = {0};
 
     FILE *file = fopen(filePath, "rb");
     if (file == NULL) {
@@ -32,7 +32,7 @@ MReadFileRet MFileReadWithOffset(MAllocator* allocator, const char* filePath, u3
 }
 
 MFile MFileWriteOpen(const char* filePath) {
-    MFile fileData = {};
+    MFile fileData = {0};
 
     FILE *file = fopen(filePath, "wb");
     if (file == NULL) {

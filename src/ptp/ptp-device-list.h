@@ -15,7 +15,7 @@ extern "C" {
  *
  * This structure serves as the central data model for managing connected PTP devices,
  * the respective backends for communication, and the currently active open devices.
- * It also tracks the state regarding whether the device list is up-to-date, in the
+ * It also tracks the state regarding whether the device list is up to date, in the
  * case where the backends support it.
  *
  * @code{.c}
@@ -56,8 +56,8 @@ typedef struct PTPDeviceList {
  * Opens the PTPDeviceList by initializing and configuring available backends.
  *
  * This function iterates through the predefined backends and initializes each one,
- * adding them to the PTPDeviceList instance. Supported backends include LibUSBK
- * and WIA.
+ * adding them to the PTPDeviceList instance. Supported backends include LibUSBK, LibUSB,
+ * WIA, and TCP/IP.
  *
  * @param self A pointer to the PTPDeviceList to be initialized.
  * @param allocator Allocator to use for device list enumeration
@@ -83,10 +83,13 @@ PTP_EXPORT b32 PTPDeviceList_Close(PTPDeviceList* self);
  * This function updates the state of the device list and populates it with the
  * latest set of devices available from all backends.
  *
+ * Blocking in most cases, but for the IP backend camera can take some time to response so response must
+ * be polled.
+ *
  * @param self A pointer to the PTPDeviceList instance to be refreshed.
  * @return Returns TRUE (1) upon successful refresh of the device list.
  */
-b32 PTP_EXPORT PTPDeviceList_RefreshList(PTPDeviceList* self);
+PTP_EXPORT b32 PTPDeviceList_RefreshList(PTPDeviceList* self);
 
 /**
  * Quick check if PTPDeviceList needs a refresh, without actually refreshing.
@@ -98,6 +101,24 @@ b32 PTP_EXPORT PTPDeviceList_RefreshList(PTPDeviceList* self);
  * @return TRUE if the list needs to be refreshed, FALSE otherwise.
  */
 PTP_EXPORT b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
+
+/**
+ * If PTPDeviceList_RefreshList() starts a refresh in the background, use this function to check if polling for
+ * updates is necessary (calls to PTPDeviceList_PollUpdates() will add new devices found).
+ *
+ * @param self Pointer to the PTPDeviceList instance to be checked.
+ * @return TRUE if the list is currently being refreshed, FALSE otherwise.
+ */
+PTP_EXPORT b32 PTPDeviceList_IsRefreshingList(PTPDeviceList* self);
+
+/**
+ * If PTPDeviceList_RefreshList() start a refresh in the background, use this function to check if polling for
+ * updates as necessary (calls to PTPDeviceList_PollUpdates() will add new devices found).
+ *
+ * @param self Pointer to the PTPDeviceList instance to be checked.
+ * @return TRUE if a device was added
+ */
+PTP_EXPORT b32 PTPDeviceList_PollUpdates(PTPDeviceList* self);
 
 /**
  * Number of devices found.

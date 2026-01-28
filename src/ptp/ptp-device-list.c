@@ -12,6 +12,9 @@
 #ifdef PTP_ENABLE_LIBUSB
 #include "platform/libusb/ptp-backend-libusb.h"
 #endif
+#ifdef PTP_ENABLE_IP
+#include "platform/ip/ptp-backend-ip.h"
+#endif
 
 static PTPBackendType sBackends[] = {
 #ifdef PTP_ENABLE_IOKIT
@@ -24,12 +27,15 @@ static PTPBackendType sBackends[] = {
     PTP_BACKEND_LIBUSBK,
 #endif
 #ifdef PTP_ENABLE_LIBUSB
-    PTP_BACKEND_LIBUSB
+    PTP_BACKEND_LIBUSB,
+#endif
+#ifdef PTP_ENABLE_IP
+    PTP_BACKEND_IP
 #endif
 };
 
 static PTPBackend* AddBackendSlot(PTPDeviceList* self, PTPBackendType backendType) {
-    PTPBackend* backend = MArrayAddPtr(self->allocator, self->backends);
+    PTPBackend* backend = MArrayAddPtrZ(self->allocator, self->backends);
     backend->type = backendType;
     backend->logger = self->logger;
     backend->allocator = self->allocator;
@@ -85,6 +91,15 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
 #endif
                 break;
             }
+            case PTP_BACKEND_IP: {
+#ifdef PTP_ENABLE_IP
+                PTPBackend *backend = AddBackendSlot(self, backendType);
+                if (PTPIpDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                    backendsOpened = TRUE;
+                }
+#endif
+                break;
+            }
         }
     }
     return backendsOpened;
@@ -107,6 +122,7 @@ void PTPDeviceList_ReleaseList(PTPDeviceList* self, b32 free) {
             MStrFree(self->allocator, deviceInfo->manufacturer);
             MStrFree(self->allocator, deviceInfo->product);
             MStrFree(self->allocator, deviceInfo->serial);
+            MStrFree(self->allocator, deviceInfo->ipAddress);
         }
         if (free) {
             MArrayFree(self->allocator, self->devices);
@@ -156,13 +172,39 @@ b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self) {
     return FALSE;
 }
 
+b32 PTPDeviceList_PollUpdates(PTPDeviceList* self) {
+    PTP_TRACE("PTPDeviceList_PollUpdates");
+    b32 ret = FALSE;
+    MArrayEachPtr(self->backends, backend) {
+        if (backend.p->isRefreshingList && backend.p->pollListUpdates) {
+            if (backend.p->isRefreshingList(backend.p)) {
+                PTP_TRACE_F("PollListUpdates for backend '%s'...", PTPBackend_GetTypeAsStr(backend.p->type));
+                if (backend.p->pollListUpdates(backend.p,  &self->devices)) {
+                    ret = TRUE;
+                }
+            }
+        }
+    }
+    return ret;
+}
+
+b32 PTPDeviceList_IsRefreshingList(PTPDeviceList* self) {
+    PTP_TRACE("PTPDeviceList_IsRefreshingList");
+    MArrayEachPtr(self->backends, backend) {
+        if (backend.p->isRefreshingList && backend.p->isRefreshingList(backend.p)) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPDeviceList_OpenDevice");
     PTP_INFO_F("Opening device %.*s (%.*s)...", deviceInfo->product.size, deviceInfo->product.str,
         deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
 
     PTPBackend* backend = PTPDeviceList_GetBackend(self, deviceInfo->backendType);
-    PTPDevice* device = MArrayAddPtr(self->allocator, self->openDevices);
+    PTPDevice* device = MArrayAddPtrZ(self->allocator, self->openDevices);
     b32 r = backend->openDevice(backend, deviceInfo, &device);
     if (r) {
         *deviceOut = device;

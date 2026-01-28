@@ -10,6 +10,8 @@ const char* PTPBackend_GetTypeAsStr(PTPBackendType type) {
             return "IOKit";
         case PTP_BACKEND_LIBUSB:
             return "libusb";
+        case PTP_BACKEND_IP:
+            return "ip";
     }
     MBreakpointf("PTPBackend_GetTypeAsStr: Unknown PTPBackendType %d", type);
     return "Unknown";

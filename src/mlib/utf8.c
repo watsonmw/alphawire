@@ -1,4 +1,4 @@
-#include "mlib/utf.h"
+#include "mlib/utf8.h"
 
 size_t UTF8_GetConvertUTF16Len(const u16* utf16, size_t utf16Len) {
     size_t utf8Len = 0;
@@ -104,23 +104,7 @@ size_t UTF8_ConvertFromUTF16(const u16* utf16In, size_t inLen, char* utf8Out, si
     return outPos;
 }
 
-// Get the length of the UTF-8 sequence based on the first byte
-MINLINE size_t UTF8_SequenceLength(u8 firstByte) {
-    if ((firstByte & 0x80) == 0) {
-        return 1; // 0xxxxxxx
-    } else if ((firstByte & 0xE0) == 0xC0) {
-        return 2; // 110xxxxx
-    } else if ((firstByte & 0xF0) == 0xE0) {
-        return 3; // 1110xxxx
-    } else if ((firstByte & 0xF8) == 0xF0) {
-        return 4; // 11110xxx
-    } else {
-        return 1; // Invalid UTF-8, treat as single byte
-    }
-}
-
-// Decode a UTF-8 sequence into a Unicode codepoint
-static u32 UTF8_Decode(const u8* str, size_t* len) {
+u32 UTF8_Decode(const u8* str, size_t* len) {
     u32 codepoint = 0;
     *len = UTF8_SequenceLength(str[0]);
 

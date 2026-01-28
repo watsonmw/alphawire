@@ -135,16 +135,17 @@ b32 PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** d
             libusbDeviceInfo->device = libusb_ref_device(dev);
 
             PTPDeviceInfo* deviceInfo = MArrayAddPtrZ(self->allocator, *devices);
-            deviceInfo->manufacturer = MStrMake(self->allocator, manufacturer);
-            deviceInfo->product = MStrMake(self->allocator, product);
-            deviceInfo->serial = MStrMake(self->allocator, serial);
+            deviceInfo->manufacturer = MStrMakeCopyC(self->allocator, manufacturer);
+            deviceInfo->product = MStrMakeCopyC(self->allocator, product);
+            deviceInfo->serial = MStrMakeCopyC(self->allocator, serial);
             deviceInfo->usbVID = desc.idVendor;
             deviceInfo->usbPID = desc.idProduct;
             deviceInfo->usbVersion = desc.bcdUSB;
             deviceInfo->backendType = PTP_BACKEND_LIBUSB;
             deviceInfo->device = libusbDeviceInfo;
 
-            PTP_INFO_F("Found device: %s (%s)", deviceInfo->product.str, deviceInfo->manufacturer.str);
+            PTP_INFO_F("Found device: %.*s (%.*s)", deviceInfo->product.size, deviceInfo->product.str,
+                deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
         }
     }
 
@@ -327,7 +328,7 @@ b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* 
     u8 bulkIn = 0, bulkOut = 0, interruptIn = 0;
     CheckDeviceHasPtpEndPoints(self, dev, &bulkIn, &bulkOut, &interruptIn);
 
-    PTPDeviceLibusb* deviceLibusb = MArrayAddPtr(self->allocator, self->openDevices);
+    PTPDeviceLibusb* deviceLibusb = MArrayAddPtrZ(self->allocator, self->openDevices);
     deviceLibusb->device = libusb_ref_device(dev);
     deviceLibusb->handle = handle;
     deviceLibusb->usbBulkIn = bulkIn;

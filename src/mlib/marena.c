@@ -241,7 +241,7 @@ void MArenaReset(MArena* arena) {
 }
 
 MArenaStats MArenaGetStats(MArena* arena) {
-    MArenaStats stats = {};
+    MArenaStats stats = {0};
     MArenaBlock* block = arena->curBlock;
 
     stats.usedBytes += (arena->end - arena->mem);

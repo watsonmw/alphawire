@@ -15,15 +15,15 @@
 //
 // Feature defines:
 //
-//  * M_ASSERT           * Asserts & breakpoints
-//  * M_LOG_ALLOCATIONS  * Log allocations
-//  * M_MEM_DEBUG        * Heap checking
-//  * M_STACKTRACE       * Enable Stacktraces
-//   - M_LIBBACKTRACE     - Use libbacktrace
-//  * M_THREADING        * Enable threading / thread local / mutexes
-//   - M_PTHREADS         - Use pthreads
+//  - M_ASSERT            Asserts & breakpoints
+//  - M_LOG_ALLOCATIONS   Log allocations
+//  - M_MEM_DEBUG         Heap checking
+//  - M_STACKTRACE        Enable Stacktraces
+//  -- M_LIBBACKTRACE     Use libbacktrace
+//  - M_THREADING         Enable threading / thread local / mutexes
+//  -- M_PTHREADS         Use pthreads
 //
-#include <string.h>
+#include <string.h> // memcpy() / size_t
 
 typedef char i8;
 typedef unsigned char u8;
@@ -435,6 +435,11 @@ void MMemWriteI32BE(MMemIO* memIO, i32 val);
 void MMemWriteU32LE(MMemIO* memIO, u32 val);
 void MMemWriteU32BE(MMemIO* memIO, u32 val);
 
+void MMemWriteI64LE(MMemIO* memIO, i64 val);
+void MMemWriteI64BE(MMemIO* memIO, i64 val);
+void MMemWriteU64LE(MMemIO* memIO, u64 val);
+void MMemWriteU64BE(MMemIO* memIO, u64 val);
+
 void MMemWriteU8CopyN(MMemIO* writer, u8* src, u32 size);
 void MMemWriteI8CopyN(MMemIO* writer, i8* src, u32 size);
 
@@ -494,9 +499,9 @@ MINLINE u8* MMemReadAdvance(MMemIO* reader, u32 skipBytes) {
     return pos;
 }
 
-// Make pointer align to given given alignment (move pointer forward to make it align)
+// Make pointer align to given alignment (move pointer forward to make it align)
 MINLINE void* MPtrAlign(void* ptr, size_t alignBytes) {
-    return (void*)((size_t)((u8*)ptr + alignBytes - 1) & ~(alignBytes - 1));
+    return (void*)((uintptr_t)((u8*)ptr + alignBytes - 1) & ~(alignBytes - 1));
 }
 
 // Return byte size nearest multiple of alignBytes that size will fit in
@@ -541,10 +546,10 @@ typedef struct {
 #define MArrayGrow(m, a, s) ((a) = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s))
 
 // Insert a value at the given index to an array (may involve moving memory and/or reallocation)
-#define MArrayInsert(m, a, i, v) ((a) = M_ArrayInsertSpace(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i)), ((a)[(i)] = (v)), 0)
+#define MArrayInsert(m, a, i, v) do { (a) = M_ArrayInsertSpace(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i)); (a)[(i)] = (v); } while (0)
 
 // Set value in the array, resize if necessary, gaps are initialized to zero.
-#define MArraySet(m, a, i, v) ((a) = M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i) + 1)), (((a)[(i)] = (v)), 0)
+#define MArraySet(m, a, i, v) do { (a) = M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i) + 1); (a)[(i)] = (v); } while (0)
 
 #define MArraySize(a) ((a) ? M_ArrayHeader(a)->size : 0)
 #define MArrayLen(a) (MArraySize(a))
@@ -552,6 +557,8 @@ typedef struct {
 #define MArrayCapacity(a) ((a) ? M_ArrayHeader(a)->capacity : 0)
 
 // Pop an item from the end of the array and return a copy of it
+// If you don't use the return value, to avoid the unused computed value warning,
+// cast to (void), e.g. (void)MArrayPop(a)
 #define MArrayPop(a) ((a)[--(M_ArrayHeader(a)->size)])
 
 #define MArrayLast(a) ((a)[(M_ArrayHeader(a)->size) - 1])
@@ -566,7 +573,7 @@ typedef struct {
 
 #define MArrayEachPtr(a, it) for ( \
     M_DISABLE_ANON_STRUCT_WARN_B struct {M_TYPEOF(a) p; size_t i;} M_DISABLE_ANON_STRUCT_WARN_E \
-    (it) = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), ++((it).p))
+    it = {(a), 0}; ((it).i) < MArraySize(a); ++((it).i), ++((it).p))
 
 #define M_ArrayHeader(a) ((MArrayHeader*)(a) - 1)
 
@@ -710,9 +717,11 @@ MParseResult MParseF32(const char* start, const char* end, f32* out);
 MParseResult MParseBool(const char* pos, const char* end, b32* out);
 
 MINLINE int MCharIsDigit(char c) { return (c >= '0' && c <= '9'); }
-MINLINE int MCharIsWhitespace(char c) { return (c == '\t' || c == ' '); }
 MINLINE int MCharIsSpaceTab(char c) { return (c == '\t' || c == ' '); }
 MINLINE int MCharIsNewLine(char c) { return (c == '\n' || c == '\r'); }
+MINLINE int MCharIsWhitespace(char c) { return (c == '\t' || c == ' '); }
+MINLINE int MCharIsAnyWhitespace(char c) { return (c == '\t' || c == ' ' ||
+    c == '\n' || c == '\r' || c == '\v'); }
 
 // Get pointer to end of str (scan for null terminator)
 MINLINE const char* MCStrEnd(const char* str) {
@@ -732,7 +741,7 @@ MINLINE u32 MCStrLen(const char* str) {
     return n;
 }
 
-MINLINE MStrView MStrViewWrap(const char* str) {
+MINLINE MStrView MStrViewFromCStr(const char* str) {
     return M_STRUCT(MStrView){(char*)str, MCStrLen(str)};
 }
 
@@ -778,19 +787,13 @@ void MCStrU32ToBinary(u32 val, i32 outSize, char* outStr);
 #define MStrFree(a, s) ((s).capacity ? (M_Free(MDEBUG_SOURCE_MACRO (a), (void*)(s).str, (s).capacity), \
     (s).str = 0, (s).size = 0, (s).capacity = 0) : 0)
 
-// Make a MStr copy from a C string - includes null terminator
-MINLINE MStr MStrMake(MAllocator* alloc, const char* c) {
-    MStr r = {};
-    u32 len = MCStrLen(c);
-    MStrInit(alloc, r, len + 1);
-    if (!r.str) {return r;}
-    memcpy((void*)r.str, c, len + 1);
-    r.size = len;
-    r.capacity = len + 1;
-    return r;
+MINLINE MStr MStrMakeEmpty() {
+    return M_STRUCT(MStr){ NULL, 0, 0 };
 }
 
-MINLINE MStr MStrMakeLen(MAllocator* alloc, const char* c, u32 len) {
+// Make a MStr copy from a C string - expects nul-terminator on 'c'
+// Strings made this way keep the nul-terminator
+MINLINE MStr MStrMakeCopyLenNul(MAllocator* alloc, const char* c, u32 len) {
     MStr r = {};
     MStrInit(alloc, r, len + 1);
     if (!r.str) {return r;}
@@ -800,10 +803,31 @@ MINLINE MStr MStrMakeLen(MAllocator* alloc, const char* c, u32 len) {
     return r;
 }
 
-// Make a MStr from a C string
-MINLINE MStr MStrWrap(const char* c) {
-    const MStr r = {(char*)c, MCStrLen(c), 0};
+// Make a MStr copy from a C string - includes nul-terminator
+// Strings made this way keep the nul-terminator
+MINLINE MStr MStrMakeCopyCStrNul(MAllocator* alloc, const char* c) {
+    return MStrMakeCopyLenNul(alloc, c, MCStrLen(c));
+}
+
+// Make a MStr copy from a string of given length - no nul-terminator
+MINLINE MStr MStrMakeCopyLen(MAllocator* alloc, const char* c, u32 len) {
+    MStr r = {};
+    MStrInit(alloc, r, len);
+    if (!r.str) {return r;}
+    memcpy((void*)r.str, c, len);
+    r.size = len;
+    r.capacity = len;
     return r;
+}
+
+// Make a MStr copy from a string of given length - no nul terminator
+MINLINE MStr MStrMakeCopyCStr(MAllocator* alloc, const char* c) {
+    return MStrMakeCopyLen(alloc, c, MCStrLen(c));
+}
+
+// Make a MStr from a static C string
+MINLINE MStr MStrMakeStaticCStr(const char* c) {
+    return M_STRUCT(MStr){ (char*)c, MCStrLen(c), 0 };
 }
 
 MINLINE void MStrZero(MStr* str) {
@@ -817,9 +841,104 @@ MINLINE i32 MStrViewCopyN(MStrView* strView, char* bufOut, size_t bufOutSize) {
     return (i32)copySize;
 }
 
+MINLINE MStrView MStrViewSub(MStrView str, i32 start, i32 len) {
+    return M_STRUCT(MStrView){str.str + start, len >= 0 ? (u32) len : str.size - start };
+}
+
+MINLINE MStrView MStrViewLeft(MStrView str, u32 len) {
+    return M_STRUCT(MStrView){str.str, len};
+}
+
+MINLINE MStrView MStrViewMakeC(const char* str) {
+    return M_STRUCT(MStrView){(char*)str, MCStrLen(str)};
+}
+
+MINLINE MStrView MStrViewMakeP(const char* str, u32 size) {
+    return M_STRUCT(MStrView){(char*)str, size};
+}
+
+MINLINE i32 MStrViewFindC(MStrView str, char* substring) {
+    i32 substringLen = (i32)MCStrLen(substring);
+    if (substringLen > str.size) {
+        return -1;
+    }
+    i32 j = 0;
+    for (i32 i = 0; i < str.size; i++) {
+        char c1 = str.str[i];
+        char c2 = substring[j];
+        if (c1 == c2) {
+            j++;
+            if (j >= substringLen) {
+                return i - substringLen + 1;
+            }
+            continue;
+        }
+        if (i + substringLen >= str.size) {
+            return -1;
+        }
+        if (j > 0) {
+            if (substring[0] == c1) {
+                j = 1;
+            } else {
+                j = 0;
+            }
+        }
+    }
+    return -1;
+}
+
+MINLINE i32 MStrViewFind(MStrView str, MStrView substring) {
+    i32 substringLen = (i32)substring.size;
+    if (substring.size > str.size) {
+        return -1;
+    }
+    i32 j = 0;
+    for (i32 i = 0; i < str.size; i++) {
+        char c1 = str.str[i];
+        char c2 = substring.str[j];
+        if (c1 == c2) {
+            j++;
+            if (j >= substringLen) {
+                return i - substringLen + 1;
+            }
+            continue;
+        }
+        if (i + substringLen >= str.size) {
+            return -1;
+        }
+        if (j > 0) {
+            if (substring.str[0] == c1) {
+                j = 1;
+            } else {
+                j = 0;
+            }
+        }
+    }
+    return -1;
+}
+
+MINLINE i32 MStrViewFindChar(MStrView str, char c) {
+    for (i32 i = 0; i < str.size; i++) {
+        if (str.str[i] == c) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+MINLINE void MStrViewAdvance(MStrView* str, i32 advanceChars) {
+    str->str += advanceChars;
+    str->size -= advanceChars;
+}
+
 u32 MStrAppend(MMemIO* memIo, const char* str);
 u32 MStrAppendf(MMemIO* memIo, const char* format, ...);
 
+/////////////////////////////////////////////////////////
+// Timer functions
+f64 MGetTimeSeconds();
+u64 MGetTimeMilliseconds();
+u64 MGetTimeMicroseconds();
 
 /////////////////////////////////////////////////////////
 // Stacktraces

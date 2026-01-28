@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+    <Type Name="MStrView">
+        <DisplayString>{str,[size]na}</DisplayString>
+        <Expand>
+            <Item Name="[size]">size</Item>
+            <Item Name="[ptr]">str</Item>
+            <StringView>str,[size]na</StringView>
+        </Expand>
+    </Type>
+
+    <Type Name="MStr">
+        <DisplayString>{str,[size]na}</DisplayString>
+        <Expand>
+            <Item Name="[size]">size</Item>
+            <Item Name="[capacity]">capacity</Item>
+            <StringView>str,[size]na</StringView>
+        </Expand>
+    </Type>
+
+    <Type Name="MMemIO">
+        <DisplayString>{{ size={size} capacity={capacity} }}</DisplayString>
+        <Expand>
+            <Item Name="[size]">size</Item>
+            <Item Name="[capacity]">capacity</Item>
+            <ArrayItems>
+                <Size>size</Size>
+                <ValuePointer>mem</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+
+</AutoVisualizer>

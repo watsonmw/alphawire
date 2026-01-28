@@ -11,20 +11,19 @@ AlphaWire provides both low-level and high-level APIs for controlling Sony Alpha
 
 It has some advantages over the official SDK:
 - Minimal dependencies
-- Fast
+- Fast image downloads
 - Supports older cameras not covered by official Sony Camera Remote SDK
 - Easy debugging of camera remote features
 
 Downsides to alphawire:
-- Missing backends TCP (on the roadmap)
-- Possibly missing metadata for latest cameras (will add as needed)
+- Missing metadata for latest properties (will add as needed)
 - No image processing (out of scope for this project)
 
 > **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks or registered
 > trademarks of Sony Corporation.
 
 ## Current Status
-- **Platform Support**: Currently Windows (Visual Studio 2018 or MinGW), OSX (clang) and Linux
+- **Platform Support**: Currently Windows (Visual Studio 2018 or MinGW), OSX (clang) and Linux (GCC)
 - **Build System**: CMake
 - **Architecture**: Designed for easy cross-platform expansion
 
@@ -37,10 +36,12 @@ Downsides to alphawire:
 - Tethered capture and file download
 - Camera settings management (save/load)
 - Compatible with both pre-2020 and post-2020 Alpha cameras
+- IMGUI application for camera control and debugging
 
 ### Windows Backend Support
 - WIA (Windows Image Acquisition)
 - libusbk
+- TCP/IP
 
 Use [Zadig](https://zadig.akeo.ie/) to switch drivers on Windows.
 
@@ -61,15 +62,12 @@ A GUI application is included for camera control and PTP protocol debugging.
 - Focus control and image capture
 - Camera settings management
 - Protocol debugging tools
-- Fast download of images
+- Fast image download
 
 ## Roadmap
 - [ ] Build System Improvements
    - Packaged releases for UI application
-- [ ] Platform Extensions
-   - TCP backend implementation
 - [ ] API Development
-   - Threading - support separate thread per device
-   - Expand Python bindings
+   - Python bindings
    - Descriptions for each property
    - Enhanced high-level API

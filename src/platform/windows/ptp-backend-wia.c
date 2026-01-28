@@ -527,34 +527,34 @@ b32 PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device) {
     return SUCCEEDED(hr);
 }
 
-b32 PTPWiaDeviceList_Close_(PTPBackend* backend) {
+static b32 PTPWiaDeviceList_Close_(PTPBackend* backend) {
     PTPWiaDeviceList* self = backend->self;
     b32 r = PTPWiaDeviceList_Close(self);
     MFree(self->allocator, self, sizeof(PTPWiaDeviceList));
     return r;
 }
 
-b32 PTPWiaDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
+static b32 PTPWiaDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
     PTPWiaDeviceList* self = backend->self;
     return PTPWiaDeviceList_RefreshList(self, deviceList);
 }
 
-b32 PTPWiaDeviceList_NeedsRefresh_(PTPBackend* backend) {
+static b32 PTPWiaDeviceList_NeedsRefresh_(PTPBackend* backend) {
     PTPWiaDeviceList* self = backend->self;
     return PTPWiaDeviceList_NeedsRefresh(self);
 }
 
-void PTPWiaDeviceList_ReleaseList_(PTPBackend* backend) {
+static void PTPWiaDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPWiaDeviceList* self = backend->self;
     PTPWiaDeviceList_ReleaseList(self);
 }
 
-b32 PTPWiaDeviceList_ConnectDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+static b32 PTPWiaDeviceList_ConnectDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTPWiaDeviceList* self = backend->self;
     return PTPWiaDeviceList_ConnectDevice(self, deviceInfo, deviceOut);
 }
 
-b32 PTPWiaDeviceList_DisconnectDevice_(PTPBackend* backend, PTPDevice* device) {
+static b32 PTPWiaDeviceList_DisconnectDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPWiaDeviceList* self = backend->self;
     return PTPWiaDeviceList_DisconnectDevice(self, device);
 }

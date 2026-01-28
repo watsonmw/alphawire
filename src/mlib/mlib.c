@@ -4,6 +4,12 @@
 #include <stdlib.h>
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <time.h>
+#endif
+
 #ifdef M_THREADING
 #if defined(M_PTHREADS)
 #include <pthread.h>
@@ -15,7 +21,6 @@ void MExecuteOnce(MOnce* once, void (*fn)(void)) {
     pthread_once((pthread_once_t*)once, fn);
 }
 #elif defined(_WIN32)
-#include <windows.h>
 
 void MMutexLock(MMutex* m)   { AcquireSRWLockExclusive((PSRWLOCK)m); }
 void MMutexUnlock(MMutex* m) { ReleaseSRWLockExclusive((PSRWLOCK)m); }
@@ -112,7 +117,7 @@ MINLINE void* MMemDebug_ArrayMaybeGrow(MAllocator* allocator, void* a, size_t el
 #ifdef M_STACKTRACE
 static void MMemDebug_AddStacktrace(MAllocator* alloc, MMemAllocInfo* memAlloc, int skipFrames) {
     // TODO: More efficient stacktrace lookup and storage
-    MStacktrace currentStacktrace = {};
+    MStacktrace currentStacktrace = {0};
     MGetStacktrace(&currentStacktrace, skipFrames);
     memAlloc->stacktraceHash = currentStacktrace.hash;
     b32 found = FALSE;
@@ -772,60 +777,136 @@ void MMemWriteU8(MMemIO* memIO, u8 val) {
     memIO->size += 1;
 }
 
-void MMemWriteU16BE(MMemIO* memIO, u16 val) {
+void MMemWriteU16BE(MMemIO *memIO, u16 val) {
     M_MemGrowBytes(memIO, 2);
-    u8 a[] = {val >> 8, val & 0xff};
-    memmove(memIO->mem + memIO->size, a, 2);
+#ifdef MLITTLEENDIAN
+    u16 beVal = MBIGENDIAN16(val);
+    memmove(memIO->mem + memIO->size, &beVal, 2);
+#else
+    memmove(memIO->mem + memIO->size, &val, 2);
+#endif
     memIO->size += 2;
 }
 
-void MMemWriteU16LE(MMemIO* memIO, u16 val) {
+void MMemWriteU16LE(MMemIO *memIO, u16 val) {
     M_MemGrowBytes(memIO, 2);
-    u8 a[] = {val & 0xff, val >> 8};
-    memmove(memIO->mem + memIO->size, a, 2);
+#ifdef MBIGENDIAN
+    u16 leVal = MLITTLEENDIAN16(val);
+    memmove(memIO->mem + memIO->size, &leVal, 2);
+#else
+    memmove(memIO->mem + memIO->size, &val, 2);
+#endif
     memIO->size += 2;
 }
 
-void MMemWriteI16BE(MMemIO* memIO, i16 val) {
+void MMemWriteI16BE(MMemIO *memIO, i16 val) {
     M_MemGrowBytes(memIO, 2);
-    u8 a[] = {val >> 8, val & 0xff};
-    memmove(memIO->mem + memIO->size, a, 2);
+#ifdef MLITTLEENDIAN
+    i16 beVal = MBIGENDIAN16(val);
+    memmove(memIO->mem + memIO->size, &beVal, 2);
+#else
+    memmove(memIO->mem + memIO->size, &val, 2);
+#endif
     memIO->size += 2;
 }
 
-void MMemWriteI16LE(MMemIO* memIO, i16 val) {
+void MMemWriteI16LE(MMemIO *memIO, i16 val) {
     M_MemGrowBytes(memIO, 2);
-    u8 a[] = {val & 0xff, val >> 8};
-    memmove(memIO->mem + memIO->size, a, 2);
+#ifdef MBIGENDIAN
+    i16 leVal = MLITTLEENDIAN16(val);
+    memmove(memIO->mem + memIO->size, &leVal, 2);
+#else
+    memmove(memIO->mem + memIO->size, &val, 2);
+#endif
     memIO->size += 2;
 }
 
-void MMemWriteU32BE(MMemIO* memIO, u32 val) {
+void MMemWriteU32BE(MMemIO *memIO, u32 val) {
     M_MemGrowBytes(memIO, 4);
-    u8 a[] = {val >> 24, (val >> 16) & 0xff, (val >> 8) & 0xff, (val & 0xff)};
-    memmove(memIO->mem + memIO->size, a, 4);
+#ifdef MLITTLEENDIAN
+    u32 beVal = MBIGENDIAN32(val);
+    memmove(memIO->mem + memIO->size, &beVal, 4);
+#else
+    memmove(memIO->mem + memIO->size, &val, 4);
+#endif
     memIO->size += 4;
 }
 
-void MMemWriteU32LE(MMemIO* memIO, u32 val) {
+void MMemWriteU32LE(MMemIO *memIO, u32 val) {
     M_MemGrowBytes(memIO, 4);
-    u8 a[] = {(val & 0xff), (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24)};
-    memmove(memIO->mem + memIO->size, a, 4);
+#ifdef MBIGENDIAN
+    u32 leVal = MLITTLEENDIAN32(val);
+    memmove(memIO->mem + memIO->size, &leVal, 4);
+#else
+    memmove(memIO->mem + memIO->size, &val, 4);
+#endif
     memIO->size += 4;
 }
 
-void MMemWriteI32BE(MMemIO* memIO, i32 val) {
+void MMemWriteI32BE(MMemIO *memIO, i32 val) {
     M_MemGrowBytes(memIO, 4);
-    u8 a[] = {val >> 24, (val >> 16) & 0xff, (val >> 8) & 0xff, (val & 0xff)};
-    memmove(memIO->mem + memIO->size, a, 4);
+#ifdef MLITTLEENDIAN
+    i32 beVal = MBIGENDIAN32(val);
+    memmove(memIO->mem + memIO->size, &beVal, 4);
+#else
+    memmove(memIO->mem + memIO->size, &val, 4);
+#endif
     memIO->size += 4;
 }
 
-void MMemWriteI32LE(MMemIO* memIO, i32 val) {
+void MMemWriteI32LE(MMemIO *memIO, i32 val) {
     M_MemGrowBytes(memIO, 4);
-    u8 a[] = {(val & 0xff), (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24)};
-    memmove(memIO->mem + memIO->size, a, 4);
+#ifdef MBIGENDIAN
+    i32 leVal = MLITTLEENDIAN32(val);
+    memmove(memIO->mem + memIO->size, &leVal, 4);
+#else
+    memmove(memIO->mem + memIO->size, &val, 4);
+#endif
     memIO->size += 4;
+}
+
+void MMemWriteU64BE(MMemIO *memIO, u64 val) {
+    M_MemGrowBytes(memIO, 8);
+#ifdef MLITTLEENDIAN
+    u64 beVal = MBIGENDIAN64(val);
+    memmove(memIO->mem + memIO->size, &beVal, 8);
+#else
+    memmove(memIO->mem + memIO->size, &val, 8);
+#endif
+    memIO->size += 8;
+}
+
+void MMemWriteU64LE(MMemIO *memIO, u64 val) {
+    M_MemGrowBytes(memIO, 8);
+#ifdef MBIGENDIAN
+    u64 leVal = MLITTLEENDIAN64(val);
+    memmove(memIO->mem + memIO->size, &leVal, 8);
+#else
+    memmove(memIO->mem + memIO->size, &val, 8);
+#endif
+    memIO->size += 8;
+}
+
+void MMemWriteI64BE(MMemIO *memIO, i64 val) {
+    M_MemGrowBytes(memIO, 8);
+#ifdef MLITTLEENDIAN
+    i64 beVal = MBIGENDIAN64(val);
+    memmove(memIO->mem + memIO->size, &beVal, 8);
+#else
+    memmove(memIO->mem + memIO->size, &val, 8);
+#endif
+    memIO->size += 8;
+}
+
+void MMemWriteI64LE(MMemIO *memIO, i64 val) {
+    M_MemGrowBytes(memIO, 8);
+#ifdef MBIGENDIAN
+    i64 leVal = MLITTLEENDIAN64(val);
+    memmove(memIO->mem + memIO->size, &leVal, 8);
+#else
+    memmove(memIO->mem + memIO->size, &val, 8);
+#endif
+    memIO->size += 8;
 }
 
 void MMemWriteU8CopyN(MMemIO* restrict memIO, u8* restrict src, u32 size) {
@@ -1488,6 +1569,40 @@ i32 MFileWriteDataFully(const char* filePath, u8* data, u32 size) {
     return -1;
 }
 
+#ifdef _WIN32
+static LARGE_INTEGER sPerfCounterFrequency;
+#endif
+
+#ifdef _WIN32
+void GetPerformanceFrequency(void) {
+    QueryPerformanceFrequency(&sPerfCounterFrequency);
+}
+#endif
+
+u64 MGetTimeMicroseconds() {
+#ifdef _WIN32
+    static MOnce hasFreqOnce = M_ONCE_INIT;
+    MExecuteOnce(&hasFreqOnce, GetPerformanceFrequency);
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    // Multiply by 1,000,000 first, then divide to keep it as an integer operation.
+    // QuadPart is 64-bit, so this handles ~18,000 seconds before overflow if frequency is high.
+    return (counter.QuadPart * 1000000) / sPerfCounterFrequency.QuadPart;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (u64)ts.tv_sec * 1000000ULL + (u64)ts.tv_nsec / 1000ULL;
+#endif
+}
+
+u64 MGetTimeMilliseconds() {
+    return (MGetTimeMicroseconds() / 1000);
+}
+
+f64 MGetTimeSeconds() {
+    return ((f64)MGetTimeMicroseconds()) / 1000000.0;
+}
+
 #if defined(M_STACKTRACE)
 
 #if defined(M_LIBBACKTRACE)
@@ -1573,7 +1688,9 @@ b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
 #elif defined(WIN32)
 #include <windows.h>
 #include <dbghelp.h>
+#ifdef _MSC_VER
 #pragma comment(lib, "dbghelp.lib")
+#endif
 
 #ifdef M_THREADING
 // Protect single threaded dbghelp functions
@@ -1594,10 +1711,10 @@ static void MWin32EnsureSymInit() {
 }
 
 void MLogStacktraceCurrent(int skipFrames) {
-    CONTEXT context = {};
+    CONTEXT context = {0};
     RtlCaptureContext(&context);
 
-    STACKFRAME64 stackFrame = {};
+    STACKFRAME64 stackFrame = {0};
     stackFrame.AddrPC.Offset = context.Rip;
     stackFrame.AddrPC.Mode = AddrModeFlat;
     stackFrame.AddrStack.Offset = context.Rsp;

@@ -18,22 +18,6 @@
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
 
-// TODO:
-//   Build list of property editors / widgets?
-//      - Debug Set widgets
-//      - Enum List Read only support (except in debug)
-//   Remove sorting for other tabs
-//   Backends:
-//     IP
-//   Timing / Position
-//   Connect multiple cameras
-//   Live View
-//     - Focus Area
-//     - Click to focus
-//     - Click to zoom
-//   Events API
-//   Log window to IMGUI
-//   Settings apply
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
     // Buffer for hex input (max length depends on integer type)
@@ -648,7 +632,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 ImGui::TableNextColumn();
                 MStr propAsString = {};
                 if (PTPControl_GetPropertyValueAsStr(&c.ptp, property, c.autoReleasePool, &propAsString)) {
-                    ImGui::Text("%s", propAsString.str);
+                    ImGui::Text("%.*s", propAsString.size, propAsString.str);
                 }
 
                 ImGui::PopID();
@@ -1300,6 +1284,11 @@ static void ShowDeviceListWindow(AppContext& c) {
     ImGui::SetNextWindowSize(ImVec2(910, 150), ImGuiCond_FirstUseEver);
     ImGui::Begin("Device List");
 
+    if (PTPDeviceList_IsRefreshingList(&c.ptpDeviceList)) {
+        if (PTPDeviceList_PollUpdates(&c.ptpDeviceList)) {
+            c.selectedDeviceIndex = -1;
+        }
+    }
     if (PTPDeviceList_NeedsRefresh(&c.ptpDeviceList)) {
         c.RefreshDevices();
     }
@@ -1339,12 +1328,13 @@ static void ShowDeviceListWindow(AppContext& c) {
                                  ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable |
                                  ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
 
-    if (ImGui::BeginTable("Devices", 6, tableFlags)) {
+    if (ImGui::BeginTable("Devices", 7, tableFlags)) {
         ImGui::TableSetupColumn("Product", ImGuiTableColumnFlags_WidthFixed, 200.0);
         ImGui::TableSetupColumn("Manufacturer", ImGuiTableColumnFlags_WidthFixed, 300);
         ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_WidthFixed, 300);
         ImGui::TableSetupColumn("USB Id", ImGuiTableColumnFlags_WidthFixed, 100);
         ImGui::TableSetupColumn("USB Version", ImGuiTableColumnFlags_WidthFixed, 100);
+        ImGui::TableSetupColumn("IP Address", ImGuiTableColumnFlags_WidthFixed, 100);
         ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
@@ -1376,14 +1366,19 @@ static void ShowDeviceListWindow(AppContext& c) {
             ImGui::TextUnformatted(deviceInfo->serial.str, MStrEnd(deviceInfo->serial));
 
             ImGui::TableNextColumn();
-            ImGui::Text("%04x:%04x", deviceInfo->usbVID, deviceInfo->usbPID);
+            if (deviceInfo->usbVID || deviceInfo->usbPID) {
+                ImGui::Text("%04x:%04x", deviceInfo->usbVID, deviceInfo->usbPID);
+            }
 
             ImGui::TableNextColumn();
             char versionStr[8];
             if (deviceInfo->usbVersion && USB_BcdVersionAsString(deviceInfo->usbVersion, versionStr, sizeof(versionStr)) > 0) {
                 ImGui::TextUnformatted(versionStr);
-            } else {
-                ImGui::TextUnformatted("");
+            }
+
+            ImGui::TableNextColumn();
+            if (!MStrIsEmpty(deviceInfo->ipAddress)) {
+                ImGui::TextUnformatted(deviceInfo->ipAddress.str, MStrEnd(deviceInfo->ipAddress));
             }
 
             ImGui::TableNextColumn();

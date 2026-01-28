@@ -16,10 +16,18 @@ add_library(alphawire SHARED
     src/mlib/mlib-file-stdlib.c
     src/mlib/mlib-log-stdlib.c
     src/mlib/mlib.c
-    src/mlib/utf.c
-    src/mlib/utf.h
+    src/mlib/utf8.c
+    src/mlib/utf8.h
+    src/mlib/msock.c
+    src/mlib/msock.h
+    src/mlib/mxml.c
+    src/mlib/mxml.h
     src/ptp/ptp-backend.c
     src/ptp/ptp-backend.h
+    src/platform/ip/http-client.c
+    src/platform/ip/http-client.h
+    src/platform/ip/ptp-backend-ip.c
+    src/platform/ip/ptp-backend-ip.h
     src/ptp/ptp-const.h
     src/ptp/ptp-control.c
     src/ptp/ptp-control.h
@@ -64,14 +72,14 @@ if(WIN32)
     )
 
     # Configure backends
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA)
+    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA PTP_ENABLE_IP)
 
     # Set Windows version to compile to (needed to pick up WIA).
     target_compile_definitions(alphawire PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0600)
 
     # Configure libUSBK
     target_include_directories(alphawire PRIVATE libs/libusbk)
-    list(APPEND ALPHAWIRE_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib)
+    list(APPEND ALPHAWIRE_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib ws2_32)
 
     # Export functions
     target_compile_definitions(alphawire PRIVATE ALPHAWIRE_BUILDING_SHARED_LIB)
@@ -140,8 +148,8 @@ add_executable(alphawireui
     src/mlib/mlib-log-stdlib.c
     src/mlib/mlib.c
     src/mlib/mlib.h
-    src/mlib/utf.c
-    src/mlib/utf.h
+    src/mlib/utf8.c
+    src/mlib/utf8.h
     src/ui/ui-live-view.cpp
     src/ui/ui-main.cpp
     src/ui/ui-ptp-debug.cpp
@@ -192,7 +200,7 @@ endif()
 if(WIN32)
     # Set Windows version to compile to (this just matches alphawire library - but probably doesnt need to)
     target_compile_definitions(alphawireui PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0600)
-    target_compile_definitions(alphawireui PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA)
+    target_compile_definitions(alphawireui PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA PTP_ENABLE_IP)
 
     # MinGW specific
     if (MINGW)
