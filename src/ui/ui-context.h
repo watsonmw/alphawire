@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <locale>
 #include <string>
+#include <deque>
 
 #ifdef PTP_ENABLE_WIA
 #include "platform/windows/ptp-backend-wia.h"
@@ -141,6 +142,32 @@ struct PropTable {
     }
 };
 
+struct LogEntry {
+    PTPLogLevel level;
+    std::string message;
+
+    LogEntry(PTPLogLevel lvl, const char* msg) : level(lvl), message(msg) {}
+};
+
+struct LogWindow {
+    std::deque<LogEntry> entries;
+    bool autoScroll = true;
+    int selectedLogLevel = PTP_LOG_LEVEL_TRACE;  // Show all logs by default
+    bool showWindow = false;
+    static const size_t MAX_LOG_ENTRIES = 5000;
+
+    void AddLog(PTPLogLevel level, const char* message) {
+        entries.emplace_back(level, message);
+        if (entries.size() > MAX_LOG_ENTRIES) {
+            entries.pop_front();
+        }
+    }
+
+    void Clear() {
+        entries.clear();
+    }
+};
+
 struct AppContext {
     MAllocator* deviceListAllocator = NULL;
     MAllocator* autoReleasePool = NULL;
@@ -194,6 +221,9 @@ struct AppContext {
 
     bool shutterHalfPress = false;
     bool autoFocusButton = false;
+
+    // Log window
+    LogWindow logWindow;
 
     void RefreshDevices() {
         selectedDeviceIndex = -1;

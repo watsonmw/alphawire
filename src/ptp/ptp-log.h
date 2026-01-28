@@ -26,6 +26,7 @@ typedef void (*PTPLog_Log_Func)(struct PTPLog* logger, PTPLogLevel level, const 
 typedef struct PTPLog {
     PTPLogLevel level;
     PTPLog_Log_Func logFunc;
+    void* userData;
     char msgBuffer[1024];
 } PTPLog;
 

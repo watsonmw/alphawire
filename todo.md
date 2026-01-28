@@ -11,7 +11,6 @@ UI
   - Click to focus
   - Click to zoom
 - Events API
-- Log window to IMGUI
 - Settings apply
 - Support for SDIO_GetOSDImage - check if it has focus peeking pixels
 - Focus Magnifier needs its own API - two sets of properties control the same thing - which one to use depends on

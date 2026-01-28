@@ -150,9 +150,12 @@ add_executable(alphawireui
     src/mlib/mlib.h
     src/mlib/utf8.c
     src/mlib/utf8.h
+    src/ui/ui-context.h
     src/ui/ui-live-view.cpp
+    src/ui/ui-live-view.h
     src/ui/ui-main.cpp
     src/ui/ui-ptp-debug.cpp
+    src/ui/ui-ptp-debug.h
 )
 
 target_compile_definitions(alphawireui PRIVATE M_USE_SDL M_USE_STDLIB)

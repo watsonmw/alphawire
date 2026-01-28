@@ -8,6 +8,7 @@
 #include "ui/ui-live-view.h"
 
 #include "ptp/ptp-control.h"
+#include "ptp/ptp-log.h"
 #include "platform/usb-const.h"
 #include "ptp/ptp-util.h"
 
@@ -695,6 +696,105 @@ static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* lab
     }
 }
 
+void CustomLogCallback(PTPLog* logger, PTPLogLevel level, const char* message) {
+    // Add to UI log window
+    AppContext* appContext = (AppContext*)logger->userData;
+    if (appContext) {
+        appContext->logWindow.AddLog(level, message);
+    }
+    // Also call default logger
+    PTPLog_LogDefault(logger, level, message);
+}
+
+void UiInitLogging(AppContext& c) {
+    c.ptpDeviceList.logger.userData = &c;
+    c.ptpDeviceList.logger.logFunc = CustomLogCallback;
+    // Log to the highest logging level enabled at compile time
+    c.ptpDeviceList.logger.level = PTP_LOG_LEVEL_TRACE;
+}
+
+static void ShowLogWindow(AppContext& c) {
+    if (!c.logWindow.showWindow) {
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImVec2(910, 20), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(700, 600), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Log", &c.logWindow.showWindow);
+
+    // Log level selector
+    const char* logLevels[] = { "ERROR", "WARNING", "INFO", "DEBUG", "TRACE" };
+    ImGui::Text("Min Log Level:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::Combo("##LogLevel", &c.logWindow.selectedLogLevel, logLevels, 5);
+
+    ImGui::SameLine();
+    if (ImGui::Button("Clear")) {
+        c.logWindow.Clear();
+    }
+
+    ImGui::SameLine();
+    ImGui::Checkbox("Auto-scroll", &c.logWindow.autoScroll);
+
+    ImGui::Separator();
+
+    // Log entries table
+    ImGuiTableFlags flags = ImGuiTableFlags_ScrollY |
+                           ImGuiTableFlags_RowBg |
+                           ImGuiTableFlags_BordersOuter |
+                           ImGuiTableFlags_BordersV |
+                           ImGuiTableFlags_Resizable;
+
+    if (ImGui::BeginTable("LogEntries", 2, flags)) {
+        ImGui::TableSetupColumn("Level", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+
+        // Display log entries filtered by level
+        for (const auto& entry : c.logWindow.entries) {
+            if (entry.level <= c.logWindow.selectedLogLevel) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+
+                // Color code by log level
+                ImVec4 color;
+                switch (entry.level) {
+                    case PTP_LOG_LEVEL_ERROR:
+                        color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
+                        break;
+                    case PTP_LOG_LEVEL_WARNING:
+                        color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f);
+                        break;
+                    case PTP_LOG_LEVEL_INFO:
+                        color = ImVec4(0.3f, 0.8f, 0.3f, 1.0f);
+                        break;
+                    case PTP_LOG_LEVEL_DEBUG:
+                        color = ImVec4(0.5f, 0.5f, 1.0f, 1.0f);
+                        break;
+                    case PTP_LOG_LEVEL_TRACE:
+                        color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+                        break;
+                    default:
+                        color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+                }
+
+                ImGui::TextColored(color, "%s", PTPLog_LevelAsStr(entry.level));
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(entry.message.c_str());
+            }
+        }
+
+        if (c.logWindow.autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+            ImGui::SetScrollHereY(1.0f);
+        }
+
+        ImGui::EndTable();
+    }
+
+    ImGui::End();
+}
+
 void ShowCameraControlsWindow(AppContext& c) {
     ImGui::SetNextWindowPos(ImVec2(910, 660), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(990, 305), ImGuiCond_FirstUseEver);
@@ -1307,6 +1407,9 @@ static void ShowDeviceListWindow(AppContext& c) {
         c.Disconnect();
     }
 
+    ImGui::SameLine();
+    ImGui::Checkbox("Show Log", &c.logWindow.showWindow);
+
     // if (c.device) {
     //     ImGui::SameLine();
     //     if (ImGui::Button("Reset")) {
@@ -1395,6 +1498,7 @@ static void ShowDeviceListWindow(AppContext& c) {
 
 void UiPtpShow(AppContext& c) {
     ShowDeviceListWindow(c);
+    ShowLogWindow(c);
 
     if (c.connected) {
         RefreshProperties(c);
