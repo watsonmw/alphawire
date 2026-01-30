@@ -18,16 +18,8 @@ add_library(alphawire SHARED
     src/mlib/mlib.c
     src/mlib/utf8.c
     src/mlib/utf8.h
-    src/mlib/msock.c
-    src/mlib/msock.h
-    src/mlib/mxml.c
-    src/mlib/mxml.h
     src/ptp/ptp-backend.c
     src/ptp/ptp-backend.h
-    src/platform/ip/http-client.c
-    src/platform/ip/http-client.h
-    src/platform/ip/ptp-backend-ip.c
-    src/platform/ip/ptp-backend-ip.h
     src/ptp/ptp-const.h
     src/ptp/ptp-control.c
     src/ptp/ptp-control.h
@@ -41,6 +33,17 @@ add_library(alphawire SHARED
     src/platform/usb-const.h
 )
 
+set(PTP_IP_FILES
+    src/mlib/msock.c
+    src/mlib/msock.h
+    src/mlib/mxml.c
+    src/mlib/mxml.h
+    src/platform/ip/http-client.c
+    src/platform/ip/http-client.h
+    src/platform/ip/ptp-backend-ip.c
+    src/platform/ip/ptp-backend-ip.h
+)
+
 target_compile_definitions(alphawire PRIVATE M_USE_SDL M_USE_STDLIB PTP_LOG_LEVEL=3 ALPHAWIRE_BUILDING_SHARED_LIB)
 target_include_directories(alphawire PUBLIC src)
 target_compile_features(alphawire PUBLIC cxx_std_17)
@@ -49,9 +52,10 @@ if(APPLE)
     target_sources(alphawire PRIVATE
         src/platform/osx/ptp-backend-iokit.c
         src/platform/osx/ptp-backend-iokit.h
+        ${PTP_IP_FILES}
     )
 
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_IOKIT)
+    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_IOKIT PTP_ENABLE_IP)
     target_compile_options(alphawire PRIVATE -fvisibility=hidden)
 
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
@@ -69,6 +73,7 @@ if(WIN32)
         src/platform/windows/ptp-backend-wia.h
         src/platform/windows/win-utils.c
         src/platform/windows/win-utils.h
+        ${PTP_IP_FILES}
     )
 
     # Configure backends

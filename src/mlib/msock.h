@@ -7,10 +7,6 @@
     #include <ws2tcpip.h>
 #else
     #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <errno.h>
 #endif
 
 #ifdef __cplusplus
@@ -64,6 +60,26 @@ int MSockRecvFrom(MSock s, void* buf, int len, char* outIp, int outIpLen, u16* o
 int MSockGetLastError();
 
 int M_SockClose(MSock s);
+
+typedef struct MSockInterface {
+    MStrView name;                  // interface name (e.g. "eth0", "en0")
+    int family;                     // AF_INET / AF_INET6
+    int isUp;
+    int isLoopback;
+    struct sockaddr addr;
+    char nameBuffer[128];
+} MSockInterface;
+
+typedef enum MSockInterfaceEnumFlags {
+    MSockIfAddrFlag_Down = 1,          // include interface even if currently down
+    MSockIfAddrFlag_Loopback = 1 << 1, // include loopback
+    MSockIfAddrFlag_IPV4 = 1 << 2,     // include ipv4
+    MSockIfAddrFlag_IPV6 = 1 << 3,     // include ipv6
+                                       // if neither ipv4 or ipv6 is specified then return both
+} MSockInterfaceEnumFlags;
+
+// Enumerate interfaces and address
+int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flags);
 
 #ifdef __cplusplus
 }
