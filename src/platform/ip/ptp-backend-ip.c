@@ -556,42 +556,34 @@ static b32 PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
     addr.sin_addr.s_addr = htonl(SSDP_MULTICAST_ADDR);
 
     // Get all local IPv4 addresses and send M-SEARCH on each interface
-    char hostname[256];
-    if (gethostname(hostname, sizeof(hostname)) == 0) {
-        struct addrinfo hints, *res, *p;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_DGRAM;
-        if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
-            for (p = res; p != NULL; p = p->ai_next) {
-                struct sockaddr_in* ip = (struct sockaddr_in*)p->ai_addr;
+    MSockInterface* interfaces = NULL;
+    if (MSockGetInterfaces(self->allocator, &interfaces, MSockIfAddrFlag_IPV4)) {
+        MArrayEachPtr(interfaces, it) {
+            MSockInterface* iface = it.p;
+            struct sockaddr_in* ip = (struct sockaddr_in*)&iface->addr;
 
-                char ipStr[INET6_ADDRSTRLEN];
-                if (inet_ntop(AF_INET, &ip->sin_addr, ipStr, sizeof(ipStr)) == NULL) {
-                    ipStr[0] = '\0';
-                }
-
-                PTP_INFO_F("Sending M-SEARCH on interface: %s", ipStr);
-                
-                if (setsockopt(self->discoverySock, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip->sin_addr,
-                    sizeof(ip->sin_addr)) == MSOCK_ERROR) {
-                    PTP_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastError());
-                }
-
-                int sent = sendto(self->discoverySock, msg, msgSize, 0, (struct sockaddr*)&addr, sizeof(addr));
-                if (sent == MSOCK_ERROR) {
-                    PTP_ERROR_F("PTPIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastError());
-                }
+            char ipStr[INET6_ADDRSTRLEN];
+            if (inet_ntop(AF_INET, &ip->sin_addr, ipStr, sizeof(ipStr)) == NULL) {
+                ipStr[0] = '\0';
             }
-            freeaddrinfo(res);
-        } else {
-            PTP_ERROR_F("getaddrinfo failed for hostname %s: %d", hostname, MSockGetLastError());
-            goto exitWithError;
+
+            PTP_INFO_F("Sending M-SEARCH on interface: %s", ipStr);
+
+            if (setsockopt(self->discoverySock, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip->sin_addr,
+                sizeof(ip->sin_addr)) == MSOCK_ERROR) {
+                PTP_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastError());
+            }
+
+            int sent = sendto(self->discoverySock, msg, msgSize, 0, (struct sockaddr*)&addr, sizeof(addr));
+            if (sent == MSOCK_ERROR) {
+                PTP_ERROR_F("PTPIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastError());
+            }
         }
     } else {
-        PTP_ERROR_F("gethostname failed: %d", MSockGetLastError());
+        PTP_ERROR_F("MSockGetInterfaces failed: %d", MSockGetLastError());
         goto exitWithError;
     }
+    MArrayFree(self->allocator, interfaces);
 
     return TRUE;
 
@@ -605,7 +597,7 @@ static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList)
     b32 foundDevice = FALSE;
     char buffer[4096];
     struct sockaddr_in from;
-    int fromLen = sizeof(from);
+    unsigned int fromLen = sizeof(from);
     int n;
 
     while ((n = recvfrom(self->discoverySock, buffer, sizeof(buffer)-1, 0, (struct sockaddr*)&from, &fromLen)) > 0) {

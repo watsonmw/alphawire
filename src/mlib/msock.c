@@ -2,12 +2,16 @@
 
 #include <string.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+    #include <iphlpapi.h>
+#else
     #include <sys/fcntl.h>
     #include <arpa/inet.h>
     #include <netdb.h>
     #include <unistd.h>
     #include <errno.h>
+    #include <ifaddrs.h>
+    #include <net/if.h>
 #endif
 
 int MSockInit() {
@@ -263,4 +267,129 @@ int MSockGetLastError() {
 #else
     return errno;
 #endif
+}
+
+
+// #ifndef INET6_ADDRSTRLEN
+// #define INET6_ADDRSTRLEN 46
+// #endif
+
+// char ip[INET6_ADDRSTRLEN];
+// ip[0] = '\0';
+
+// if (family == AF_INET) {
+//     struct sockaddr_in* sa = (struct sockaddr_in*)ifa->ifa_addr;
+//     if (!inet_ntop(AF_INET, &sa->sin_addr, ip, sizeof(ip))) {
+//         continue;
+//     }
+// } else if (family == AF_INET6) {
+//     struct sockaddr_in6* sa6 = (struct sockaddr_in6*)ifa->ifa_addr;
+//     if (!inet_ntop(AF_INET6, &sa6->sin6_addr, ip, sizeof(ip))) {
+//         continue;
+//     }
+// } else {
+//     continue;
+// }
+
+static b32 M_SockFamilyAllowed(int family, int isUp, int isLoopback, int flags) {
+    if (isLoopback && !(flags & MSockIfAddrFlag_Loopback)) {
+        return FALSE;
+    }
+    if (!isUp && !(flags & MSockIfAddrFlag_Down)) {
+        return FALSE;
+    }
+    if ((flags & MSockIfAddrFlag_IPV4) && family == AF_INET) {
+        return TRUE;
+    }
+    if ((flags & MSockIfAddrFlag_IPV6) && family == AF_INET6) {
+        return TRUE;
+    }
+    if ((flags & (MSockIfAddrFlag_IPV4 | MSockIfAddrFlag_IPV6)) == 0) {
+        return (family == AF_INET || family == AF_INET6);
+    }
+    return FALSE;
+}
+
+int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flags) {
+    MArrayClear(*outAddr);
+
+#ifndef _WIN32
+    struct ifaddrs* ifaddr = NULL;
+    if (getifaddrs(&ifaddr) != 0) {
+        return FALSE;
+    }
+
+    for (struct ifaddrs* ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) continue;
+
+        int family = ifa->ifa_addr->sa_family;
+        int isUp = (ifa->ifa_flags & IFF_UP) != 0;
+        int isLoopback = (ifa->ifa_flags & IFF_LOOPBACK) != 0;
+
+        if (!M_SockFamilyAllowed(family, isUp, isLoopback, flags)) {
+            continue;
+        }
+
+        MSockInterface* e = MArrayAddPtrZ(allocator, *outAddr);
+        memcpy(e->nameBuffer, ifa->ifa_name ? ifa->ifa_name : "", sizeof(e->name));
+        e->name = (MStrView){ e->nameBuffer, sizeof(e->name) - 1};
+        e->family = family;
+        e->isUp = isUp;
+        e->isLoopback = isLoopback;
+        memcpy(&e->addr, ifa->ifa_addr, sizeof(e->addr));
+    }
+
+    freeifaddrs(ifaddr);
+
+#else
+    ULONG gaaFlags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    ULONG family = AF_UNSPEC;
+
+    ULONG bufLen = 0;
+    (void)GetAdaptersAddresses(family, gaaFlags, NULL, NULL, &bufLen);
+    if (bufLen == 0) {
+        return FALSE;
+    }
+
+    IP_ADAPTER_ADDRESSES* aa = (IP_ADAPTER_ADDRESSES*)MMallocZ(allocator, bufLen);
+    if (!aa) {
+        return FALSE;
+    }
+
+    DWORD r = GetAdaptersAddresses(family, flags, NULL, aa, &bufLen);
+    if (r != NO_ERROR) {
+        MFree(allocator, aa);
+        return FALSE;
+    }
+
+    for (IP_ADAPTER_ADDRESSES* a = aa; a; a = a->Next) {
+        int isUp = (a->OperStatus == IfOperStatusUp);
+        int isLoopback = (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
+
+        const char* nameA = a->AdapterName ? a->AdapterName : "";
+        int nameALen = MCStrLen(nameA);
+
+        for (IP_ADAPTER_UNICAST_ADDRESS* u = a->FirstUnicastAddress; u; u = u->Next) {
+            if (!u->Address.lpSockaddr) {
+                continue;
+            }
+
+            int fam = u->Address.lpSockaddr->sa_family;
+            if (!M_SockFamilyAllowed(fam, isUp, isLoopback, flags)) {
+                continue;
+            }
+
+            MSockInterface* e = MArrayAddPtrZ(allocator, *outAddr);
+            memcpy(e->nameBuffer, nameA, nameALen + 1); // this is not the friendly name, but stable
+            e->name = (MStrView){ e->nameBuffer, nameALen};
+            e->family = fam;
+            e->isUp = isUp;
+            e->isLoopback = isLoopback;
+            memcpy(&e->addr, u->Address.lpSockaddr, sizeof(e->addr));
+        }
+    }
+
+    MFree(allocator, aa);
+#endif
+    return MArraySize(*outAddr);
 }
