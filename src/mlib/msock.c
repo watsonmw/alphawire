@@ -345,20 +345,20 @@ int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flag
     ULONG gaaFlags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
     ULONG family = AF_UNSPEC;
 
-    ULONG bufLen = 0;
-    (void)GetAdaptersAddresses(family, gaaFlags, NULL, NULL, &bufLen);
-    if (bufLen == 0) {
+    ULONG aaBufSize = 0;
+    (void)GetAdaptersAddresses(family, gaaFlags, NULL, NULL, &aaBufSize);
+    if (aaBufSize == 0) {
         return FALSE;
     }
 
-    IP_ADAPTER_ADDRESSES* aa = (IP_ADAPTER_ADDRESSES*)MMallocZ(allocator, bufLen);
+    IP_ADAPTER_ADDRESSES* aa = (IP_ADAPTER_ADDRESSES*)MMallocZ(allocator, aaBufSize);
     if (!aa) {
         return FALSE;
     }
 
-    DWORD r = GetAdaptersAddresses(family, flags, NULL, aa, &bufLen);
+    DWORD r = GetAdaptersAddresses(family, flags, NULL, aa, &aaBufSize);
     if (r != NO_ERROR) {
-        MFree(allocator, aa);
+        MFree(allocator, aa, aaBufSize);
         return FALSE;
     }
 
@@ -389,7 +389,7 @@ int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flag
         }
     }
 
-    MFree(allocator, aa);
+    MFree(allocator, aa, aaBufSize);
 #endif
     return MArraySize(*outAddr);
 }
