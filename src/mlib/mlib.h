@@ -24,6 +24,7 @@
 //  -- M_PTHREADS         Use pthreads
 //
 #include <string.h> // memcpy() / size_t
+#include <stdint.h> // uintptr_t
 
 typedef char i8;
 typedef unsigned char u8;

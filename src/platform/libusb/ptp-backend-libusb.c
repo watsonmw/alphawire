@@ -135,9 +135,9 @@ b32 PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** d
             libusbDeviceInfo->device = libusb_ref_device(dev);
 
             PTPDeviceInfo* deviceInfo = MArrayAddPtrZ(self->allocator, *devices);
-            deviceInfo->manufacturer = MStrMakeCopyC(self->allocator, manufacturer);
-            deviceInfo->product = MStrMakeCopyC(self->allocator, product);
-            deviceInfo->serial = MStrMakeCopyC(self->allocator, serial);
+            deviceInfo->manufacturer = MStrMakeCopyCStr(self->allocator, manufacturer);
+            deviceInfo->product = MStrMakeCopyCStr(self->allocator, product);
+            deviceInfo->serial = MStrMakeCopyCStr(self->allocator, serial);
             deviceInfo->usbVID = desc.idVendor;
             deviceInfo->usbPID = desc.idProduct;
             deviceInfo->usbVersion = desc.bcdUSB;

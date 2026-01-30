@@ -113,6 +113,7 @@ if(LINUX)
     target_sources(alphawire PRIVATE
         src/platform/libusb/ptp-backend-libusb.c
         src/platform/libusb/ptp-backend-libusb.h
+        ${PTP_IP_FILES}
     )
 
     find_package(PkgConfig)
@@ -133,7 +134,7 @@ if(LINUX)
         endif()
     endif()
 
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB)
+    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB PTP_ENABLE_IP)
 endif()
 
 target_link_libraries(alphawire PUBLIC ${ALPHAWIRE_LIBS})
