@@ -23,5 +23,6 @@ Backends
 
 - IP: Don't copy packet buffer so much
 - IP: Connect via IP only?
+- IP: Connect with password (TLS)
 - Split PTPResult and AW results
-- Event handling
+- Events for libusb and IOKit

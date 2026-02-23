@@ -47,7 +47,7 @@ typedef struct PTPDeviceList {
     PTPDevice* openDevices;
     // Set before calling When PTPDeviceList_Open().  When et to 0 will block during device enumeration.
     u32 timeoutMilliseconds;
-
+    MBackendConfig backendConfig;
     MAllocator* allocator;
     PTPLog logger;
 } PTPDeviceList;

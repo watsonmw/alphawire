@@ -22,6 +22,16 @@ typedef struct {
     u32 timeoutMilliseconds;
     MAllocator* allocator;
     PTPLog logger;
+    // Event handling
+    u32 usbInterruptInterval;
+    MMemIO eventMem; // Event buffer for reading and parsing events (reused across calls)
+    HANDLE eventsEvent;
+    OVERLAPPED eventOverlapped;
+    // Background event thread
+    HANDLE eventThread;
+    HANDLE eventThreadStopEvent;
+    SRWLOCK eventLock;
+    PTPEvent* eventList; // MArray of stored events
 } PTPUsbkDeviceUsbk;
 
 typedef struct {
@@ -31,6 +41,7 @@ typedef struct {
     u32 timeoutMilliseconds;
     MAllocator* allocator;
     PTPLog logger;
+    struct PTPBackend* backend; // Reference to parent backend
 } PTPUsbkBackend;
 
 PTP_EXPORT b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds);
@@ -40,8 +51,6 @@ PTP_EXPORT b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo
 PTP_EXPORT void PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self);
 PTP_EXPORT b32 PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
 PTP_EXPORT b32 PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device);
-
-PTP_EXPORT b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
 
 #ifdef __cplusplus
 } // extern "C"

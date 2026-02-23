@@ -116,6 +116,14 @@ typedef struct {
 } MStacktrace;
 #endif
 
+#ifdef M_THREADING
+#if defined(M_PTHREADS)
+    typedef struct {void* m;} MRWLock;
+#elif defined(_WIN32)
+    typedef struct { int m; } MRWLock;
+#endif
+#endif
+
 #ifdef M_MEM_DEBUG
 typedef struct {
     size_t size;
@@ -135,8 +143,12 @@ typedef struct {
     MStacktrace* stacktraces;
 #endif
     u32 initialized : 1;
-    u32 sentinelCheck : 1;
-    u32 leakTracking : 1;
+    u32 enableSentinelCheck : 1;
+    u32 enableLeakTracking : 1;
+#ifdef M_THREADING
+    u32 enableLocking : 1;
+    MRWLock lock;
+#endif
     u32 totalAllocations;
     u32 totalAllocatedBytes;
     u32 curAllocatedBytes;
@@ -237,23 +249,21 @@ MINLINE void* M_ReallocZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t
 #endif
 
 #if defined(M_PTHREADS)
-    #define M_MUTEX_INIT {0}
-    typedef struct { int m; } MMutex;
-
     #define M_ONCE_INIT 0
     typedef int MOnce;
 #elif defined(_WIN32)
-    #define M_MUTEX_INIT {0}
-    typedef struct {void* m;} MMutex;
-
     #define M_ONCE_INIT {0}
     typedef struct {void* o;} MOnce;
 #endif
 
-void MMutexLock(MMutex* m);
-void MMutexUnlock(MMutex* m);
-#else
+void MRWLockInit(MRWLock* m);
+void MRWLockDestroy(MRWLock* m);
+void MRWLockAcquireExclusive(MRWLock* m);
+void MRWLockReleaseExclusive(MRWLock* m);
+void MRWLockAcquireShared(MRWLock* m);
+void MRWLockReleaseShared(MRWLock* m);
 
+#else
 #define M_ONCE_INIT 0
 typedef int MOnce;
 void MExecuteOnce(MOnce* once, void (*fn)(void));

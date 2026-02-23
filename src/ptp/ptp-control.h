@@ -60,6 +60,8 @@ typedef struct {
     PTPRequestHeader ptpRequest;
     PTPResponseHeader ptpResponse;
 
+    PTPEvent* eventQueue;  // Array of queued events
+
     MAllocator* allocator;
     PTPLog logger;
 } PTPControl;
@@ -276,6 +278,8 @@ PTP_EXPORT PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileO
 
 PTP_EXPORT PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut);
 PTP_EXPORT PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
+
+PTP_EXPORT PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** eventsOut);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // String conversion, value helpers

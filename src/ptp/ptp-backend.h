@@ -7,19 +7,26 @@
 extern "C" {
 #endif
 
-typedef void* (*PTP_Device_ReallocBuffer_t)(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize);
-typedef void (*PTP_Device_FreeBuffer_t)(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize);
-typedef PTPResult (*PTP_Device_SendAndRecvEx_t)(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                                PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                                size_t* actualDataOutSize);
-typedef b32 (*PTP_Device_Reset_t)(void* deviceSelf);
+struct PTPDevice;
+
+typedef void* (*PTP_Device_ReallocBuffer_t)(struct PTPDevice* device, PTPBufferType type, void* dataMem,
+                                            size_t dataOldSize, size_t dataNewSize);
+typedef void (*PTP_Device_FreeBuffer_t)(struct PTPDevice* device, PTPBufferType type, void* dataMem,
+                                        size_t dataOldSize);
+typedef PTPResult (*PTP_Device_SendAndRecv_t)(struct PTPDevice* device, PTPRequestHeader* request, u8* dataIn,
+                                              size_t dataInSize, PTPResponseHeader* response, u8* dataOut,
+                                              size_t dataOutSize, size_t* actualDataOutSize);
+typedef b32 (*PTP_Device_Reset_t)(struct PTPDevice* device);
+typedef PTPResult (*PTP_Device_ReadEvents_Func_t)(struct PTPDevice* device, int timeoutMilliseconds, MAllocator* alloc,
+                                                  PTPEvent** outEventList);
 
 // Device transport for communicating with a device
 typedef struct {
     PTP_Device_ReallocBuffer_t reallocBuffer;
     PTP_Device_FreeBuffer_t freeBuffer;
-    PTP_Device_SendAndRecvEx_t sendAndRecvEx;
+    PTP_Device_SendAndRecv_t sendAndRecv;
     PTP_Device_Reset_t reset;
+    PTP_Device_ReadEvents_Func_t readEvents;
     b32 requiresSessionOpenClose;
     MAllocator* allocator;
 } PTPDeviceTransport;
@@ -55,6 +62,10 @@ typedef struct PTPDevice {
     PTPDeviceInfo* deviceInfo;
 } PTPDevice;
 
+typedef struct MBackendConfig {
+    b32 disallowSpawnEventThread;
+} MBackendConfig;
+
 struct PTPBackend;
 
 typedef b32 (*PTPBackend_Close_Func)(struct PTPBackend* backend);
@@ -76,6 +87,7 @@ typedef struct PTPBackend {
     PTPBackend_OpenDevice_Func openDevice;
     PTPBackend_CloseDevice_Func closeDevice;
     PTPBackendType type;
+    MBackendConfig config;
     PTPLog logger;
     MAllocator* allocator;
     void* self; // Pointer to concrete backend

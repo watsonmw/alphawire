@@ -612,6 +612,7 @@ typedef enum {
 
 typedef struct {
     PTPEventCode code;
+    u32 size;
     union {
         struct {
             u32 param1;

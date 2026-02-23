@@ -130,78 +130,195 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandl
     return hasPTP;
 }
 
-b32 PTPUsbkDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds) {
-    PTPUsbkDeviceUsbk* deviceUsbk = device->device;
-    UCHAR eventBuffer[512];
-    UINT transferred = 0;
-
-    OVERLAPPED overlapped = {0};
-    BOOL hasEvent = FALSE;
-    if (outEvent == NULL) {
-        return FALSE;
-    }
-
+static PTPResult IssueOverlappedEventRead(PTPUsbkDeviceUsbk* dev, MAllocator* alloc, UINT* transferred, BOOL* immediateResult) {
     // Create event for async operation
-    overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (!overlapped.hEvent) {
-        WinUtils_LogLastError(&deviceUsbk->logger, "Failed to create event");
-        return 0;
-    }
-
-    if (!UsbK_ReadPipe(deviceUsbk->usbHandle, deviceUsbk->usbInterrupt, eventBuffer, sizeof(eventBuffer),
-                       &transferred, &overlapped)) {
-        if (GetLastError() != ERROR_IO_PENDING) {
-            CloseHandle(overlapped.hEvent);
-            WinUtils_LogLastError(&deviceUsbk->logger, "Failed to start interrupt read");
-            return 0;
-        }
-
-        // Wait for data or timeout
-        DWORD result = WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds);
-        if (result == WAIT_OBJECT_0) {
-            // Get results
-            if (UsbK_GetOverlappedResult(deviceUsbk->usbHandle, &overlapped, &transferred, FALSE)) {
-                hasEvent = TRUE;
-            }
-        } else if (result == WAIT_TIMEOUT) {
-            PTP_LOG_ERROR(&deviceUsbk->logger, "Timeout waiting for event");
-            // No event available, cancel the transfer
-            UsbK_AbortPipe(deviceUsbk->usbHandle, deviceUsbk->usbInterrupt);
+    if (dev->eventsEvent == 0) {
+        dev->eventsEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (!dev->eventsEvent) {
+            WinUtils_LogLastError(&dev->logger, "Failed to create event");
+            return PTP_GENERAL_ERROR;
         }
     } else {
-       // Immediate completion
-       hasEvent = TRUE;
+        ResetEvent(dev->eventsEvent);
+    }
+    dev->eventOverlapped = (OVERLAPPED){0};
+    dev->eventOverlapped.hEvent = dev->eventsEvent;
+
+    if (!dev->eventMem.allocator) {
+        MMemInitAlloc(&dev->eventMem, alloc, 1024);
+    } else {
+        dev->eventMem.size = 0;
     }
 
-    CloseHandle(overlapped.hEvent);
+    *transferred = 0;
+    if (UsbK_ReadPipe(dev->usbHandle, dev->usbInterrupt, dev->eventMem.mem, dev->eventMem.capacity, transferred,
+            &dev->eventOverlapped)) {
+        *immediateResult = TRUE;
+        return PTP_OK;
+    } else {
+        if (GetLastError() != ERROR_IO_PENDING) {
+            dev->eventOverlapped = (OVERLAPPED){0};
+            WinUtils_LogLastError(&dev->logger, "Failed to start interrupt read");
+            return PTP_GENERAL_ERROR;
+        }
+        *immediateResult = FALSE;
+        return PTP_OK;
+    }
+}
 
-    if (hasEvent && transferred >= sizeof(PTPContainerHeader)) {
-        PTPContainerHeader* event = (PTPContainerHeader*)eventBuffer;
+static b32 ReadEventFromBuffer(PTPUsbkDeviceUsbk* dev, UINT transferred, PTPEvent* outEvent) {
+    MMemIO payloadRead;
+    MMemInitRead(&payloadRead, dev->eventMem.mem, transferred);
+
+    if (payloadRead.capacity >= sizeof(PTPContainerHeader)) {
+        PTPContainerHeader* event = (PTPContainerHeader*)payloadRead.mem;
         if (event->type == PTP_CONTAINER_EVENT) {
-            PTP_LOG_INFO(&deviceUsbk->logger, "PTP Event received:");
-            PTP_LOG_INFO_F(&deviceUsbk->logger, "Length: %d", event->length);
-            PTP_LOG_INFO_F(&deviceUsbk->logger, "Transferred: %d", transferred);
-            PTP_LOG_INFO_F(&deviceUsbk->logger, "Type: 0x%04X", event->type);
-            PTP_LOG_INFO_F(&deviceUsbk->logger, "Event Code: %s (0x%04X)", PTP_GetEventLabel(event->code), event->code);
-            PTP_LOG_INFO_F(&deviceUsbk->logger, "Transaction: 0x%08X", event->transactionId);
             size_t headerSize = sizeof(PTPContainerHeader);
+            outEvent->code = event->code;
             if (event->length > headerSize) {
-                size_t payloadSize = event->length - headerSize;
-                MMemIO memIO;
-                MMemInitRead(&memIO, eventBuffer + headerSize, payloadSize);
-                memset(outEvent, 0, sizeof(PTPEvent));
-                outEvent->code = event->code;
-                MMemReadU32BE(&memIO, &outEvent->param1);
-                MMemReadU32BE(&memIO, &outEvent->param2);
-                MMemReadU32BE(&memIO, &outEvent->param3);
-                MLogfNoNewLine("Payload: 0x");
-                MLogBytes(eventBuffer + headerSize, payloadSize);
+                payloadRead.size += headerSize;
+                MMemReadU32LE(&payloadRead, &outEvent->param1);
+                MMemReadU32LE(&payloadRead, &outEvent->param2);
+                MMemReadU32LE(&payloadRead, &outEvent->param3);
             }
             return TRUE;
         }
     }
-
     return FALSE;
+}
+
+// Background thread function for processing events
+static DWORD WINAPI EventThreadProc(LPVOID lpParameter) {
+    PTPUsbkDeviceUsbk* dev = (PTPUsbkDeviceUsbk*)lpParameter;
+
+    while (TRUE) {
+        // Check if we should stop
+        if (WaitForSingleObject(dev->eventThreadStopEvent, 0) == WAIT_OBJECT_0) {
+            break;
+        }
+
+        UINT transferred = 0;
+        BOOL immediateResult = FALSE;
+
+        // Issue overlapped read if not already pending
+        if (dev->eventOverlapped.hEvent == 0) {
+            PTPResult r = IssueOverlappedEventRead(dev, dev->allocator, &transferred, &immediateResult);
+            if (r != PTP_OK) {
+                Sleep(100);
+                continue;
+            }
+        }
+
+        DWORD waitResult;
+        if (!immediateResult) {
+            // Wait for either event completion or stop signal
+            HANDLE handles[2] = { dev->eventOverlapped.hEvent, dev->eventThreadStopEvent };
+            waitResult = WaitForMultipleObjects(2, handles, FALSE, 1000);
+
+            if (waitResult == WAIT_OBJECT_0 + 1) {
+                // Stop signal received
+                UsbK_AbortPipe(dev->usbHandle, dev->usbInterrupt);
+                break;
+            } else if (waitResult == WAIT_OBJECT_0) {
+                // Event data available
+                UsbK_GetOverlappedResult(dev->usbHandle, &dev->eventOverlapped, &transferred, FALSE);
+            } else if (waitResult == WAIT_TIMEOUT) {
+                // Timeout, continue loop
+                continue;
+            } else {
+                // Error
+                Sleep(100);
+                continue;
+            }
+        }
+
+        if (transferred > 0) {
+            PTPEvent tempEvent = {};
+            if (ReadEventFromBuffer(dev, transferred, &tempEvent)) {
+                AcquireSRWLockExclusive(&dev->eventLock);
+                PTPEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
+                *event = tempEvent;
+                ReleaseSRWLockExclusive(&dev->eventLock);
+            }
+        }
+
+        // Reset for next read
+        dev->eventOverlapped = (OVERLAPPED){0};
+    }
+
+    return 0;
+}
+
+static PTPResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents) {
+    PTPUsbkDeviceUsbk* dev = self->device;
+
+    if (outEvents == NULL) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    // If event thread is running, return stored events
+    if (dev->eventThread) {
+        AcquireSRWLockExclusive(&dev->eventLock);
+
+        // Copy all events to output
+        if (dev->eventList && MArraySize(dev->eventList) > 0) {
+            for (int i = 0; i < MArraySize(dev->eventList); i++) {
+                PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+                *event = dev->eventList[i];
+            }
+            // Clear the stored events
+            MArrayClear(dev->eventList);
+        }
+
+        ReleaseSRWLockExclusive(&dev->eventLock);
+        return PTP_OK;
+    }
+
+    // Non-threaded mode - this may miss some events if ReadEvents is not called frequently enough
+    UINT transferred = 0;
+    BOOL immediateResult = FALSE;
+
+    if (dev->eventOverlapped.hEvent == 0) {
+        PTPResult r = IssueOverlappedEventRead(dev, self->transport.allocator, &transferred, &immediateResult);
+        if (r != PTP_OK) {
+            return r;
+        }
+    }
+
+    if (immediateResult) {
+        PTPEvent outEvent = {};
+        if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
+            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            *event = outEvent;
+        }
+    } else {
+        DWORD result = WaitForSingleObject(dev->eventOverlapped.hEvent, 0);
+        if (result == WAIT_OBJECT_0) {
+            // Get results
+            UsbK_GetOverlappedResult(dev->usbHandle, &dev->eventOverlapped, &transferred, FALSE);
+        } else if (result != WAIT_TIMEOUT) {
+            WinUtils_LogLastError(&dev->logger, "Failed waiting for event");
+            // No event available, cancel the transfer
+            UsbK_AbortPipe(dev->usbHandle, dev->usbInterrupt);
+        }
+    }
+
+    // Reset and issue another event
+    transferred = 0;
+    PTPResult r = IssueOverlappedEventRead(dev, self->transport.allocator, &transferred, &immediateResult);
+    if (r != PTP_OK) {
+        return r;
+    }
+
+    if (immediateResult) {
+        PTPEvent outEvent = {};
+        if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
+            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            *event = outEvent;
+        }
+    }
+
+    return PTP_OK;
 }
 
 b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkBackend* self) {
@@ -315,8 +432,8 @@ void PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self) {
     }
 }
 
-void* PTPDeviceUsbk_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void* PTPDeviceUsbk_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize,
+                                         size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -327,8 +444,7 @@ void* PTPDeviceUsbk_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* da
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceUsbk_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void PTPDeviceUsbk_FreeBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -337,10 +453,9 @@ void PTPDeviceUsbk_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMe
     }
 }
 
-PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                    PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                    size_t* actualDataOutSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static PTPResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                           PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                           size_t* actualDataOutSize) {
     PTPUsbkDeviceUsbk* deviceUsbk = self->device;
     KUSB_HANDLE usbHandle = deviceUsbk->usbHandle;
     OVERLAPPED overlapped = {0};
@@ -518,8 +633,7 @@ PTPResult PTPDeviceUsbk_SendAndRecv(void* deviceSelf, PTPRequestHeader* request,
     return PTP_OK;
 }
 
-static b32 PTPDeviceUsbk_Reset(void* deviceSelf) {
-    PTPDevice* device = (PTPDevice*)deviceSelf;
+static b32 PTPDeviceUsbk_Reset(PTPDevice* device) {
     PTPUsbkDeviceUsbk* deviceUsbk = device->device;
     if (!deviceUsbk || !deviceUsbk->usbHandle) {
         return FALSE;
@@ -528,7 +642,7 @@ static b32 PTPDeviceUsbk_Reset(void* deviceSelf) {
 }
 
 static b32 FindBulkInOutEndpoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
-                                  UCHAR* interruptOut, u32 timeoutMilliseconds) {
+                                  UCHAR* interruptOut, UCHAR* interruptIntervalOut, u32 timeoutMilliseconds) {
     USB_CONFIGURATION_DESCRIPTOR configDesc = {};
     OVERLAPPED overlapped = {0};
     UINT transferred = 0;
@@ -613,6 +727,7 @@ static b32 FindBulkInOutEndpoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandle, U
                 }
             } else if (endPointType == USB_ENDPOINT_TYPE_INTERRUPT) {
                 *interruptOut = endPoint->bEndpointAddress;
+                *interruptIntervalOut = endPoint->bInterval;
             }
 
             if (*bulkIn && *bulkOut && *interruptOut) {
@@ -637,7 +752,8 @@ b32 PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceInfo
     if (UsbK_Init(&usbHandle, deviceInfoHandle)) {
         // Find bulk endpoints
         UCHAR bulkIn = 0, bulkOut = 0, interruptOut = 0;
-        if (!FindBulkInOutEndpoints(self, usbHandle, &bulkIn, &bulkOut, &interruptOut, self->timeoutMilliseconds)) {
+        UCHAR interruptInterval = 0;
+        if (!FindBulkInOutEndpoints(self, usbHandle, &bulkIn, &bulkOut, &interruptOut, &interruptInterval, self->timeoutMilliseconds)) {
             PTP_WARNING("Failed to connected to device: Unable to get endpoints");
             UsbK_Free(usbHandle);
             return FALSE;
@@ -650,19 +766,49 @@ b32 PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceInfo
         usbkDevice->usbBulkIn = bulkIn;
         usbkDevice->usbBulkOut = bulkOut;
         usbkDevice->usbInterrupt = interruptOut;
+        usbkDevice->usbInterruptInterval = (u32)interruptInterval;
         usbkDevice->disconnected = FALSE;
         usbkDevice->timeoutMilliseconds = self->timeoutMilliseconds;
         usbkDevice->logger = self->logger;
+        usbkDevice->allocator = self->allocator;
+        usbkDevice->eventThread = NULL;
+        usbkDevice->eventThreadStopEvent = NULL;
+        usbkDevice->eventList = NULL;
 
         (*deviceOut)->transport.reallocBuffer = PTPDeviceUsbk_ReallocBuffer;
         (*deviceOut)->transport.freeBuffer = PTPDeviceUsbk_FreeBuffer;
-        (*deviceOut)->transport.sendAndRecvEx = PTPDeviceUsbk_SendAndRecv;
+        (*deviceOut)->transport.sendAndRecv = PTPDeviceUsbk_SendAndRecv;
         (*deviceOut)->transport.reset = PTPDeviceUsbk_Reset;
+        (*deviceOut)->transport.readEvents = PTPDeviceUsbk_ReadEvents;
         (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
         (*deviceOut)->logger = self->logger;
         (*deviceOut)->device = usbkDevice;
         (*deviceOut)->backendType = PTP_BACKEND_LIBUSBK;
         (*deviceOut)->disconnected = FALSE;
+
+        // Start event thread if allowed
+        if (!self->backend->config.disallowSpawnEventThread) {
+            InitializeSRWLock(&usbkDevice->eventLock);
+            AcquireSRWLockExclusive(&usbkDevice->eventLock);
+
+            MArrayInit(usbkDevice->allocator, usbkDevice->eventList, 16);
+
+            usbkDevice->eventThreadStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+            if (usbkDevice->eventThreadStopEvent) {
+                usbkDevice->eventThread = CreateThread(NULL, 0, EventThreadProc, usbkDevice, 0, NULL);
+                if (!usbkDevice->eventThread) {
+                    WinUtils_LogLastError(&self->logger, "Failed to create event thread");
+                    CloseHandle(usbkDevice->eventThreadStopEvent);
+                    usbkDevice->eventThreadStopEvent = NULL;
+                } else {
+                    PTP_DEBUG("Started event thread");
+                }
+            } else {
+                WinUtils_LogLastError(&self->logger, "Failed to create event stop event");
+            }
+
+            ReleaseSRWLockExclusive(&usbkDevice->eventLock);
+        }
 
         return TRUE;
     } else {
@@ -674,6 +820,36 @@ b32 PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceInfo
 b32 PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) {
     PTP_TRACE("PTPUsbkDeviceList_CloseDevice");
     PTPUsbkDeviceUsbk* deviceUsbk = device->device;
+
+    // Stop event thread if running
+    if (deviceUsbk->eventThread) {
+        // Signal thread to stop
+        SetEvent(deviceUsbk->eventThreadStopEvent);
+
+        // Wait for thread to exit (with timeout)
+        DWORD waitResult = WaitForSingleObject(deviceUsbk->eventThread, 5000);
+        if (waitResult == WAIT_TIMEOUT) {
+            PTP_WARNING("Event thread did not exit in time, terminating");
+            TerminateThread(deviceUsbk->eventThread, 1);
+        }
+
+        CloseHandle(deviceUsbk->eventThread);
+        CloseHandle(deviceUsbk->eventThreadStopEvent);
+        deviceUsbk->eventThread = NULL;
+        deviceUsbk->eventThreadStopEvent = NULL;
+
+        // Clean up event list
+        if (deviceUsbk->eventList) {
+            MArrayFree(deviceUsbk->allocator, deviceUsbk->eventList);
+            deviceUsbk->eventList = NULL;
+        }
+    }
+
+    if (deviceUsbk->eventsEvent) {
+        CloseHandle(deviceUsbk->eventsEvent);
+    }
+    MMemFree(&deviceUsbk->eventMem);
+
     if (deviceUsbk->usbHandle) {
         UsbK_Free(deviceUsbk->usbHandle);
         deviceUsbk->usbHandle = NULL;
@@ -739,5 +915,6 @@ b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) 
     deviceList->timeoutMilliseconds = timeoutMilliseconds;
     deviceList->allocator = backend->allocator;
     deviceList->logger = backend->logger;
+    deviceList->backend = backend;
     return PTPUsbkDeviceList_Open(deviceList);
 }

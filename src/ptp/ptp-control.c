@@ -2172,6 +2172,7 @@ static PtpEventLabels sPtpEventLabels[] = {
     {0xC203, "SDIE_DevicePropChanged"},
     {0xC205, "SDIE_DateTimeSettingResult"},
     {0xC206, "SDIE_CapturedEvent"},
+    {0xC207, "SDIE_UnknownEvent"},
     {0xC208, "SDIE_CWBCapturedResult"},
     {0xC209, "SDIE_CameraSettingReadResult"},
     {0xC20A, "SDIE_FTPSettingReadResult"},
@@ -2185,9 +2186,18 @@ static PtpEventLabels sPtpEventLabels[] = {
     {0xC214, "SDIE_ControlUploadDataResult"},
     {0xC218, "SDIE_FocusPositionResult"},
     {0xC21B, "SDIE_LensInformationChanged"},
+    {0xC21D, "SDIE_FirmwareUpdateCheckResult"},
+    {0xC21E, "SDIE_FirmwareUpdateEvent"},
+    {0xC21F, "SDIE_StreamStatusEvent"},
     {0xC222, "SDIE_OperationResults"},
     {0xC223, "SDIE_AFStatus"},
-    {0xC224, "SDIE_MovieRecOperationResults"}
+    {0xC224, "SDIE_MovieRecOperationResults"},
+    {0xC226, "SDIE_PresetInfoListChanged"},
+    {0xC228, "SDIE_CautionDisplayEvent"},
+    {0xC234, "SDIE_ContentInfoListChanged"},
+    {0xC238, "SDIE_ControlPTZFResult"},
+    {0xC239, "SDIE_PresetPTZFEvent"},
+    {0xC240, "SDIE_DeleteContentResult"}
 };
 
 static PTPPropValueEnum sControl_UpDown[] = {
@@ -2287,7 +2297,7 @@ char* PTP_GetEventLabel(u16 eventCode) {
         }
     }
 
-    return NULL;
+    return "SDIE_UnknownEvent";
 }
 
 typedef struct {
@@ -2948,7 +2958,7 @@ typedef struct {
 
 static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
     size_t actualDataOutSize = 0;
-    PTPResult r = self->device->transport.sendAndRecvEx(self->device,
+    PTPResult r = self->device->transport.sendAndRecv(self->device,
         request, self->dataInMem, self->dataInSize,
         &self->ptpResponse, self->dataOutMem, self->dataOutSize,
         &actualDataOutSize);
@@ -3682,6 +3692,16 @@ PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
     }
     PTP_FreeObjectInfo(self->allocator, &objectInfo);
     return PTP_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
+}
+
+PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** eventsOut) {
+    PTP_TRACE("PTPControl_ReadEvents");
+
+    if (!self->device->transport.readEvents || eventsOut == NULL) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    return self->device->transport.readEvents(self->device, timeoutMilliseconds, alloc, eventsOut);
 }
 
 PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {

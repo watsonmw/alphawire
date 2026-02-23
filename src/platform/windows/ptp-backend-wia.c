@@ -365,7 +365,7 @@ cleanup:
     }
 }
 
-void* PTPDeviceWia_ReallocBuffers(void* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+static void* PTPDeviceWia_ReallocBuffers(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = 0;
     if (type == PTP_BUFFER_IN) {
         headerSize = sizeof(WiaPtpRequest);
@@ -383,7 +383,7 @@ void* PTPDeviceWia_ReallocBuffers(void* self, PTPBufferType type, void* dataMem,
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceWia_FreeBuffers(void* self, PTPBufferType type, void* dataMem, size_t dataSize) {
+static void PTPDeviceWia_FreeBuffers(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataSize) {
     size_t headerSize = 0;
     if (type == PTP_BUFFER_IN) {
         headerSize = sizeof(WiaPtpRequest);
@@ -397,9 +397,9 @@ void PTPDeviceWia_FreeBuffers(void* self, PTPBufferType type, void* dataMem, siz
     }
 }
 
-PTPResult PTPDeviceWia_SendAndRecvEx(void* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                     PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                     size_t* actualDataOutSize) {
+static PTPResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                          PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                          size_t* actualDataOutSize) {
 
     WiaPtpRequest* requestData = (WiaPtpRequest*)(dataIn-sizeof(WiaPtpRequest));
 
@@ -465,7 +465,7 @@ b32 PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* device
 
     (*deviceOut)->transport.reallocBuffer = PTPDeviceWia_ReallocBuffers;
     (*deviceOut)->transport.freeBuffer = PTPDeviceWia_FreeBuffers;
-    (*deviceOut)->transport.sendAndRecvEx = PTPDeviceWia_SendAndRecvEx;
+    (*deviceOut)->transport.sendAndRecv = PTPDeviceWia_SendAndRecv;
     (*deviceOut)->transport.requiresSessionOpenClose = FALSE;
     (*deviceOut)->device = wiaDevice;
     (*deviceOut)->backendType = PTP_BACKEND_WIA;

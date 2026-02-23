@@ -14,23 +14,30 @@
 #if defined(M_PTHREADS)
 #include <pthread.h>
 
-void MMutexLock(MMutex* m)   { pthread_mutex_lock((pthread_mutex_t*)m); }
-void MMutexUnlock(MMutex* m) { pthread_mutex_unlock((pthread_mutex_t*)m); }
-
 void MExecuteOnce(MOnce* once, void (*fn)(void)) {
     pthread_once((pthread_once_t*)once, fn);
 }
+
+void MRWLockInit(MRWLock* m) { pthread_rwlock_init((pthread_rwlock_t*)m, NULL); }
+void MRWLockDestroy(MRWLock* m) { pthread_rwlock_destroy((pthread_rwlock_t*)m); }
+void MRWLockAcquireExclusive(MRWLock* m) { pthread_rwlock_wrlock((pthread_rwlock_t*)m); }
+void MRWLockReleaseExclusive(MRWLock* m) { pthread_rwlock_unlock((pthread_rwlock_t*)m); }
+void MRWLockAcquireShared(MRWLock* m) { pthread_rwlock_rdlock((pthread_rwlock_t*)m); }
+void MRWLockReleaseShared(MRWLock* m) { pthread_rwlock_unlock((pthread_rwlock_t*)m); }
+
 #elif defined(_WIN32)
-
-void MMutexLock(MMutex* m)   { AcquireSRWLockExclusive((PSRWLOCK)m); }
-void MMutexUnlock(MMutex* m) { ReleaseSRWLockExclusive((PSRWLOCK)m); }
-
 MINTERNAL BOOL CALLBACK M_once_cb(PINIT_ONCE once, PVOID param, PVOID* ctx) {
     void (*fn)(void) = (void(*)(void))param; fn(); return TRUE;
 }
 void MExecuteOnce(MOnce* once, void (*fn)(void)) {
     InitOnceExecuteOnce((PINIT_ONCE)once, M_once_cb, (PVOID)fn, NULL);
 }
+void MRWLockInit(MRWLock* m) { InitializeSRWLock((PSRWLOCK)m); }
+void MRWLockDestroy(MRWLock* m) { m->m = 0; }
+void MRWLockAcquireExclusive(MRWLock* m) { AcquireSRWLockExclusive((PSRWLOCK)m); }
+void MRWLockReleaseExclusive(MRWLock* m) { ReleaseSRWLockExclusive((PSRWLOCK)m); }
+void MRWLockAcquireShared(MRWLock* m) { AcquireSRWLockShared((PSRWLOCK)m); }
+void MRWLockReleaseShared(MRWLock* m) { ReleaseSRWLockShared((PSRWLOCK)m); }
 #endif
 #else
 void MExecuteOnce(MOnce* once, void (*fn)(void)) {
@@ -43,22 +50,22 @@ void MExecuteOnce(MOnce* once, void (*fn)(void)) {
 
 #ifndef M_CLIB_DISABLE
 
-void* default_malloc(void* alloc, size_t size) {
+static void* CLib_Malloc(void* alloc, size_t size) {
     return malloc(size);
 }
 
-void* default_realloc(void* alloc, void* mem, size_t oldSize, size_t newSize) {
+static void* CLib_Realloc(void* alloc, void* mem, size_t oldSize, size_t newSize) {
     return realloc(mem, newSize);
 }
 
-void default_free(void* alloc, void* mem, size_t size) {
+static void CLib_Free(void* alloc, void* mem, size_t size) {
     free(mem);
 }
 
 void MAllocatorMakeClibHeap(MAllocator* allocator) {
-    allocator->mallocFunc = default_malloc;
-    allocator->reallocFunc = default_realloc;
-    allocator->freeFunc = default_free;
+    allocator->mallocFunc = CLib_Malloc;
+    allocator->reallocFunc = CLib_Realloc;
+    allocator->freeFunc = CLib_Free;
 }
 
 #endif
@@ -159,8 +166,11 @@ void MMemDebugInit(MAllocator* allocator) {
         allocator->debug.allocSlots = NULL;
         allocator->debug.freeSlots = NULL;
         allocator->debug.initialized = 1;
-        allocator->debug.leakTracking = 1;
-        allocator->debug.sentinelCheck = 1;
+        allocator->debug.enableLeakTracking = 1;
+        allocator->debug.enableSentinelCheck = 1;
+#ifdef M_THREADING
+        allocator->debug.enableLocking = 1;
+#endif
         allocator->debug.maxAllocatedBytes = 0;
         allocator->debug.curAllocatedBytes = 0;
         allocator->debug.totalAllocations = 0;
@@ -172,8 +182,21 @@ void MMemDebugDeinit(MAllocator* alloc) {
     MMemDebugDeinit2(alloc, TRUE);
 }
 
+static b32 MMemDebugCheckAllNoLock(MAllocator* alloc);
+
 void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
     if (!alloc->debug.initialized) {
+#ifdef M_THREADING
+        if (lock) {
+            MRWLockReleaseExclusive(&alloc->debug.lock);
+        }
+#endif
         return;
     }
 
@@ -189,9 +212,9 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
         MLogf("   Max memory used: %d bytes", alloc->debug.maxAllocatedBytes);
     }
 
-    MMemDebugCheckAll(alloc);
+    MMemDebugCheckAllNoLock(alloc);
 
-    if (alloc->debug.leakTracking) {
+    if (alloc->debug.enableLeakTracking) {
         MArrayEachPtr(alloc->debug.allocSlots, it) {
             MMemAllocInfo* memAlloc = it.p;
             if (memAlloc->start) {
@@ -226,11 +249,17 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
 #endif
 
     alloc->debug.initialized = 0;
+
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
 }
 
 static u8 sMagicCanaryValues[4] = { 0x1d, 0xdf, 0x83, 0xc7 };
 
-void MMemDebugCanarySet(void* mem, size_t size) {
+static void MMemDebugCanarySet(void* mem, size_t size) {
     u8* ptr = (u8*)mem;
 
     for (u32 i = 0; i < size; ++i) {
@@ -238,7 +267,7 @@ void MMemDebugCanarySet(void* mem, size_t size) {
     }
 }
 
-u32 MMemDebugCanaryCheck(void* mem, size_t size) {
+static u32 MMemDebugCanaryCheck(void* mem, size_t size) {
     u8* ptr = (u8*)mem;
     u32 bytesOverwritten = 0;
 
@@ -261,7 +290,7 @@ static void LogBytesOverwritten(u8* startSentintel, u8* startOverwrite, u32 byte
     MLogBytes(startOverwrite, bytesOverwritten);
 }
 
-void MMemDebugCanaryCheckMLog(void* sentinelMemStart, size_t size, b32 isAfter) {
+static void MMemDebugCanaryCheckMLog(void* sentinelMemStart, size_t size, b32 isAfter) {
     u8* sentinelStart = (u8*)sentinelMemStart;
     u32 bytesOverwritten = 0;
 
@@ -286,12 +315,12 @@ void MMemDebugCanaryCheckMLog(void* sentinelMemStart, size_t size, b32 isAfter) 
     }
 }
 
-b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
+static b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
     if (!memAlloc->mem) {
         return FALSE;
     }
 
-    if (!alloc->debug.sentinelCheck) {
+    if (!alloc->debug.enableSentinelCheck) {
         return TRUE;
     }
 
@@ -323,6 +352,13 @@ b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
 }
 
 b32 MMemDebugCheck(MAllocator* alloc, void* p) {
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
+
     MMemAllocInfo* memAllocFound = NULL;
     MArrayEachPtr(alloc->debug.allocSlots, it) {
         MMemAllocInfo* memAlloc = it.p;
@@ -340,10 +376,16 @@ b32 MMemDebugCheck(MAllocator* alloc, void* p) {
         return FALSE;
     }
 
-    return MMemDebugCheckMemAlloc(alloc, memAllocFound);
+    b32 r = MMemDebugCheckMemAlloc(alloc, memAllocFound);
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
+    return r;
 }
 
-b32 MMemDebugCheckAll(MAllocator* alloc) {
+static b32 MMemDebugCheckAllNoLock(MAllocator* alloc) {
     b32 memOk = TRUE;
     MArrayEachPtr(alloc->debug.allocSlots, it) {
         MMemAllocInfo* memAlloc = it.p;
@@ -351,12 +393,37 @@ b32 MMemDebugCheckAll(MAllocator* alloc) {
             memOk = FALSE;
         }
     }
-
     return memOk;
 }
 
+b32 MMemDebugCheckAll(MAllocator* alloc) {
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
+
+    b32 memOk = MMemDebugCheckAllNoLock(alloc);
+
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
+    return memOk;
+}
+
+
 b32 MMemDebugListAll(MAllocator* alloc) {
     b32 memOk = TRUE;
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
+
     MLogf("Allocations for %s:", alloc->name);
     MArrayEachPtr(alloc->debug.allocSlots, it) {
         MMemAllocInfo* memAlloc = it.p;
@@ -366,10 +433,22 @@ b32 MMemDebugListAll(MAllocator* alloc) {
         }
     }
 
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
     return memOk;
 }
 
 void MMemDebugFreePtrsInRange(MAllocator* alloc, const u8* startAddress, const u8* endAddress) {
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
+
     size_t compactedSize = 0;
     MArrayEachPtr(alloc->debug.allocSlots, it) {
         MMemAllocInfo* memAlloc = it.p;
@@ -388,12 +467,27 @@ void MMemDebugFreePtrsInRange(MAllocator* alloc, const u8* startAddress, const u
 
     MArrayResize(alloc, alloc->debug.allocSlots, compactedSize);
     MArrayResize(alloc, alloc->debug.freeSlots, 0);
+
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
 }
 
 static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) {
     if (!alloc->debug.initialized) {
         MMemDebugInit(alloc);
     }
+
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
+
+    void* r = NULL;
 
     MMemAllocInfo* memAlloc = NULL;
     int pos = 0;
@@ -403,24 +497,24 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
     } else {
         memAlloc = MMemDebugArrayAddPtr(alloc, alloc->debug.allocSlots);
         if (memAlloc == NULL) {
-            return NULL;
+            goto done;
         }
         pos = MArraySize(alloc->debug.allocSlots) - 1;
     }
 
-    if (alloc->debug.sentinelCheck) {
+    if (alloc->debug.enableSentinelCheck) {
         size_t start = M_SENTINEL_BEFORE;
         size_t allocSize = start + size + M_SENTINEL_AFTER;
         u8* mem = (u8*)alloc->mallocFunc(alloc, allocSize);
         if (mem == NULL) {
-            return NULL;
+            goto done;
         }
         memAlloc->start = mem;
         memAlloc->mem = (u8*)memAlloc->start + M_SENTINEL_BEFORE;
     } else {
         u8* mem = (u8*)alloc->mallocFunc(alloc, size);
         if (mem == NULL) {
-            return NULL;
+            goto done;
         }
         memAlloc->start = mem;
         memAlloc->mem = mem;
@@ -441,7 +535,7 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
         alloc->debug.maxAllocatedBytes = alloc->debug.curAllocatedBytes;
     }
 
-    if (alloc->debug.sentinelCheck) {
+    if (alloc->debug.enableSentinelCheck) {
         MMemDebugCanarySet(memAlloc->mem - M_SENTINEL_BEFORE, M_SENTINEL_BEFORE);
         MMemDebugCanarySet(memAlloc->mem + memAlloc->size, M_SENTINEL_AFTER);
     }
@@ -449,7 +543,16 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
 #ifdef M_LOG_ALLOCATIONS
     MLogf("-> 0x%p", memAlloc->mem);
 #endif
-    return memAlloc->mem;
+
+    r = memAlloc->mem;
+done:
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
+
+    return r;
 }
 
 #endif
@@ -483,6 +586,12 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
     }
 
 #ifdef M_MEM_DEBUG
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
     MArrayEachPtr(alloc->debug.allocSlots, it) {
         MMemAllocInfo* memAlloc = it.p;
         if (p == memAlloc->mem) {
@@ -511,9 +620,20 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
 #endif
 #endif
             *(MMemDebugArrayAddPtr(alloc, alloc->debug.freeSlots)) = it.i;
+#ifdef M_THREADING
+            if (lock) {
+                MRWLockReleaseExclusive(&alloc->debug.lock);
+            }
+#endif
             return;
         }
     }
+
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
 
     MBreakpointf("MFree %s:%d called on invalid ptr: 0x%p", file, line, p);
 #ifdef M_STACKTRACE
@@ -540,6 +660,13 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     if (p == NULL) {
         return M_MallocDebug(MDEBUG_SOURCE_PASS alloc, newSize);
     }
+
+#ifdef M_THREADING
+    b32 lock = alloc->debug.enableLocking;
+    if (lock) {
+        MRWLockAcquireExclusive(&alloc->debug.lock);
+    }
+#endif
 
     MMemAllocInfo* memAllocFound = NULL;
     MArrayEachPtr(alloc->debug.allocSlots, it) {
@@ -574,7 +701,7 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
         alloc->debug.maxAllocatedBytes = alloc->debug.curAllocatedBytes;
     }
 
-    if (alloc->debug.sentinelCheck) {
+    if (alloc->debug.enableSentinelCheck) {
         size_t allocSize = M_SENTINEL_BEFORE + newSize + M_SENTINEL_AFTER;
         memAllocFound->size = newSize;
         memAllocFound->start = (u8*)alloc->reallocFunc(alloc, memAllocFound->start,
@@ -599,7 +726,13 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
 #ifdef M_LOG_ALLOCATIONS
     MLogf("-> %p (resized)", memAllocFound->mem);
 #endif
-    return memAllocFound->mem;
+    void* r = memAllocFound->mem;
+#ifdef M_THREADING
+    if (lock) {
+        MRWLockReleaseExclusive(&alloc->debug.lock);
+    }
+#endif
+    return r;
 #else
 #ifdef M_LOG_ALLOCATIONS
     MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
@@ -1694,7 +1827,7 @@ b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
 
 #ifdef M_THREADING
 // Protect single threaded dbghelp functions
-static MMutex gSymLock = M_MUTEX_INIT;
+static SRWLOCK gSymLock = {};
 #endif
 
 // One-time symbol backend init
@@ -1702,6 +1835,7 @@ static MOnce gSymOnce = M_ONCE_INIT;
 
 MINTERNAL void MWin32SymInit(void) {
     HANDLE proc = GetCurrentProcess();
+    InitializeSRWLock(&gSymLock);
     SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
     SymInitialize(proc, NULL, TRUE);
 }
@@ -1730,7 +1864,7 @@ void MLogStacktraceCurrent(int skipFrames) {
     HANDLE thread = GetCurrentThread();
 
 #ifdef M_THREADING
-    MMutexLock(&gSymLock);
+    AcquireSRWLockExclusive(&gSymLock);
 #endif
     while (TRUE) {
         BOOL r = StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread,
@@ -1738,7 +1872,7 @@ void MLogStacktraceCurrent(int skipFrames) {
                    SymGetModuleBase64, NULL);
         if (!r) {
 #ifdef M_THREADING
-            MMutexUnlock(&gSymLock);
+            ReleaseSRWLockExclusive(&gSymLock);
 #endif
             break;
         }
@@ -1772,7 +1906,7 @@ void MLogStacktraceCurrent(int skipFrames) {
         }
 
 #ifdef M_THREADING
-        MMutexUnlock(&gSymLock);
+        ReleaseSRWLockExclusive(&gSymLock);
 #endif
 
         if (funcName == NULL) {
@@ -1790,7 +1924,7 @@ void MLogStacktraceCurrent(int skipFrames) {
         }
 
 #ifdef M_THREADING
-        MMutexLock(&gSymLock);
+        AcquireSRWLockExclusive(&gSymLock);
 #endif
     }
 }
@@ -1804,7 +1938,7 @@ void MLogStacktrace(MStacktrace* stacktrace) {
         void* pc = stacktrace->addresses[i];
 
 #ifdef M_THREADING
-        MMutexLock(&gSymLock);
+        AcquireSRWLockExclusive(&gSymLock);
 #endif
         char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME];
         PSYMBOL_INFO symbol = (PSYMBOL_INFO) symbolBuffer;
@@ -1830,7 +1964,7 @@ void MLogStacktrace(MStacktrace* stacktrace) {
         }
 
 #ifdef M_THREADING
-        MMutexUnlock(&gSymLock);
+        ReleaseSRWLockExclusive(&gSymLock);
 #endif
 
         if (funcName == NULL) {

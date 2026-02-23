@@ -19,6 +19,9 @@
 #include "platform/windows/ptp-backend-libusbk.h"
 #endif
 
+const float AUTO_PROP_REFRESH_INTERVAL_SECS = 1.0f;
+const float AUTO_EVENT_FETCH_INTERVAL_SECS = 0.05f;
+
 template<typename T>
 bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSigned, i64 min, i64 max, int base=10) {
     // Buffer for hex input (max length depends on integer type)
@@ -986,17 +989,6 @@ void ShowCameraControlsWindow(AppContext& c) {
                 MStrFree(c.ptp.allocator, cii.filename);
             }
         }
-
-#ifdef PTP_ENABLE_LIBUSBK
-        if (c.device->backendType == PTP_BACKEND_LIBUSBK) {
-            if (ImGui::Button("Read Event")) {
-                PTPEvent event = {};
-                if (PTPUsbkDevice_ReadEvent(c.device, &event, 10)) {
-                    MLogf("event %x %x %x %x", event.code, event.param1, event.param2, event.param3);
-                }
-            }
-        }
-#endif
     }
 
     ImGui::Spacing();
@@ -1102,15 +1094,24 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::End();
 }
 
-const float AUTO_REFRESH_INTERVAL_SECS = 1.0f;
+static void FetchEvents(AppContext& c, float currentTime) {
+    if (currentTime - c.eventRefreshTime >= AUTO_EVENT_FETCH_INTERVAL_SECS) {
+        PTPEvent* events = NULL;
+        PTPResult r = PTPControl_ReadEvents(&c.ptp, 10, c.autoReleasePool, &events);
+        for (int i = 0; i < MArraySize(events); ++i) {
+            PTPEvent* event = events + i;
+            PTP_LOG_INFO_F(&c.ptp.logger, "%s(%04x) 0x%08x 0x%08x 0x%08x", PTP_GetEventLabel(event->code), event->code, event->param1, event->param2, event->param3);
+        }
+        c.eventRefreshTime = currentTime;
+    }
+}
 
-static void RefreshProperties(AppContext& c) {
+static void RefreshProperties(AppContext& c, float currentTime) {
     bool fullRefresh = TRUE;
     bool propRefresh =  c.propRefresh;
 
     if (c.propAutoRefresh) {
-        double currentTime = ImGui::GetTime();
-        if (currentTime - c.propertyLastRefreshTime >= AUTO_REFRESH_INTERVAL_SECS) {
+        if (currentTime - c.propertyLastRefreshTime >= AUTO_PROP_REFRESH_INTERVAL_SECS) {
             propRefresh = true;
             fullRefresh = !c.propAutoRefreshIncremental;
         }
@@ -1119,7 +1120,7 @@ static void RefreshProperties(AppContext& c) {
     if (propRefresh) {
         PTPControl_UpdateProperties(&c.ptp, fullRefresh);
         c.propRefresh = false;
-        c.propertyLastRefreshTime = ImGui::GetTime();
+        c.propertyLastRefreshTime = currentTime;
         c.propTable.needsRebuild = true;
     }
 
@@ -1501,7 +1502,10 @@ void UiPtpShow(AppContext& c) {
     ShowLogWindow(c);
 
     if (c.connected) {
-        RefreshProperties(c);
+        double currentTime = ImGui::GetTime();
+
+        FetchEvents(c, currentTime);
+        RefreshProperties(c, currentTime);
 
         if (c.showWindowDeviceDebug) {
             ShowMainDeviceDebugWindow(c);

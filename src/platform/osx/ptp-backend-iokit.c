@@ -13,8 +13,6 @@
 #include "platform/osx/ptp-backend-iokit.h"
 #include "platform/usb-const.h"
 
-static b32 PTPDeviceIokit_Reset(void* deviceSelf);
-
 const char* IOReturnToString(IOReturn ret) {
     if (ret & sys_iokit) {
         switch (ret) {
@@ -475,8 +473,7 @@ void PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self) {
     }
 }
 
-void* PTPDeviceIokit_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void* PTPDeviceIokit_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -487,8 +484,7 @@ void* PTPDeviceIokit_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* d
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceIokit_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void PTPDeviceIokit_FreeBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -497,10 +493,9 @@ void PTPDeviceIokit_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataM
     }
 }
 
-PTPResult PTPDeviceIokit_SendAndRecv(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                     PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                     size_t* actualDataOutSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                            PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                            size_t* actualDataOutSize) {
     PTPDeviceIOKit * deviceIokit = self->device;
     IOReturn result;
 
@@ -613,8 +608,7 @@ PTPResult PTPDeviceIokit_SendAndRecv(void* deviceSelf, PTPRequestHeader* request
     return PTP_OK;
 }
 
-static b32 PTPDeviceIokit_Reset(void* deviceSelf) {
-    PTPDevice* dev = (PTPDevice*)deviceSelf;
+static b32 PTPDeviceIokit_Reset(PTPDevice* dev) {
     if (!dev || !dev->device) {
         return FALSE;
     }
@@ -830,7 +824,7 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
 
             (*deviceOut)->transport.reallocBuffer = PTPDeviceIokit_ReallocBuffer;
             (*deviceOut)->transport.freeBuffer = PTPDeviceIokit_FreeBuffer;
-            (*deviceOut)->transport.sendAndRecvEx = PTPDeviceIokit_SendAndRecv;
+            (*deviceOut)->transport.sendAndRecv = PTPDeviceIokit_SendAndRecv;
             (*deviceOut)->transport.reset = PTPDeviceIokit_Reset;
             (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
             (*deviceOut)->logger = self->logger;

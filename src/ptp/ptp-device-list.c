@@ -39,6 +39,7 @@ static PTPBackend* AddBackendSlot(PTPDeviceList* self, PTPBackendType backendTyp
     backend->type = backendType;
     backend->logger = self->logger;
     backend->allocator = self->allocator;
+    backend->config = self->backendConfig;
     return backend;
 }
 

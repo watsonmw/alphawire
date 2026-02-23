@@ -56,10 +56,14 @@ int MSockRecvAll(MSock s, MMemIO* memIo);
 int MSockSendTo(MSock s, const void* buf, int len, const char* ip, u16 port);
 int MSockRecvFrom(MSock s, void* buf, int len, char* outIp, int outIpLen, u16* outPort);
 
-#define MSockClose(s) if ((s) != MSOCK_INVALID) { M_SockClose((s)); (s) = MSOCK_INVALID;}
-int MSockGetLastError();
+#define MSockClose(s) if ((s) != MSOCK_INVALID) { M_SockClose((s)); (s) = MSOCK_INVALID; }
 
-int M_SockClose(MSock s);
+typedef struct MSockError {
+    int code; // Platform error code
+    b32 timeout; // Set to TRUE if (the error is a timeout) or (a blocking operation on a non-blocking socket)
+} MSockError;
+
+MSockError MSockGetLastError();
 
 typedef struct MSockInterface {
     MStrView name;                  // interface name (e.g. "eth0", "en0")
@@ -80,6 +84,9 @@ typedef enum MSockInterfaceEnumFlags {
 
 // Enumerate interfaces and address
 int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flags);
+
+// Internals
+int M_SockClose(MSock s);
 
 #ifdef __cplusplus
 }

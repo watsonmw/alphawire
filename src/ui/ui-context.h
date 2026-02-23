@@ -219,6 +219,9 @@ struct AppContext {
     bool fileDownloadAuto = false;
     std::string fileDownloadPath = "";
 
+    // Events
+    double eventRefreshTime = 0.;
+
     bool shutterHalfPress = false;
     bool autoFocusButton = false;
 

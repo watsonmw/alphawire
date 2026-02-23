@@ -302,6 +302,32 @@ static b32 PTPDeviceLibusb_Reset(void* deviceSelf) {
     return ok ? TRUE : FALSE;
 }
 
+b32 PTPDeviceLibusb_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds) {
+    PTPDeviceLibusb* deviceLibusb = device->device;
+    unsigned char buffer[512];
+    int transferred = 0;
+    int r = libusb_interrupt_transfer(deviceLibusb->handle, deviceLibusb->usbInterrupt, buffer,
+        sizeof(buffer), &transferred, timeoutMilliseconds);
+
+    if (r == 0 && transferred >= (int)sizeof(PTPContainerHeader)) {
+        PTPContainerHeader* header = (PTPContainerHeader*)buffer;
+        if (header->type == PTP_CONTAINER_EVENT) {
+            outEvent->code = header->code;
+            if (header->length >= sizeof(PTPContainerHeader) + 4) {
+                outEvent->param1 = *(u32*)(header + 1);
+            }
+            if (header->length >= sizeof(PTPContainerHeader) + 8) {
+                outEvent->param2 = *(u32*)(((u8*)(header + 1)) + 4);
+            }
+            if (header->length >= sizeof(PTPContainerHeader) + 12) {
+                outEvent->param3 = *(u32*)(((u8*)(header + 1)) + 8);
+            }
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPLibusbDeviceList_ConnectDevice");
     LibusbDeviceInfo* info = deviceInfo->device;
@@ -341,8 +367,9 @@ b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* 
 
     (*deviceOut)->transport.reallocBuffer = PTPDeviceLibusb_ReallocBuffer;
     (*deviceOut)->transport.freeBuffer = PTPDeviceLibusb_FreeBuffer;
-    (*deviceOut)->transport.sendAndRecvEx = PTPDeviceLibusb_SendAndRecv;
+    (*deviceOut)->transport.sendAndRecv = PTPDeviceLibusb_SendAndRecv;
     (*deviceOut)->transport.reset = PTPDeviceLibusb_Reset;
+    (*deviceOut)->transport.readEvent = PTPDeviceLibusb_ReadEvent;
     (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
     (*deviceOut)->transport.allocator = self->allocator;
     (*deviceOut)->logger = self->logger;
@@ -374,32 +401,6 @@ b32 PTPLibusbDeviceList_DisconnectDevice(PTPLibusbDeviceList* self, PTPDevice* d
         }
     }
     return TRUE;
-}
-
-b32 PTPLibusbDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds) {
-    PTPDeviceLibusb* deviceLibusb = device->device;
-    unsigned char buffer[512];
-    int transferred = 0;
-    int r = libusb_interrupt_transfer(deviceLibusb->handle, deviceLibusb->usbInterrupt, buffer,
-        sizeof(buffer), &transferred, timeoutMilliseconds);
-
-    if (r == 0 && transferred >= (int)sizeof(PTPContainerHeader)) {
-        PTPContainerHeader* header = (PTPContainerHeader*)buffer;
-        if (header->type == PTP_CONTAINER_EVENT) {
-            outEvent->code = header->code;
-            if (header->length >= sizeof(PTPContainerHeader) + 4) {
-                outEvent->param1 = *(u32*)(header + 1);
-            }
-            if (header->length >= sizeof(PTPContainerHeader) + 8) {
-                outEvent->param2 = *(u32*)(((u8*)(header + 1)) + 4);
-            }
-            if (header->length >= sizeof(PTPContainerHeader) + 12) {
-                outEvent->param3 = *(u32*)(((u8*)(header + 1)) + 8);
-            }
-            return TRUE;
-        }
-    }
-    return FALSE;
 }
 
 static b32 PTPLibusbDeviceList_Close_(PTPBackend* backend) {

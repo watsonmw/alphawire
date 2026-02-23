@@ -99,7 +99,7 @@ void InitMemDebug(MArena *arena) {
     MMemDebugInit(&arena->alloc);
     // Don't report leaks - we still track memory allocations in this mode - that's just for debugging which allocations
     // are made where.
-    arena->alloc.debug.leakTracking = FALSE;
+    arena->alloc.debug.enableLeakTracking = FALSE;
     // arena->alloc.debug.sentinelCheck = FALSE;
 }
 #endif

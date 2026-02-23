@@ -261,14 +261,21 @@ int M_SockClose(MSock s) {
 #endif
 }
 
-int MSockGetLastError() {
+MSockError MSockGetLastError() {
+    int error = 0;
+    b32 timeout = FALSE;
 #ifdef _WIN32
-    return WSAGetLastError();
+    error = WSAGetLastError();
 #else
-    return errno;
+    error = errno;
 #endif
+#ifdef _WIN32
+    timeout = (error == WSAETIMEDOUT || error == WSAEWOULDBLOCK);
+#else
+    timeout = (error == EAGAIN || error == EWOULDBLOCK);
+#endif
+    return (MSockError){ error, timeout };
 }
-
 
 // #ifndef INET6_ADDRSTRLEN
 // #define INET6_ADDRSTRLEN 46

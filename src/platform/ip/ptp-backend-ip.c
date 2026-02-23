@@ -60,9 +60,13 @@ static const char * PTPIp_GetInitFailErrorString(u32 failureCode) {
 
 typedef struct {
     MSock dataSock;
+    u32 sessionId; // Session id for device connection
+    u32 transactionId; // Next requestion transaction id
+
+    // Event socket
     MSock eventSock;
-    u32 sessionId;
-    u32 transactionId;
+    MMemIO eventMem; // Event buffer for reading and parsing events (reused across calls)
+    u32 eventSockTimeoutMilliseconds; // Cached timeout for event socket operations in milliseconds
 } PTPIpDevice;
 
 typedef struct {
@@ -94,8 +98,7 @@ static b32 PTPIp_Close(PTPIpBackend* backend) {
     return TRUE;
 }
 
-void* PTPDeviceIp_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void* PTPDeviceIp_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -106,8 +109,7 @@ void* PTPDeviceIp_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* data
     return ((u8*)dataMem) + headerSize;
 }
 
-void PTPDeviceIp_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void PTPDeviceIp_FreeBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -164,18 +166,19 @@ static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
 // <len      > <data more> <tid      > <data       |           > <len      > <data end > <tid      > | <len      > <cmd   res> <res> <tid      >
 //
 
-static PTPResult PTPDeviceIp_SendAndRecvEx(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                           PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                           size_t* actualDataOutSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                         PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                         size_t* actualDataOutSize) {
     PTPIpDevice* dev = (PTPIpDevice*)self->device;
     MAllocator* allocator = self->transport.allocator;
     PTPResult error = PTP_OK;
 
-    // 1. Send request packet
-    u32 packetLen = 4 + 4 + 4 + 2 + 4 + (request->NumParams * 4);
+    MMemIO in = {0};
     MMemIO out;
     MMemInitEmpty(&out, allocator);
+
+    // 1. Send request packet
+    u32 packetLen = 4 + 4 + 4 + 2 + 4 + (request->NumParams * 4);
     MMemWriteU32LE(&out, packetLen);
     MMemWriteU32LE(&out, PTPIP_TYPE_CMD_REQUEST);
     MMemWriteU32LE(&out, dataInSize == 0 ? 1 : 2);
@@ -219,7 +222,6 @@ static PTPResult PTPDeviceIp_SendAndRecvEx(void* deviceSelf, PTPRequestHeader* r
     MMemFree(&out);
 
     // 3. Receive Response(s)
-    MMemIO in;
     MMemInitAlloc(&in, allocator, 1024);
 
     MMemIO inRead = {in.mem, 0, in.capacity};
@@ -343,9 +345,117 @@ exitWithError:
     return error;
 }
 
+// TODO fix PTPResult it's really two things AW error + PTP error code
+static PTPResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents) {
+    if (!outEvents) {
+        return PTP_GENERAL_ERROR;
+    }
+    b32 gotEvent = FALSE;
+
+    PTPIpDevice* dev = (PTPIpDevice*)self->device;
+    if (!dev || dev->eventSock == INVALID_SOCKET) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    // Initialize event buffer on first use
+    if (dev->eventMem.allocator == NULL) {
+        MMemInitAlloc(&dev->eventMem, self->transport.allocator, 4096);
+    } else {
+        // Ensure we have space in buffer
+        if (dev->eventMem.size + 1024 > dev->eventMem.capacity) {
+            MMemGrowBytes(&dev->eventMem, 4096);
+        }
+    }
+
+    if (dev->eventSockTimeoutMilliseconds != timeoutMilliseconds) {
+        if (timeoutMilliseconds > 0) {
+            MSockSetNonBlocking(dev->eventSock, 0);
+            MSockSetSocketTimeout(dev->eventSock, timeoutMilliseconds);
+        } else {
+            MSockSetNonBlocking(dev->eventSock, 1);
+        }
+        dev->eventSockTimeoutMilliseconds = timeoutMilliseconds;
+    }
+
+    // Parse events
+    // TODO: Capacity should be the size of the data
+    MMemIO inRead = {dev->eventMem.mem, 0, dev->eventMem.capacity};
+
+    // TODO: Start non blocking, only move to blocking if no data is found (and timeout is > 0)
+    int r = 0;
+    do {
+        r = TcpReadBytesIntoBuffer(dev->eventSock, &dev->eventMem, &inRead, 8);
+        if (r < 0) {
+            // we weren't able to read he required number of bytes (within the timeout, if any)
+            break;
+        }
+
+        // Try parsing again with new data
+        if (dev->eventMem.size >= 8) {
+            u32 packetLen = 0;
+            u32 packetType = 0;
+            MMemReadU32LE(&inRead, &packetLen);
+            MMemReadU32LE(&inRead, &packetType);
+            if (packetLen > 8) {
+                r = TcpReadBytesIntoBuffer(dev->eventSock, &dev->eventMem, &inRead, packetLen-8);
+                if (r < 0) {
+                    // we weren't able to read he required number of bytes (within the timeout, if any)
+                    break;
+                }
+                if (packetType == PTPIP_TYPE_EVENT) {
+                    PTPEvent* outEvent = MArrayAddPtrZ(alloc, *outEvents);
+
+                    MMemIO payloadRead;
+                    MMemInitRead(&payloadRead, inRead.mem + inRead.size, packetLen - 8);
+                    u16 eventCode = 0;
+                    MMemReadU16LE(&payloadRead, &eventCode);
+                    outEvent->code = (u32)eventCode;
+                    outEvent->size = packetLen - 8;
+
+                    u32 transactionId = 0;
+                    MMemReadU32LE(&payloadRead, &transactionId);
+                    MMemReadU32LE(&payloadRead, &outEvent->param1);
+                    MMemReadU32LE(&payloadRead, &outEvent->param2);
+                    MMemReadU32LE(&payloadRead, &outEvent->param3);
+
+                    gotEvent = TRUE;
+                }
+                // Skip the rest if the packet
+                MMemReadSkipBytes(&inRead, packetLen - 8);
+            }
+        } else {
+            break;
+        }
+    } while (TRUE);
+
+    // Remember remaining data packet data for next time
+    if (inRead.mem + inRead.size < dev->eventMem.mem + dev->eventMem.size) {
+        dev->eventMem.size = dev->eventMem.size - inRead.size;
+        memmove(dev->eventMem.mem, inRead.mem + inRead.size, dev->eventMem.size);
+    } else {
+        dev->eventMem.size = 0;
+    }
+
+    if (r == MSOCK_ERROR) {
+        MSockError e = MSockGetLastError();
+        if (e.timeout) {
+            if (gotEvent) {
+                return PTP_OK;
+            } else {
+                return PTP_AW_TIMEOUT;
+            }
+        }
+    } else if (r == 0) {
+        return PTP_AW_CONNECTION_CLOSED;
+    } else {
+        return PTP_OK;
+    }
+}
+
 static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPIp_OpenDevice");
-    MMemIO out;
+    MMemIO out = {0};
+    MMemIO in = {0};
     PTPResult error = PTP_OK;
 
     PTPIpDevice dev = {};
@@ -387,7 +497,6 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
 
     MMemFree(&out);
 
-    MMemIO in;
     MMemInitAlloc(&in, self->allocator, 1024);
     MMemIO inRead = {in.mem, 0, in.capacity};
 
@@ -441,6 +550,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     }
 
     MSockSetSocketTimeout(dev.eventSock, 5000);
+    dev.eventSockTimeoutMilliseconds = 5000;
     if (MSockConnectAddress(dev.eventSock, &socketAddr) == MSOCK_INVALID) {
         goto exitWithError;
     }
@@ -488,14 +598,16 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     MMemFree(&in);
 
     PTPIpDevice* newDev = MArrayAddPtr(self->allocator, self->openDevices);
+    memset(newDev, 0, sizeof(PTPIpDevice));
     *newDev = dev;
     PTPDevice* device = *deviceOut;
     device->backendType = PTP_BACKEND_IP;
     device->device = newDev;
     device->transport.allocator = self->allocator;
-    device->transport.sendAndRecvEx = PTPDeviceIp_SendAndRecvEx;
+    device->transport.sendAndRecv = PTPDeviceIp_SendAndRecv;
     device->transport.reallocBuffer = PTPDeviceIp_ReallocBuffer;
     device->transport.freeBuffer = PTPDeviceIp_FreeBuffer;
+    device->transport.readEvents = PTPDeviceIp_ReadEvents;
     device->transport.reset = NULL;
     device->transport.requiresSessionOpenClose = TRUE;
     device->logger = self->logger;
@@ -516,6 +628,9 @@ static b32 PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
     PTPIpDevice* dev = (PTPIpDevice*)device->device;
     MSockClose(dev->dataSock);
     MSockClose(dev->eventSock);
+
+    // Free event buffer if allocated
+    MMemFree(&dev->eventMem);
 
     MArrayEachPtr(backend->openDevices, it) {
         if (it.p == dev) {

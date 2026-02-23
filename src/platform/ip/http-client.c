@@ -1,10 +1,9 @@
 #include "http-client.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../mlib/msock.h"
+#include "mlib/msock.h"
 
 b32 Http_ParseUrl(MAllocator* allocator, MStrView url, HttpUrl* outUrl) {
     memset(outUrl, 0, sizeof(HttpUrl));
