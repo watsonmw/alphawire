@@ -206,6 +206,12 @@ struct AppContext {
     ImTextureID liveViewImageGLId = 0;
     i32 liveViewImageWidth = 0;
     i32 liveViewImageHeight = 0;
+    bool osdEnabled = false;
+    bool osdCaptured = false;
+    MMemIO osdImage{};
+    ImTextureID osdImageGLId = 0;
+    i32 osdImageWidth = 0;
+    i32 osdImageHeight = 0;
 
     // Camera settings file
     bool cameraSettingsSaveEnabled = false;
@@ -266,6 +272,8 @@ struct AppContext {
         cameraSettingsSaveEnabled = false;
         connected = false;
         liveViewOpen = false;
+        osdEnabled = false;
+        osdCaptured = false;
         propAutoRefresh = true;
         propRefresh = true;
         propertyLastRefreshTime = 0.;
@@ -283,6 +291,7 @@ struct AppContext {
     void DisconnectDevice() {
         if (device != NULL) {
             MMemFree(&this->liveViewImage);
+            MMemFree(&this->osdImage);
             PTPControl_FreeLiveViewFrames(&ptp, &liveViewFrames);
             PTPControl_Cleanup(&ptp);
             PTPDeviceList_CloseDevice(&ptpDeviceList, device);

@@ -804,6 +804,19 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Begin("Camera Controls");
 
     ImGui::Checkbox("LiveView", &c.liveViewOpen);
+    PTPProperty* osdImageModeProp = PTPControl_GetPropertyByCode(&c.ptp, DPC_OSD_IMAGE_MODE);
+    if (osdImageModeProp) {
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!c.liveViewOpen);
+        if (ImGui::Checkbox("OSD", &c.osdEnabled)) {
+            if (osdImageModeProp) {
+                PTPPropValue value = {};
+                value.u8 = c.osdEnabled ? 1 : 0;
+                PTPControl_SetPropertyValue(&c.ptp, osdImageModeProp, value);
+            }
+        }
+        ImGui::EndDisabled();
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Inspect Controls", &c.showWindowDeviceDebug);
 
@@ -997,7 +1010,7 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         bool magEnabled = false;
         PTPProperty* propMagPos = PTPControl_GetPropertyByCode(&c.ptp, DPC_FOCUS_MAGNIFY_POS);
-        if (PTPControl_SupportsProperty(&c.ptp, propMagPos)) {
+        if (propMagPos) {
             magEnabled = true;
         }
 

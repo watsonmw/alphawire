@@ -80,8 +80,15 @@ void UiPtpLiveViewShow(AppContext& c) {
     if (refresh) {
         c.liveViewLastTime = currentTime;
         if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames) == PTP_OK) {
-            LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId,
-                                  &c.liveViewImageWidth, &c.liveViewImageHeight);
+            LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId, &c.liveViewImageWidth, &c.liveViewImageHeight);
+        }
+        if (c.osdEnabled) {
+            if (PTPControl_GetOSDImage(&c.ptp, &c.osdImage) == PTP_OK) {
+                LoadTextureFromMemory(&c.osdImage, &c.osdImageGLId, &c.osdImageWidth, &c.osdImageHeight);
+                c.osdCaptured = true;
+            } else {
+                c.osdCaptured = false;
+            }
         }
     }
 
@@ -109,6 +116,12 @@ void UiPtpLiveViewShow(AppContext& c) {
                 (windowSize.y - renderHeight) * 0.5f);
         ImGui::SetCursorPos(imagePos);
         ImGui::Image(c.liveViewImageGLId, ImVec2(renderWidth, renderHeight));
+
+        if (c.osdEnabled && c.osdCaptured) {
+            // Render OSD at aspect
+            ImGui::SetCursorPos(imagePos);
+            ImGui::Image(c.osdImageGLId, ImVec2(renderWidth, renderHeight));
+        }
 
         // Indicate detected focus frames
         if (MArraySize(c.liveViewFrames.focus.frames)) {

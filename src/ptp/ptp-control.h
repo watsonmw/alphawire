@@ -132,7 +132,7 @@ PTP_EXPORT PTPResult PTPControl_Cleanup(PTPControl* self);
 
 PTP_EXPORT b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode);
 PTP_EXPORT b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode);
-PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, PTPProperty* property);
+PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode);
 PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property);
 
 
@@ -205,13 +205,28 @@ PTP_EXPORT b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* propert
 PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut);
 
 PTP_EXPORT PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value);
-PTP_EXPORT b32 PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value);
-PTP_EXPORT b32 PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value);
-PTP_EXPORT b32 PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value);
-PTP_EXPORT b32 PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value);
-PTP_EXPORT b32 PTPControl_SetPropertyFancy(PTPControl* self, PTPProperty* property, MStr value);
+PTP_EXPORT PTPResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value);
 PTP_EXPORT PTPResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch);
 
+MINLINE PTPResult PTPControl_SetPropertyU8(PTPControl* self, PTPProperty* property, u8 value) {
+    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u8 = value});
+}
+
+MINLINE PTPResult PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
+    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u16 = value});
+}
+
+MINLINE PTPResult PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
+    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u32 = value});
+}
+
+MINLINE PTPResult PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
+    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u64 = value});
+}
+
+MINLINE PTPResult PTPControl_SetPropertyStrRaw(PTPControl* self, PTPProperty* property, MStr value) {
+    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.str = value});
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Generic controls getters and setters
@@ -263,6 +278,8 @@ PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
 PTP_EXPORT PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
 
 PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
+
+PTP_EXPORT PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut);
 
 /**
  * Downloads an image from the cameras buffer.

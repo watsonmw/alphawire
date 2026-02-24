@@ -1696,6 +1696,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("live-view-quality", DPC_LIVE_VIEW_QUALITY, sProp_LiveViewImageQuality),
     META_ENUM_U8 ("live-view-status", DPC_LIVE_VIEW_STATUS, sProp_LiveViewStatus),
     META_ENUM_U8 ("live-view-setting-effect", DPC_LIVE_VIEW_SETTING_EFFECT, sProp_LiveViewSettingEffect),
+    META_ENUM_U8 ("osd-image-mode", DPC_OSD_IMAGE_MODE, sProp_OnOff0),
 
     META_FUNC_I8 ("battery-remaining", DPC_BATTERY_REMAINING, NULL, GetBatteryRemainingAsString),
     META_ENUM_U8 ("battery-level", DPC_BATTERY_LEVEL, sProp_BatteryLevel),
@@ -1964,6 +1965,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {DPC_FLASH_COMPENSATION, "Flash Compensation"},
     {DPC_DRO_HDR_MODE, "Dynamic Range Optimizer"},
     {DPC_IMAGE_SIZE, "Image Size"},
+    {DPC_OSD_IMAGE_MODE, "OSD Image Mode"},
     {DPC_SHUTTER_SPEED, "Shutter Speed"},
     {DPC_BATTERY_LEVEL, "Battery Level Indicator"},
     {DPC_COLOR_TEMPERATURE, "Color Temperature"},
@@ -2386,10 +2388,29 @@ static OperationMetadata sPtpOperationMetadata[] = {
     {PTP_OC_SDIO_ControlFTPJobList, "SDIO_ControlFTPJobList", "Control the FTP Job List."},
     {PTP_OC_SDIO_UploadData, "SDIO_UploadData", "Upload data to Camera temporary storage."},
     {PTP_OC_SDIO_ControlUploadData, "SDIO_ControlUploadData", "Control the Upload Data."},
+    {PTP_OC_SDIO_DownloadData, "SDIO_DownloadData", "Download the data from the camera."},
     {PTP_OC_SDIO_GetFTPSettingList, "SDIO_GetFTPSettingList", "Get FTP Setting List."},
     {PTP_OC_SDIO_SetFTPSettingList, "SDIO_SetFTPSettingList", "Set FTP Setting List."},
     {PTP_OC_SDIO_GetLensInformation, "SDIO_GetLensInformation", "Get Lens Information."},
     {PTP_OC_SDIO_OperationResultsSupported, "SDIO_OperationResultsSupported", "Get the Operation Results Supported."},
+    {PTP_OC_SDIO_GetPresetInfoList, "SDIO_GetPresetInfoList", "Get PresetInfoList."},
+    {PTP_OC_SDIO_GetDisplayFTPResult, "SDIO_GetDisplayFTPResult", "Get Display FTP Result."},
+    {PTP_OC_SDIO_GetOSDImage, "SDIO_GetOSDImage", "Get OSD Image."},
+    {PTP_OC_SDIO_GetRestrictionInfo, "SDIO_GetRestrictionInfo", "Get Restriction Info."},
+    {PTP_OC_SDIO_GetDeviceDescriptionFile, "SDIO_GetDeviceDescriptionFile", "Get Device Description File."},
+    {PTP_OC_SDIO_GetCapturedDateList, "SDIO_GetCapturedDateList", "Get Captured Date List."},
+    {PTP_OC_SDIO_GetContentInfoList, "SDIO_GetContentInfoList", "Get Contents Info List."},
+    {PTP_OC_SDIO_GetContentData, "SDIO_GetContentData", "Get Content Data."},
+    {PTP_OC_SDIO_GetContentCompressedData, "SDIO_GetContentCompressedData", "Get Content Compressed Data."},
+    {PTP_OC_SDIO_GetStreamSettingList, "SDIO_GetStreamSettingList", "Get Stream Setting List."},
+    {PTP_OC_SDIO_SetStreamSettingList, "SDIO_SetStreamSettingList", "Set Stream Setting List."},
+    {PTP_OC_SDIO_ControlPTZF, "SDIO_ControlPTZF", "Control the PTZF."},
+    {PTP_OC_SDIO_SetPresetPTZF, "SDIO_SetPresetPTZF", "Set Preset PTZF."},
+    {PTP_OC_SDIO_GetFirmwareUpdateInfo, "SDIO_GetFirmwareUpdateInfo", "Get FirmwareUpdateInfo in Media."},
+    {PTP_OC_SDIO_GetAreaTimeZoneSetting, "SDIO_GetAreaTimeZoneSetting", "Get AreaTimeZone Setting."},
+    {PTP_OC_SDIO_SetAreaTimeZoneSetting, "SDIO_SetAreaTimeZoneSetting", "Set AreaTimeZone Setting."},
+    {PTP_OC_SDIO_DeleteContent, "SDIO_DeleteContent", "Delete Content."},
+    {PTP_OC_SDIO_GetExtDeviceProp, "SDIO_GetExtDeviceProp", "Get the DevicePropInfo."},
 };
 
 char* PTP_GetOperationLabel(u16 operationCode) {
@@ -3657,6 +3678,38 @@ PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
     return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
 }
 
+PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut) {
+    PTP_TRACE("PTP_GetOSDImage");
+    PTPResponse r = DoRequest(self,
+                              PTP_OC_SDIO_GetOSDImage,
+                              0,
+                              0x10000,
+                              0);
+
+    RETURN_IF_FAIL(r);
+
+    u32 offsetImage = 0;
+    MMemReadU32(&r.memIo, &offsetImage);
+
+    u32 imageSize = 0;
+    MMemReadU32(&r.memIo, &imageSize);
+
+    u32 metadataOffset = 0;
+    MMemReadU32(&r.memIo, &metadataOffset);
+
+    u32 metadataSize = 0;
+    MMemReadU32(&r.memIo, &metadataSize);
+
+    // Skip to osd image
+    r.memIo.size = offsetImage;
+
+    fileOut->size = 0;
+    fileOut->allocator = self->allocator;
+    MMemWriteU8CopyN(fileOut, r.memIo.mem + offsetImage, imageSize);
+
+    return r.result;
+}
+
 PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
     PTP_TRACE("PTPControl_GetCapturedImage");
     PTPObjectInfo objectInfo = {};
@@ -3966,10 +4019,9 @@ b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode) {
     return FALSE;
 }
 
-b32 PTPControl_SupportsProperty(PTPControl* self, PTPProperty* property) {
-    if (!property) return FALSE;
+b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode) {
     for (int i = 0; i < MArraySize(self->supportedProperties); ++i) {
-        if (self->supportedProperties[i] == property->propCode) {
+        if (self->supportedProperties[i] == propCode) {
             return TRUE;
         }
     }
@@ -4307,25 +4359,8 @@ PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, P
     return r;
 }
 
-b32 PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
-    return FALSE;
-}
-
-b32 PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
-    return FALSE;
-}
-
-b32 PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
-    return FALSE;
-}
-
-b32 PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value) {
-    // Set from string directly
-    return FALSE;
-}
-
-b32 PTPControl_SetPropertyFancy(PTPControl* self, PTPProperty* property, MStr value) {
-    // Parse string
+PTPResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value) {
+    // TODO: generic and per prop string parsing
     return FALSE;
 }
 

@@ -10,9 +10,7 @@ UI
 - Live View
   - Click to focus
   - Click to zoom
-- Events API
 - Settings apply
-- Support for SDIO_GetOSDImage - check if it has focus peeking pixels
 - Focus Magnifier needs its own API - two sets of properties control the same thing - which one to use depends on
   on the camera.  Maybe good idea to create some virtual properties (id only) for this - disable id for
   magnifier properties.
@@ -26,3 +24,4 @@ Backends
 - IP: Connect with password (TLS)
 - Split PTPResult and AW results
 - Events for libusb and IOKit
+
