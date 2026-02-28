@@ -190,7 +190,7 @@ def discover_sony_cameras_ptp_ip(timeout=10):
     # Send M-SEARCH on all local interfaces
     for ip in local_ips:
         try:
-            print(f"Sending M-SEARCH on interface: {ip}")
+            print(f"SSDP device search on interface: {ip}")
             # Tell the socket to use this specific interface for multicast
             s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(ip))
             s.sendto(msg.encode('utf-8'), ('239.255.255.250', 1900))

@@ -55,7 +55,7 @@ if(APPLE)
         ${PTP_IP_FILES}
     )
 
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_IOKIT PTP_ENABLE_IP)
+    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_IOKIT PTP_ENABLE_IP M_PTHREADS)
     target_compile_options(alphawire PRIVATE -fvisibility=hidden)
 
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
@@ -202,6 +202,7 @@ list(APPEND ALPHAWIREUI_LIBS SDL3::SDL3)
 list(APPEND ALPHAWIREUI_LIBS alphawire)
 
 if(APPLE)
+    target_compile_definitions(alphawireui PRIVATE M_PTHREADS)
     find_package(OpenGL REQUIRED)
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
     find_library(IOKIT_LIBRARY IOKit REQUIRED)

@@ -25,3 +25,9 @@ Backends
 - Split PTPResult and AW results
 - Events for libusb and IOKit
 
+Commands
+===
+
+Shutdown - 0x9280
+
+

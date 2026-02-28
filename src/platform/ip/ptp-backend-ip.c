@@ -353,7 +353,7 @@ static PTPResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds
     b32 gotEvent = FALSE;
 
     PTPIpDevice* dev = (PTPIpDevice*)self->device;
-    if (!dev || dev->eventSock == INVALID_SOCKET) {
+    if (!dev || dev->eventSock == MSOCK_INVALID) {
         return PTP_GENERAL_ERROR;
     }
 
@@ -682,7 +682,7 @@ static b32 PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
                 ipStr[0] = '\0';
             }
 
-            PTP_INFO_F("Sending M-SEARCH on interface: %s", ipStr);
+            PTP_INFO_F("SSDP device search on interface: %s", ipStr);
 
             if (setsockopt(self->discoverySock, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip->sin_addr,
                 sizeof(ip->sin_addr)) == MSOCK_ERROR) {
