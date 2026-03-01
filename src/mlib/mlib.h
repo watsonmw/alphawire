@@ -118,7 +118,8 @@ typedef struct {
 
 #ifdef M_THREADING
 #if defined(M_PTHREADS)
-    typedef struct {void* m;} MRWLock;
+    #include <pthread.h>
+    typedef struct { pthread_rwlock_t m; } MRWLock;
 #elif defined(_WIN32)
     typedef struct { int m; } MRWLock;
 #endif

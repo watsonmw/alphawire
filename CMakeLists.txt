@@ -135,6 +135,7 @@ if(LINUX)
     endif()
 
     target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB PTP_ENABLE_IP)
+    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB M_PTHREADS)
 endif()
 
 target_link_libraries(alphawire PUBLIC ${ALPHAWIRE_LIBS})
@@ -235,6 +236,7 @@ if(WIN32)
 endif()
 
 if(LINUX)
+    target_compile_definitions(alphawireui PRIVATE M_PTHREADS)
     find_package(OpenGL REQUIRED)
     list(APPEND ALPHAWIREUI_LIBS OpenGL::GL)
 endif()

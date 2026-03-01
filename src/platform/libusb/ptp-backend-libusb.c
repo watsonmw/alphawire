@@ -1,6 +1,7 @@
 #include <libusb.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "mlib/mlib.h"
 #include "ptp/ptp-control.h"
@@ -164,8 +165,7 @@ void PTPLibusbDeviceList_ReleaseList(PTPLibusbDeviceList* self) {
     }
 }
 
-void* PTPDeviceLibusb_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void* PTPDeviceLibusb_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -176,8 +176,7 @@ void* PTPDeviceLibusb_ReallocBuffer(void* deviceSelf, PTPBufferType type, void* 
     return data + headerSize;
 }
 
-void PTPDeviceLibusb_FreeBuffer(void* deviceSelf, PTPBufferType type, void* dataMem, size_t dataOldSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static void PTPDeviceLibusb_FreeBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -186,10 +185,9 @@ void PTPDeviceLibusb_FreeBuffer(void* deviceSelf, PTPBufferType type, void* data
     }
 }
 
-PTPResult PTPDeviceLibusb_SendAndRecv(void* deviceSelf, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                     PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                     size_t* actualDataOutSize) {
-    PTPDevice* self = (PTPDevice*)deviceSelf;
+static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                             PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                             size_t* actualDataOutSize) {
     PTPDeviceLibusb* deviceLibusb = self->device;
     libusb_device_handle* handle = deviceLibusb->handle;
     int transferred = 0;
@@ -279,15 +277,14 @@ PTPResult PTPDeviceLibusb_SendAndRecv(void* deviceSelf, PTPRequestHeader* reques
     return PTP_OK;
 }
 
-static b32 PTPDeviceLibusb_Reset(void* deviceSelf) {
-    PTPDevice* dev = (PTPDevice*)deviceSelf;
-    PTPDeviceLibusb* d = (PTPDeviceLibusb*)dev->device;
+static b32 PTPDeviceLibusb_Reset(PTPDevice* self) {
+    PTPDeviceLibusb* d = (PTPDeviceLibusb*)self->device;
     int ok = 1;
     if (d->handle) {
         // Best-effort device reset; ignore errors on platforms that require re-enumeration
         int r = libusb_reset_device((libusb_device_handle*)d->handle);
         if (r != 0) {
-            PTP_LOG_WARNING_F(&dev->logger, "libusb_reset_device failed: %s", libusb_error_name(r));
+            PTP_WARNING_F("libusb_reset_device failed: %s", libusb_error_name(r));
             ok = 0;
         }
         // Attempt to clear stalls on endpoints
@@ -302,30 +299,115 @@ static b32 PTPDeviceLibusb_Reset(void* deviceSelf) {
     return ok ? TRUE : FALSE;
 }
 
-b32 PTPDeviceLibusb_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds) {
-    PTPDeviceLibusb* deviceLibusb = device->device;
-    unsigned char buffer[512];
-    int transferred = 0;
-    int r = libusb_interrupt_transfer(deviceLibusb->handle, deviceLibusb->usbInterrupt, buffer,
-        sizeof(buffer), &transferred, timeoutMilliseconds);
+static b32 ReadEventFromBuffer(PTPDeviceLibusb* dev, int transferred, PTPEvent* outEvent) {
+    MMemIO payloadRead;
+    MMemInitRead(&payloadRead, dev->eventMem.mem, transferred);
 
-    if (r == 0 && transferred >= (int)sizeof(PTPContainerHeader)) {
-        PTPContainerHeader* header = (PTPContainerHeader*)buffer;
-        if (header->type == PTP_CONTAINER_EVENT) {
-            outEvent->code = header->code;
-            if (header->length >= sizeof(PTPContainerHeader) + 4) {
-                outEvent->param1 = *(u32*)(header + 1);
-            }
-            if (header->length >= sizeof(PTPContainerHeader) + 8) {
-                outEvent->param2 = *(u32*)(((u8*)(header + 1)) + 4);
-            }
-            if (header->length >= sizeof(PTPContainerHeader) + 12) {
-                outEvent->param3 = *(u32*)(((u8*)(header + 1)) + 8);
+    if (payloadRead.capacity >= sizeof(PTPContainerHeader)) {
+        PTPContainerHeader* event = (PTPContainerHeader*)payloadRead.mem;
+        if (event->type == PTP_CONTAINER_EVENT) {
+            size_t headerSize = sizeof(PTPContainerHeader);
+            outEvent->code = event->code;
+            if (event->length > headerSize) {
+                payloadRead.size += headerSize;
+                MMemReadU32LE(&payloadRead, &outEvent->param1);
+                MMemReadU32LE(&payloadRead, &outEvent->param2);
+                MMemReadU32LE(&payloadRead, &outEvent->param3);
             }
             return TRUE;
         }
     }
     return FALSE;
+}
+
+// Background thread function for processing events
+static void* EventThreadProc(void* lpParameter) {
+    PTPDeviceLibusb* dev = (PTPDeviceLibusb*)lpParameter;
+
+    while (!dev->eventThreadStop) {
+        int transferred = 0;
+
+        // Allocate event buffer if not already done
+        if (!dev->eventMem.allocator) {
+            MMemInitAlloc(&dev->eventMem, dev->allocator, 1024);
+        } else {
+            dev->eventMem.size = 0;
+        }
+
+        // Perform interrupt transfer with a reasonable timeout
+        int r = libusb_interrupt_transfer(dev->handle, dev->usbInterrupt,
+            dev->eventMem.mem, dev->eventMem.capacity, &transferred, 1000);
+
+        if (dev->eventThreadStop) {
+            break;
+        }
+
+        if (r == 0 && transferred > 0) {
+            PTPEvent tempEvent = {};
+            if (ReadEventFromBuffer(dev, transferred, &tempEvent)) {
+                pthread_mutex_lock(&dev->eventLock);
+                PTPEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
+                *event = tempEvent;
+                pthread_mutex_unlock(&dev->eventLock);
+            }
+        } else if (r != LIBUSB_ERROR_TIMEOUT) {
+            // Log error but continue running
+            PTP_LOG_WARNING_F(&dev->logger, "Interrupt transfer failed: %s", libusb_error_name(r));
+            // Sleep briefly to avoid busy-looping on persistent errors
+            struct timespec ts = {0, 100000000}; // 100ms
+            nanosleep(&ts, NULL);
+        }
+    }
+
+    return NULL;
+}
+
+static PTPResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc,
+                                            PTPEvent** outEvents) {
+    PTPDeviceLibusb* dev = self->device;
+
+    if (outEvents == NULL) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    // If event thread is running, return stored events
+    if (dev->eventThreadStarted) {
+        pthread_mutex_lock(&dev->eventLock);
+
+        // Copy all events to output
+        if (dev->eventList && MArraySize(dev->eventList) > 0) {
+            for (int i = 0; i < MArraySize(dev->eventList); i++) {
+                PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+                *event = dev->eventList[i];
+            }
+            // Clear the stored events
+            MArrayClear(dev->eventList);
+        }
+
+        pthread_mutex_unlock(&dev->eventLock);
+        return PTP_OK;
+    }
+
+    // Non-threaded mode - this may miss some events if ReadEvents is not called frequently enough
+    if (!dev->eventMem.allocator) {
+        MMemInitAlloc(&dev->eventMem, self->transport.allocator, 1024);
+    } else {
+        dev->eventMem.size = 0;
+    }
+
+    int transferred = 0;
+    int r = libusb_interrupt_transfer(dev->handle, dev->usbInterrupt,
+        dev->eventMem.mem, dev->eventMem.capacity, &transferred, timeoutMilliseconds);
+
+    if (r == 0 && transferred > 0) {
+        PTPEvent outEvent = {};
+        if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
+            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            *event = outEvent;
+        }
+    }
+
+    return PTP_OK;
 }
 
 b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
@@ -364,12 +446,15 @@ b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* 
     deviceLibusb->timeoutMilliseconds = self->timeoutMilliseconds;
     deviceLibusb->allocator = self->allocator;
     deviceLibusb->logger = self->logger;
+    deviceLibusb->usbInterruptInterval = 0;
+    deviceLibusb->eventThreadStop = FALSE;
+    deviceLibusb->eventList = NULL;
 
     (*deviceOut)->transport.reallocBuffer = PTPDeviceLibusb_ReallocBuffer;
     (*deviceOut)->transport.freeBuffer = PTPDeviceLibusb_FreeBuffer;
     (*deviceOut)->transport.sendAndRecv = PTPDeviceLibusb_SendAndRecv;
     (*deviceOut)->transport.reset = PTPDeviceLibusb_Reset;
-    (*deviceOut)->transport.readEvent = PTPDeviceLibusb_ReadEvent;
+    (*deviceOut)->transport.readEvents = PTPDeviceLibusb_ReadEvents;
     (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
     (*deviceOut)->transport.allocator = self->allocator;
     (*deviceOut)->logger = self->logger;
@@ -378,12 +463,51 @@ b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* 
     (*deviceOut)->disconnected = FALSE;
     (*deviceOut)->deviceInfo = deviceInfo;
 
+    // Start event thread if allowed
+    if (!self->backend->config.disallowSpawnEventThread) {
+        pthread_mutex_init(&deviceLibusb->eventLock, NULL);
+
+        pthread_mutex_lock(&deviceLibusb->eventLock);
+        MArrayInit(deviceLibusb->allocator, deviceLibusb->eventList, 16);
+        pthread_mutex_unlock(&deviceLibusb->eventLock);
+
+        int r = pthread_create(&deviceLibusb->eventThread, NULL, EventThreadProc, deviceLibusb);
+        if (r != 0) {
+            PTP_LOG_WARNING_F(&self->logger, "Failed to create event thread: %d", r);
+            deviceLibusb->eventThreadStop = -1;
+            pthread_mutex_destroy(&deviceLibusb->eventLock);
+        } else {
+            deviceLibusb->eventThreadStarted = -1;
+            PTP_DEBUG("Started event thread");
+        }
+    }
+
     return TRUE;
 }
 
 b32 PTPLibusbDeviceList_DisconnectDevice(PTPLibusbDeviceList* self, PTPDevice* device) {
     PTP_TRACE("PTPLibusbDeviceList_DisconnectDevice");
     PTPDeviceLibusb* deviceLibusb = device->device;
+
+    // Stop event thread if running
+    if (deviceLibusb->eventThreadStop) {
+        // Signal thread to stop
+        deviceLibusb->eventThreadStop = -1;
+
+        // Wait for thread to exit
+        pthread_join(deviceLibusb->eventThread, NULL);
+
+        // Clean up event list
+        if (deviceLibusb->eventList) {
+            MArrayFree(deviceLibusb->allocator, deviceLibusb->eventList);
+            deviceLibusb->eventList = NULL;
+        }
+
+        pthread_mutex_destroy(&deviceLibusb->eventLock);
+    }
+
+    MMemFree(&deviceLibusb->eventMem);
+
     if (deviceLibusb->handle) {
         libusb_release_interface(deviceLibusb->handle, 0);
         libusb_close(deviceLibusb->handle);
@@ -444,6 +568,7 @@ b32 PTPLibusbDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds
     self->allocator = backend->allocator;
     self->logger = backend->logger;
     self->timeoutMilliseconds = (int)timeoutMilliseconds;
+    self->backend = backend;
 
     backend->self = self;
     backend->close = PTPLibusbDeviceList_Close_;
