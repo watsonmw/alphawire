@@ -7,6 +7,8 @@
 #include <mach/mach_error.h>
 
 #include <stdlib.h>
+#include <pthread.h>
+#include <time.h>
 
 #include "mlib/mlib.h"
 #include "ptp/ptp-control.h"
@@ -634,6 +636,123 @@ static b32 PTPDeviceIokit_Reset(PTPDevice* dev) {
     return (r == kIOReturnSuccess) ? TRUE : FALSE;
 }
 
+static b32 ReadEventFromBuffer(PTPDeviceIOKit* dev, UInt32 transferred, PTPEvent* outEvent) {
+    MMemIO payloadRead;
+    MMemInitRead(&payloadRead, dev->eventMem.mem, transferred);
+
+    if (payloadRead.capacity >= sizeof(PTPContainerHeader)) {
+        PTPContainerHeader* event = (PTPContainerHeader*)payloadRead.mem;
+        if (event->type == PTP_CONTAINER_EVENT) {
+            size_t headerSize = sizeof(PTPContainerHeader);
+            outEvent->code = event->code;
+            if (event->length > headerSize) {
+                payloadRead.size += headerSize;
+                MMemReadU32LE(&payloadRead, &outEvent->param1);
+                MMemReadU32LE(&payloadRead, &outEvent->param2);
+                MMemReadU32LE(&payloadRead, &outEvent->param3);
+            }
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+// Background thread function for processing events
+static void* EventThreadProc(void* lpParameter) {
+    PTPDeviceIOKit* dev = (PTPDeviceIOKit*)lpParameter;
+
+    while (!dev->eventThreadStop) {
+        UInt32 transferred = 0;
+
+        // Allocate event buffer if not already done
+        if (!dev->eventMem.allocator) {
+            MMemInitAlloc(&dev->eventMem, dev->allocator, 1024);
+        } else {
+            dev->eventMem.size = 0;
+        }
+
+        // Perform interrupt transfer with a reasonable timeout
+        transferred = dev->eventMem.capacity;
+        IOReturn r = (*dev->ioUsbInterface)->ReadPipeTO(dev->ioUsbInterface, dev->usbInterrupt,
+                                                        dev->eventMem.mem, &transferred,
+                                                        dev->timeoutMilliseconds,
+                                                        dev->timeoutMilliseconds);
+
+        if (dev->eventThreadStop) {
+            break;
+        }
+
+        if (r == kIOReturnSuccess && transferred > 0) {
+            PTPEvent tempEvent = {};
+            if (ReadEventFromBuffer(dev, transferred, &tempEvent)) {
+                pthread_mutex_lock(&dev->eventLock);
+                PTPEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
+                *event = tempEvent;
+                pthread_mutex_unlock(&dev->eventLock);
+            }
+        } else if (r != kIOReturnTimeout) {
+            // Log error but continue running
+            PTP_LOG_WARNING_F(&dev->logger, "Interrupt transfer failed: %s (%08x)",
+                IOReturnToString(r), r);
+            // Sleep briefly to avoid busy-looping on persistent errors
+            struct timespec ts = {0, 100000000}; // 100ms
+            nanosleep(&ts, NULL);
+        }
+    }
+
+    return NULL;
+}
+
+static PTPResult PTPDeviceIokit_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc,
+                                            PTPEvent** outEvents) {
+    PTPDeviceIOKit* dev = self->device;
+
+    if (outEvents == NULL) {
+        return PTP_GENERAL_ERROR;
+    }
+
+    // If event thread is running, return stored events
+    if (dev->eventThreadStarted) {
+        pthread_mutex_lock(&dev->eventLock);
+
+        // Copy all events to output
+        if (MArraySize(dev->eventList) > 0) {
+            for (int i = 0; i < MArraySize(dev->eventList); i++) {
+                PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+                *event = dev->eventList[i];
+            }
+            // Clear the stored events
+            MArrayClear(dev->eventList);
+        }
+
+        pthread_mutex_unlock(&dev->eventLock);
+        return PTP_OK;
+    }
+
+    // Non-threaded mode - this may miss some events if ReadEvents is not called frequently enough
+    if (!dev->eventMem.allocator) {
+        MMemInitAlloc(&dev->eventMem, self->transport.allocator, 1024);
+    } else {
+        dev->eventMem.size = 0;
+    }
+
+    UInt32 transferred = dev->eventMem.capacity;
+    IOReturn r = (*dev->ioUsbInterface)->ReadPipeTO(dev->ioUsbInterface, dev->usbInterrupt,
+                                                dev->eventMem.mem, &transferred,
+                                                timeoutMilliseconds,
+                                                timeoutMilliseconds);
+
+    if (r == kIOReturnSuccess && transferred > 0) {
+        PTPEvent outEvent = {};
+        if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
+            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            *event = outEvent;
+        }
+    }
+
+    return PTP_OK;
+}
+
 static char* USBTransferTypeAsStr(u8 transferType) {
     switch (transferType) {
         case kUSBControl:
@@ -821,16 +940,40 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
             ioKitDevice->disconnected = FALSE;
             ioKitDevice->timeoutMilliseconds = self->timeoutMilliseconds;
             ioKitDevice->logger = self->logger;
+            ioKitDevice->allocator = self->allocator;
+            ioKitDevice->eventThreadStop = FALSE;
+            ioKitDevice->eventList = NULL;
 
             (*deviceOut)->transport.reallocBuffer = PTPDeviceIokit_ReallocBuffer;
             (*deviceOut)->transport.freeBuffer = PTPDeviceIokit_FreeBuffer;
             (*deviceOut)->transport.sendAndRecv = PTPDeviceIokit_SendAndRecv;
             (*deviceOut)->transport.reset = PTPDeviceIokit_Reset;
+            (*deviceOut)->transport.readEvents = PTPDeviceIokit_ReadEvents;
             (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
+            (*deviceOut)->transport.allocator = self->allocator;
             (*deviceOut)->logger = self->logger;
             (*deviceOut)->device = ioKitDevice;
             (*deviceOut)->backendType = PTP_BACKEND_IOKIT;
             (*deviceOut)->disconnected = FALSE;
+
+            // Start event thread if allowed
+            if (!self->backend->config.disallowSpawnEventThread) {
+                pthread_mutex_init(&ioKitDevice->eventLock, NULL);
+
+                pthread_mutex_lock(&ioKitDevice->eventLock);
+                MArrayInit(ioKitDevice->allocator, ioKitDevice->eventList, 16);
+                pthread_mutex_unlock(&ioKitDevice->eventLock);
+
+                int r = pthread_create(&ioKitDevice->eventThread, NULL, EventThreadProc, ioKitDevice);
+                if (r != 0) {
+                    PTP_LOG_WARNING_F(&self->logger, "Failed to create event thread: %d", r);
+                    ioKitDevice->eventThreadStop = -1;
+                    pthread_mutex_destroy(&ioKitDevice->eventLock);
+                } else {
+                    ioKitDevice->eventThreadStarted = -1;
+                    PTP_DEBUG("Started event thread");
+                }
+            }
 
             if (interfaceIter) {
                 IOObjectRelease(interfaceIter);
@@ -856,6 +999,31 @@ fail:
 b32 PTPIokitDeviceList_DisconnectDevice(PTPIokitDeviceList* self, PTPDevice* device) {
     PTP_TRACE("PTPIokitDeviceList_DisconnectDevice");
     PTPDeviceIOKit* deviceIokit = device->device;
+
+    // Stop event thread if running
+    if (deviceIokit->eventThreadStarted) {
+        // Signal thread to stop
+        deviceIokit->eventThreadStop = -1;
+
+        // Abort the pipe to unblock any pending reads
+        if (deviceIokit->ioUsbInterface) {
+            (*deviceIokit->ioUsbInterface)->AbortPipe(deviceIokit->ioUsbInterface, deviceIokit->usbInterrupt);
+        }
+
+        // Wait for thread to exit
+        pthread_join(deviceIokit->eventThread, NULL);
+
+        // Clean up event list
+        if (deviceIokit->eventList) {
+            MArrayFree(deviceIokit->allocator, deviceIokit->eventList);
+            deviceIokit->eventList = NULL;
+        }
+
+        pthread_mutex_destroy(&deviceIokit->eventLock);
+    }
+
+    MMemFree(&deviceIokit->eventMem);
+
     if (deviceIokit->ioUsbInterface) {
         (*deviceIokit->ioUsbInterface)->USBInterfaceClose(deviceIokit->ioUsbInterface);
         deviceIokit->ioUsbInterface = NULL;
@@ -935,5 +1103,6 @@ b32 PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds)
     deviceList->timeoutMilliseconds = timeoutMilliseconds;
     deviceList->allocator = backend->allocator;
     deviceList->logger = backend->logger;
+    deviceList->backend = backend;
     return PTPIokitDeviceList_Open(deviceList);
 }
