@@ -329,12 +329,16 @@ b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceL
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
         deviceInfo->manufacturer = WinUtils_BSTRToUTF8(self->allocator, propVar[1].bstrVal);
         deviceInfo->product = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
-        MStr pnpId = WinUtils_BSTRToUTF8(self->allocator, propVar[3].bstrVal);
-        if (pnpId.str) {
-            // Parse \\?\usb#vid_054c&pid_0e0c#d085e0154e26#{6bdd1fc6-810f-11d0-bec7-08002be2092f}
-            sscanf_s(pnpId.str, "\\\\?\\usb#vid_%04hx&pid_%04hx", &deviceInfo->usbVID, &deviceInfo->usbPID);
-            MStrFree(self->allocator, pnpId);
+
+        if (propVar[3].vt == VT_BSTR) {
+            MStr pnpId = WinUtils_BSTRToUTF8(self->allocator, propVar[3].bstrVal);
+            if (pnpId.str) {
+                // Parse \\?\usb#vid_054c&pid_0e0c#d085e0154e26#{6bdd1fc6-810f-11d0-bec7-08002be2092f}
+                sscanf_s(pnpId.str, "\\\\?\\usb#vid_%04hx&pid_%04hx", &deviceInfo->usbVID, &deviceInfo->usbPID);
+                MStrFree(self->allocator, pnpId);
+            }
         }
+
         deviceInfo->backendType = PTP_BACKEND_WIA;
         deviceInfo->device = wiaDeviceInfo;
         PTP_INFO_F("Found device: %.*s (%.*s)", deviceInfo->product.size, deviceInfo->product.str,
