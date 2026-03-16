@@ -80,7 +80,7 @@ enum PTPEnumValueFlags {
 
 typedef struct {
     PTPPropValue propValue;
-    MStr str;
+    MStr str; // String representation of the value (can be used in a drop-down/options select for example)
     u16 flags;
 } PTPPropValueEnum;
 
@@ -147,7 +147,7 @@ enum PTPOperationCode {
     PTP_OC_GetDeviceInfo = 0x1001,
     PTP_OC_OpenSession = 0x1002,
     PTP_OC_CloseSession = 0x1003,
-    PTP_OC_GetStorageID = 0x1004,
+    PTP_OC_GetStorageIDs = 0x1004,
     PTP_OC_GetStorageInfo = 0x1005,
     PTP_OC_GetNumObjects = 0x1006,
     PTP_OC_GetObjectHandles = 0x1007,
@@ -315,7 +315,7 @@ typedef enum {
     DPC_FORMAT_MEDIA_SLOT1_ENABLED = 0xD279,
     DPC_FORMAT_MEDIA_SLOT2_ENABLED = 0xD27A,
     DPC_FORMAT_MEDIA_PROGRESS = 0xD27B,
-    DPC_TOUCH_OPERATION_FUNCTION = 0xD283,
+    DPC_TOUCH_FOCUS_OPERATION = 0xD283,
     DPC_REMOTE_TOUCH_ENABLED = 0xD284,
     DPC_REMOTE_TOUCH_CANCEL_ENABLED = 0xD285,
     DPC_MOVIE_FRAME_RATE = 0xD286,
@@ -461,6 +461,7 @@ typedef enum {
     PTP_SD_CAMERA_STATUS_ERR = 0xA106,
 
     PTP_AW_TIMEOUT = 0xE000,
+    PTP_AW_UNSUPPORTED = 0xE001,
     PTP_AW_CONNECTION_CLOSED = 0xE001,
     PTP_AW_MALFORMED_RESPONSE = 0xE002,
 } PTPResult;
@@ -477,6 +478,22 @@ typedef enum {
     PTP_OFC_WMA = 0xB901,
     PTP_OFC_MP4 = 0xB982,
 } PTPObjectFormatCode;
+
+#define AW_OSD_WIDTH 640
+#define AW_OSD_HEIGHT 480
+
+MINLINE void AwOSDClamp(int* xOut, int* yOut) {
+    if (*xOut < 0) {
+        *xOut = 0;
+    } else if (*xOut >= AW_OSD_WIDTH) {
+        *xOut = AW_OSD_WIDTH - 1;
+    }
+    if (*yOut < 0) {
+        *yOut = 0;
+    } else if (*yOut >= AW_OSD_HEIGHT) {
+        *yOut = AW_OSD_HEIGHT - 1;
+    }
+}
 
 typedef enum
 {

@@ -7,13 +7,8 @@ UI
 - Remove sorting for other tabs
 - Timing / Position
 - Connect multiple cameras
-- Live View
-  - Click to focus
-  - Click to zoom
+- Simple bool setter for properties that have an on/off enabled/disabled state
 - Settings apply
-- Focus Magnifier needs its own API - two sets of properties control the same thing - which one to use depends on
-  on the camera.  Maybe good idea to create some virtual properties (id only) for this - disable id for
-  magnifier properties.
 - Detect transport errors and disconnect
 
 Backends

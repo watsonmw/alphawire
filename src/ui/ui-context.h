@@ -168,6 +168,18 @@ struct LogWindow {
     }
 };
 
+enum LiveViewClickAction {
+    LiveViewClickAction_NONE = 0,
+    LiveViewClickAction_FOCUS = 1,
+    LiveViewClickAction_MAGNIFY = 2,
+};
+
+enum LiveViewOverlayMode {
+    LiveViewOverlayMode_NONE = 0,
+    LiveViewOverlayMode_X = 1,
+    LiveViewOverlayMode_CROSSHAIR = 2,
+};
+
 struct AppContext {
     MAllocator* deviceListAllocator = NULL;
     MAllocator* autoReleasePool = NULL;
@@ -212,6 +224,8 @@ struct AppContext {
     ImTextureID osdImageGLId = 0;
     i32 osdImageWidth = 0;
     i32 osdImageHeight = 0;
+    i32 liveViewClickAction = LiveViewClickAction_NONE;
+    i32 liveViewOverlayMode = LiveViewOverlayMode_NONE;
 
     // Camera settings file
     bool cameraSettingsSaveEnabled = false;

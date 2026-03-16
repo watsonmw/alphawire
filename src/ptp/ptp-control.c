@@ -1387,7 +1387,7 @@ static EnumValueU8 sProp_TouchOperation[] = {
     {0x03, "Playback Only"},
 };
 
-static EnumValueU8 sProp_TouchOperationFunction[] = {
+static EnumValueU8 sProp_TouchFocusOperation[] = {
     {0x01, "OFF"},
     {0x02, "Touch Shutter"},
     {0x03, "Touch Focus"},
@@ -1567,14 +1567,14 @@ static MStr GetFocusMagnify(PTPControl* self, MAllocator* allocator, PTPProperty
     char text[32];
     int len;
     if (ratio == 0) {
-        len = snprintf(text, sizeof(text), "%d, %d (Off)", x, y);
+        len = snprintf(text, sizeof(text), "Off (%d, %d)", x, y);
     } else {
         int ratioWhole = ratio / 10;
         int ratioDecimals = ratio % 10;
         if (ratioWhole >= 10 && ratioDecimals == 0) {
-            len = snprintf(text, sizeof(text), "%d, %d (%d)", x, y, ratioWhole);
+            len = snprintf(text, sizeof(text), "x%d (%d, %d)", ratioWhole, x, y);
         } else {
-            len = snprintf(text, sizeof(text), "%d, %d (%d.%d)", x, y, ratioWhole, ratioDecimals);
+            len = snprintf(text, sizeof(text), "x%d.%d (%d, %d)", ratioWhole, ratioDecimals, x, y);
         }
     }
     if (len > 0) {
@@ -1702,7 +1702,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("battery-level", DPC_BATTERY_LEVEL, sProp_BatteryLevel),
     META_ENUM_U8 ("device-overheating-state", DPC_DEVICE_OVERHEATING_STATE, sProp_DeviceOverheatingState),
     META_ENUM_U8 ("touch-operation", DPC_TOUCH_OPERATION, sProp_TouchOperation),
-    META_ENUM_U8 ("touch-operation-function", DPC_TOUCH_OPERATION_FUNCTION, sProp_TouchOperationFunction),
+    META_ENUM_U8 ("touch-focus-operation", DPC_TOUCH_FOCUS_OPERATION, sProp_TouchFocusOperation),
     META_ENUM_U8 ("remote-touch-enabled", DPC_REMOTE_TOUCH_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("remote-touch-cancel-enabled", DPC_REMOTE_TOUCH_CANCEL_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("time-code-format", DPC_TIME_CODE_FORMAT, sProp_TimeCodeFormat),
@@ -2285,7 +2285,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD280, "FTP Connection Error Info"},
     {0xD281, "High Resolution SS Setting"},
     {0xD282, "High Resolution Shutter Speed"},
-    {DPC_TOUCH_OPERATION_FUNCTION, "Touch Operation Function"},
+    {DPC_TOUCH_FOCUS_OPERATION, "Touch Operation Function"},
     {DPC_REMOTE_TOUCH_ENABLED, "Remote Touch Enabled"},
     {DPC_REMOTE_TOUCH_CANCEL_ENABLED, "Remote Touch Cancel Enabled"},
     {DPC_MOVIE_FRAME_RATE, "Movie Frame Rate"},
@@ -2674,7 +2674,7 @@ static OperationMetadata sPtpOperationMetadata[] = {
     {PTP_OC_GetDeviceInfo, "GetDeviceInfo", NULL},
     {PTP_OC_OpenSession, "OpenSession", NULL},
     {PTP_OC_CloseSession, "CloseSession", NULL},
-    {PTP_OC_GetStorageID, "GetStorageIDs", NULL},
+    {PTP_OC_GetStorageIDs, "GetStorageIDs", NULL},
     {PTP_OC_GetStorageInfo, "GetStorageInfo", NULL},
     {PTP_OC_GetNumObjects, "GetNumObjects", NULL},
     {PTP_OC_GetObjectHandles, "GetObjectHandles", NULL},
@@ -3684,6 +3684,12 @@ static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 
         case PTP_DT_INT32:
             MMemWriteI32LE(&memIo, value.i32);
             break;
+        case PTP_DT_INT64:
+            MMemWriteI64LE(&memIo, value.i64);
+            break;
+        case PTP_DT_UINT64:
+            MMemWriteU64LE(&memIo, value.u64);
+            break;
         case PTP_DT_STR: {
             u8 strSize = value.str.size;
             MMemWriteU8(&memIo, strSize);
@@ -4095,6 +4101,139 @@ PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllo
     }
 
     return self->device->transport.readEvents(self->device, timeoutMilliseconds, alloc, eventsOut);
+}
+
+PTPResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
+    PTP_TRACE("PTPControl_GetMagnifier");
+    PTPProperty* propMagPos = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_POS);
+    if (propMagPos) {
+        PTPProperty* propMagScale = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_SCALE);
+
+        u32 posValue = propMagPos->value.u32;
+        i32 x = (i32)((posValue >> 16) & 0xffff);
+        i32 y = (i32)(posValue & 0xffff);
+        float ratioF = 0.0f;
+        i32 ratioNumerator = 0;
+
+        if (propMagScale) {
+            ratioNumerator = propMagScale->value.u16;
+            ratioF = (float)ratioNumerator / 10.0f;
+        }
+
+        outMagnifier->x = x;
+        outMagnifier->y = y;
+        outMagnifier->width = AW_OSD_WIDTH;
+        outMagnifier->height = AW_OSD_HEIGHT;
+        outMagnifier->ratio.ratio = ratioF;
+        outMagnifier->ratio.ratioByTen = ratioNumerator;
+        outMagnifier->canSet = FALSE;
+
+        return PTP_OK;
+    } else {
+        PTPProperty* propMag = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
+        if (propMag) {
+            u64 cyrValue = propMag->value.u64;
+            i32 curRatio = (i32)((cyrValue >> 32) & 0x7fffffff);
+            i32 x = (i32)((cyrValue >> 16) & 0xffff);
+            i32 y = (i32)(cyrValue & 0xffff);
+
+            outMagnifier->x = x;
+            outMagnifier->y = y;
+            outMagnifier->ratio.ratio = (float)curRatio / 10.0f;
+            outMagnifier->ratio.ratioByTen = curRatio;
+            outMagnifier->canSet = TRUE;
+
+            PTPPropValue* enums = propMag->form.enums.getSet;
+            if (!enums) {
+                enums = propMag->form.enums.set;
+            }
+
+            outMagnifier->numRatios = MArraySize(enums);
+            outMagnifier->ratioIndex = 0;
+            for (size_t i = 0; i < MArraySize(enums); ++i) {
+                PTPPropValue* v = enums + i;
+                u64 value = v->u64;
+                i32 ratio = (i32)((value >> 32) & 0x7fffffff);
+                AwMagnifierRatio* r = outMagnifier->ratios + i;
+                if (ratio == curRatio) {
+                    outMagnifier->ratioIndex = i;
+                }
+                if (ratio == 0) {
+                    r->ratio = 0;
+                    r->ratioByTen = 0;
+                } else {
+                    float ratioF = (float)ratio / 10.0f;
+                    r->ratio = ratioF;
+                    r->ratioByTen = ratio;
+                }
+                outMagnifier->width = AW_OSD_WIDTH;
+                outMagnifier->height = AW_OSD_HEIGHT;
+            }
+            return PTP_OK;
+        }
+    }
+    return PTP_GENERAL_ERROR;
+}
+
+PTPResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier) {
+    PTP_TRACE("PTPControl_SetMagnifier");
+    PTPProperty* propMag = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
+    if (propMag) {
+        u64 newValue = ((u64)magnifier.ratio.ratioByTen << 32) |
+            (((magnifier.x & 0xffff) << 16) | (magnifier.y & 0xffff));
+        return PTPControl_SetPropertyValue(self, propMag, (PTPPropValue){.u64 = newValue});
+    }
+}
+
+AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos) {
+    u32 ratio = (u32)magnifier->ratio.ratioByTen;
+    i32 x = magnifier->x;
+    i32 y = magnifier->y;
+    if (ratio == 0) {
+        ratio = 10;
+    }
+
+    float ratioF = (float)ratio;
+
+    if (ratio > 10) {
+        // current x,y is the center of the screen (clamped to edge)
+
+        // viewport size
+        float vW = (float)magnifier->width;
+        float vH = (float)magnifier->height;
+
+        // Current zoom size
+        float zW = vW * ratioF / 10.f;
+        float zH = vH * ratioF / 10.f;
+
+        // Current zoom top left
+        float zX = x * ratioF / 10.f;
+        float zY = y * ratioF / 10.f;
+        zX -= vW * 0.5f;
+        zY -= vH * 0.5f;
+        if (zX < 0) {
+            zX = 0;
+        }
+        if (zY < 0) {
+            zY = 0;
+        }
+        if (zX > (zW - vW)) {
+            zX = (zW - vW);
+        }
+        if (zY > (zH - vH)) {
+            zY = (zH - vH);
+        }
+
+        x = (int) (((zX + pos.x * vW) * 10.) / ratioF);
+        y = (int) (((zY + pos.y * vH) * 10.) / ratioF);
+    } else {
+        x = (int) (AW_OSD_WIDTH * pos.x);
+        y = (int) (AW_OSD_HEIGHT * pos.y);
+    }
+
+    AwOSDClamp(&x, &y);
+
+    return (AwPosInt2){x, y};
 }
 
 PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {

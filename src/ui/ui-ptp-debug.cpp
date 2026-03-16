@@ -804,23 +804,8 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Begin("Camera Controls");
 
     ImGui::Checkbox("LiveView", &c.liveViewOpen);
-    PTPProperty* osdImageModeProp = PTPControl_GetPropertyByCode(&c.ptp, DPC_OSD_IMAGE_MODE);
-    if (osdImageModeProp) {
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!c.liveViewOpen);
-        if (ImGui::Checkbox("OSD", &c.osdEnabled)) {
-            if (osdImageModeProp) {
-                PTPPropValue value = {};
-                value.u8 = c.osdEnabled ? 1 : 0;
-                PTPControl_SetPropertyValue(&c.ptp, osdImageModeProp, value);
-            }
-        }
-        ImGui::EndDisabled();
-    }
     ImGui::SameLine();
     ImGui::Checkbox("Inspect Controls", &c.showWindowDeviceDebug);
-
-    ImGui::Spacing();
 
     if (ImGui::Button("Shutter")) {
         PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER, false);
@@ -834,6 +819,53 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::SameLine();
     if (ImGui::Checkbox("Half-Press", &c.shutterHalfPress)) {
         PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER_HALF_PRESS, c.shutterHalfPress);
+    }
+
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Live View", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Spacing();
+        PTPProperty* osdImageModeProp = PTPControl_GetPropertyByCode(&c.ptp, DPC_OSD_IMAGE_MODE);
+        if (osdImageModeProp) {
+            ImGui::SameLine();
+            ImGui::BeginDisabled(!c.liveViewOpen);
+            if (ImGui::Checkbox("OSD", &c.osdEnabled)) {
+                PTPPropValue value = {};
+                value.u8 = c.osdEnabled ? 1 : 0;
+                PTPControl_SetPropertyValue(&c.ptp, osdImageModeProp, value);
+            }
+            ImGui::EndDisabled();
+        }
+        if (!c.liveViewOpen) {
+            ImGui::BeginDisabled();
+        }
+        PTPProperty* liveViewSettingEffect =
+            PTPControl_GetPropertyByCode(&c.ptp, DPC_LIVE_VIEW_SETTING_EFFECT);
+        if (liveViewSettingEffect) {
+            ImGui::SameLine();
+            bool settingsEffectEnabled = liveViewSettingEffect->value.u8 == 1 ? true : false;
+            if (ImGui::Checkbox("Settings Effect", &settingsEffectEnabled)) {
+                PTPPropValue value = {};
+                value.u8 = settingsEffectEnabled ? 1 : 2;
+                PTPControl_SetPropertyValue(&c.ptp, liveViewSettingEffect, value);
+            }
+        }
+
+        ImGuiBuildPropertyCombo(c, DPC_LIVE_VIEW_QUALITY, "Quality");
+
+        ImGui::PushID("clickAction");
+        ImGui::RadioButton("None", &c.liveViewClickAction, LiveViewClickAction_NONE); ImGui::SameLine();
+        ImGui::RadioButton("Click to Focus", &c.liveViewClickAction, LiveViewClickAction_FOCUS); ImGui::SameLine();
+        ImGui::RadioButton("Click to Magnify", &c.liveViewClickAction, LiveViewClickAction_MAGNIFY);
+        ImGui::PopID();
+
+        ImGui::PushID("overlayAction");
+        ImGui::RadioButton("No Overlay", &c.liveViewOverlayMode, LiveViewOverlayMode_NONE); ImGui::SameLine();
+        ImGui::RadioButton("X", &c.liveViewOverlayMode, LiveViewOverlayMode_X); ImGui::SameLine();
+        ImGui::RadioButton("Crosshair", &c.liveViewOverlayMode, LiveViewOverlayMode_CROSSHAIR); ImGui::SameLine();
+        ImGui::PopID();
+        if (!c.liveViewOpen) {
+            ImGui::EndDisabled();
+        }
     }
 
     ImGui::Spacing();
@@ -1008,26 +1040,94 @@ void ShowCameraControlsWindow(AppContext& c) {
     if (ImGui::CollapsingHeader("Magnifier", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
 
-        bool magEnabled = false;
-        PTPProperty* propMagPos = PTPControl_GetPropertyByCode(&c.ptp, DPC_FOCUS_MAGNIFY_POS);
-        if (propMagPos) {
-            magEnabled = true;
-        }
+        AwMagnifier magnifier = {};
+        if (PTPControl_GetMagnifier(&c.ptp, &magnifier) == PTP_OK) {
+            if (magnifier.ratio.ratioByTen == 0) {
+                ImGui::Text("Magnifier: Off (%d, %d)", magnifier.ratio.ratio, magnifier.x, magnifier.y);
+            } else {
+                ImGui::Text("Magnifier: x%0.1f (%d, %d)", magnifier.ratio.ratio, magnifier.x, magnifier.y);
+            }
 
-        if (magEnabled) {
-            MStr magPosition = {};
-            if (PTPControl_GetPropertyValueAsStr(&c.ptp, propMagPos, c.autoReleasePool, &magPosition)) {
-                ImGui::Text("Magnifier: %s", magPosition.str);
+            if (magnifier.canSet) {
+                if (magnifier.numRatios > 0) {
+                    for (size_t i = 0; i < magnifier.numRatios; ++i) {
+                        if (i > 0) {
+                            ImGui::SameLine();
+                        }
+                        ImGui::PushID(i + 10);
 
+                        AwMagnifierRatio* ratio = magnifier.ratios + i;
+
+                        char text[32];
+                        if (ratio->ratioByTen == 0) {
+                            snprintf(text, sizeof(text), "Off");
+                        } else {
+                            snprintf(text, sizeof(text), "x%0.1f", ratio->ratio);
+                        }
+                        if (ImGui::Button(text)) {
+                            AwMagnifierSet magnifierSet = {
+                                .x = magnifier.x,
+                                .y = magnifier.y,
+                                .ratio = *ratio
+                            };
+                            PTPControl_SetMagnifier(&c.ptp, magnifierSet);
+                        }
+                        ImGui::PopID();
+                    }
+                }
+
+                bool set = false;
+                i32 x = magnifier.x;
+                i32 y = magnifier.y;
+
+                // Up button
+                ImGui::Spacing();
+                ImGui::Dummy(ImVec2(43.0f, 0)); // Horizontal padding
+                ImGui::SameLine();
+                int delta = 20.0 / magnifier.ratio.ratio;
+                if (delta < 1) {
+                    delta = 1;
+                }
+                if (ImGui::Button("Up")) {
+                    y -= delta;
+                    set = true;
+                }
+
+                // Left + Right buttons
+                if (ImGui::Button("Left")) {
+                    x -= delta;
+                    set = true;
+                }
+                ImGui::SameLine();
+                ImGui::Dummy(ImVec2(35.0f, 0)); // Space between Left and Right
+                ImGui::SameLine();
+                if (ImGui::Button("Right")) {
+                    x += delta;
+                    set = true;
+                }
+
+                // Center "Down" button
+                ImGui::Dummy(ImVec2(36.0f, 0)); // Horizontal padding
+                ImGui::SameLine();
+                if (ImGui::Button("Down")) {
+                    y += delta;
+                    set = true;
+                }
+
+                if (set) {
+                    AwOSDClamp(&x, &y);
+                    AwMagnifierSet magnifierSet = {
+                        .x = magnifier.x,
+                        .y = magnifier.y,
+                        .ratio = magnifier.ratio,
+                    };
+                    PTPControl_SetMagnifier(&c.ptp, magnifierSet);
+                }
+            } else {
                 ImGuiControlButton(c, "Magnify", DPC_FOCUS_MAGNIFIER);
                 ImGui::SameLine();
                 ImGuiControlButton(c, "Exit", DPC_FOCUS_MAGNIFIER_CANCEL);
                 ImGui::SameLine();
-                MStr magScale = {};
-                PTPProperty* propMagScale = PTPControl_GetPropertyByCode(&c.ptp, DPC_FOCUS_MAGNIFY_SCALE);
-                if (PTPControl_GetPropertyValueAsStr(&c.ptp, propMagScale, c.autoReleasePool, &magScale)) {
-                    ImGui::Text("%s", magScale.str);
-                }
 
                 ImGui::Spacing();
                 ImGui::Dummy(ImVec2(43.0f, 0)); // Horizontal padding

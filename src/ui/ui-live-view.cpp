@@ -93,12 +93,10 @@ void UiPtpLiveViewShow(AppContext& c) {
     }
 
     if (c.liveViewImage.size != 0) {
-        ImVec2 windowSize = ImGui::GetWindowSize();
-
         // Calculate scaled dimensions while maintaining aspect ratio
+        ImVec2 windowSize = ImGui::GetWindowSize();
         float windowAspect = windowSize.x / windowSize.y;
         float aspectRatio = (float)c.liveViewImageWidth / (float)c.liveViewImageHeight;
-
         float renderWidth, renderHeight;
         if (windowAspect > aspectRatio) {
             // Window is wider than image
@@ -109,11 +107,11 @@ void UiPtpLiveViewShow(AppContext& c) {
             renderWidth = windowSize.x;
             renderHeight = renderWidth / aspectRatio;
         }
-
         // Center the image
         ImVec2 imagePos(
                 (windowSize.x - renderWidth) * 0.5f,
                 (windowSize.y - renderHeight) * 0.5f);
+
         ImGui::SetCursorPos(imagePos);
         ImGui::Image(c.liveViewImageGLId, ImVec2(renderWidth, renderHeight));
 
@@ -141,7 +139,7 @@ void UiPtpLiveViewShow(AppContext& c) {
                 w *= renderWidth * .5;
                 h *= renderHeight * .5;
 
-                ImVec2 rectMin(windowPos.x + imagePos.x + x - w,windowPos.y + imagePos.y + y - h);
+                ImVec2 rectMin(windowPos.x + imagePos.x + x - w, windowPos.y + imagePos.y + y - h);
                 ImVec2 rectMax(windowPos.x + imagePos.x + x + w, windowPos.y + imagePos.y + y + h);
 
                 ImU32 colour = IM_COL32(0, 255, 0, 255);
@@ -158,6 +156,88 @@ void UiPtpLiveViewShow(AppContext& c) {
                     DrawRectCorners(drawList, rectMin, rectMax, colour, 2.0f, cornerLength);
                 } else {
                     drawList->AddRect(rectMin, rectMax, colour, 0.0f, 0, 2.0f);
+                }
+            }
+        }
+
+        // Draw overlay if any
+        if (c.liveViewOverlayMode != LiveViewOverlayMode_NONE) {
+            ImDrawList *drawList = ImGui::GetWindowDrawList();
+            ImVec2 windowPos = ImGui::GetWindowPos();
+            ImU32 green = IM_COL32(0, 255, 0, 255);
+            float thickness = 0.8f;
+
+            ImVec2 topLeft(windowPos.x + imagePos.x, windowPos.y + imagePos.y);
+            ImVec2 topRight(windowPos.x + imagePos.x + renderWidth, windowPos.y + imagePos.y);
+            ImVec2 bottomLeft(windowPos.x + imagePos.x, windowPos.y + imagePos.y + renderHeight);
+            ImVec2 bottomRight(windowPos.x + imagePos.x + renderWidth, windowPos.y + imagePos.y + renderHeight);
+            ImVec2 center(windowPos.x + imagePos.x + renderWidth * 0.5f, windowPos.y + imagePos.y + renderHeight * 0.5f);
+
+            if (c.liveViewOverlayMode == LiveViewOverlayMode_CROSSHAIR) {
+                float crosshairLen = renderHeight * 0.05f;
+                drawList->AddLine(ImVec2(center.x, center.y - crosshairLen),
+                    ImVec2(center.x, center.y + crosshairLen), green, thickness);
+                drawList->AddLine(ImVec2(center.x - crosshairLen, center.y),
+                    ImVec2(center.x + crosshairLen, center.y), green, thickness);
+            } else if (c.liveViewOverlayMode == LiveViewOverlayMode_X) {
+                drawList->AddLine(topLeft, bottomRight, green, thickness);
+                drawList->AddLine(topRight, bottomLeft, green, thickness);
+            }
+        }
+
+        // Check if mouse is clicked over window
+        if (ImGui::IsWindowHovered()) {
+            if (ImGui::IsMouseClicked(0, false)) {
+                ImVec2 mousePos = ImGui::GetMousePos();
+                ImVec2 windowPos = ImGui::GetWindowPos();
+
+                // Calculate mouse position relative to image
+                float relX = mousePos.x - (windowPos.x + imagePos.x);
+                float relY = mousePos.y - (windowPos.y + imagePos.y);
+
+                // Check if click is within image bounds
+                if (relX >= 0 && relX <= renderWidth && relY >= 0 && relY <= renderHeight) {
+                    switch (c.liveViewClickAction) {
+                        case LiveViewClickAction_FOCUS: {
+                            // If no touch focus mode is set - set one
+                            // Still need to be set to a flexible spot mode
+                            PTPProperty* liveViewTouchOp =
+                                PTPControl_GetPropertyByCode(&c.ptp, DPC_TOUCH_FOCUS_OPERATION);
+                            if (liveViewTouchOp->value.u8 == 0) {
+                                PTPControl_SetPropertyValue(&c.ptp, liveViewTouchOp, PTPPropValue{.u8 = 1});
+                            }
+                            AwMagnifier magnifier = {};
+                            PTPControl_GetMagnifier(&c.ptp, &magnifier);
+
+                            AwPosInt2 newPos = AwMagnifierMoveViewport(&magnifier,
+                                AwPosFloat2{.x = relX / renderWidth, .y = relY / renderHeight});
+                            u32 value = (u32)(newPos.x << 16) | newPos.y;
+                            PTPControl_SetControl(&c.ptp, DPC_REMOTE_TOUCH_XY, PTPPropValue{.u32=value});
+                            break;
+                        }
+                        case LiveViewClickAction_MAGNIFY: {
+                            AwMagnifier magnifier = {};
+                            PTPControl_GetMagnifier(&c.ptp, &magnifier);
+
+                            // Move to next magnification level
+                            i32 index = magnifier.ratioIndex;
+                            if (magnifier.ratio.ratioByTen == 0) {
+                                index = 1;
+                            }
+                            if (index < (magnifier.numRatios - 1)) {
+                                index++;
+                            }
+
+                            AwMagnifierRatio* ratio = magnifier.ratios + index;
+
+                            AwPosInt2 newPos = AwMagnifierMoveViewport(&magnifier,
+                                AwPosFloat2{.x = relX / renderWidth, .y = relY / renderHeight});
+
+                            PTPControl_SetMagnifier(&c.ptp,
+                                AwMagnifierSet{.x = newPos.x, .y = newPos.y, .ratio = *ratio});
+                            break;
+                        }
+                    }
                 }
             }
         }

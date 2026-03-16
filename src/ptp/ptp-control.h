@@ -199,7 +199,7 @@ PTP_EXPORT void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnum
  */
 PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outEnums);
 
-PTP_EXPORT b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* strOut);
+PTP_EXPORT b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* outStr);
 PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property);
 PTP_EXPORT b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* property);
 PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut);
@@ -254,7 +254,7 @@ PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, 
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-// File download / upload functions
+// File download / upload
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -271,15 +271,24 @@ PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
  *
  * May have to retry if calling straight away after connecting to the camera.
  *
- * @param fileOut MemIO to write the live view image to, required must not be NULL.
- * @param liveViewFramesOut NULL or output pointer to the focus frames (if available for your camera model and mode)
+ * @param outFile MemIO to write the live view image to, required must not be NULL.
+ * @param outLiveViewFrames NULL or output pointer to the focus frames (if available for your camera model and mode)
  * @return
  */
-PTP_EXPORT PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
+PTP_EXPORT PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* outFile, LiveViewFrames* outLiveViewFrames);
 
+/**
+ * Free live view frames returned by PTPControl_GetLiveViewImage()
+ * @param liveViewFrames the live view frames to free
+ */
 PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
 
-PTP_EXPORT PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut);
+/**
+ * Get the on-screen display as PNG (if available).  2025+ cameras.
+ * @param outFile The PNG image
+ * @return
+ */
+PTP_EXPORT PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* outFile);
 
 /**
  * Downloads an image from the cameras buffer.
@@ -287,16 +296,61 @@ PTP_EXPORT PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut);
  * NOTE: downloading an image while there are no images available can cause issues on older pre-2020 camera, including
  * camera crashes and the pending file count to go negative.
  *
- * @param fileOut The image contents after it has been downloaded
- * @param ciiOut Info about the downloaded image
+ * @param outFile The image contents after it has been downloaded
+ * @param outCii Info about the downloaded image
  * @return
  */
-PTP_EXPORT PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut);
+PTP_EXPORT PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* outFile, PTPCapturedImageInfo* outCii);
 
-PTP_EXPORT PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut);
-PTP_EXPORT PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn);
+PTP_EXPORT PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* outFile);
+PTP_EXPORT PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* file);
 
-PTP_EXPORT PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** eventsOut);
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Events
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+PTP_EXPORT PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents);
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Magnifier
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct AwMagnifierRatio {
+    i32 ratioByTen;
+    float ratio;
+} AwMagnifierRatio;
+
+typedef struct AwMagnifier {
+    i32 x;
+    i32 y;
+    i32 width;
+    i32 height;
+    AwMagnifierRatio ratio;
+    b32 canSet;
+    size_t numRatios;
+    i32 ratioIndex;
+    AwMagnifierRatio ratios[8];
+} AwMagnifier;
+
+typedef struct AwMagnifierSet {
+    i32 x;
+    i32 y;
+    AwMagnifierRatio ratio;
+} AwMagnifierSet;
+
+typedef struct AwPosFloat2 {
+    float x;
+    float y;
+} AwPosFloat2;
+
+typedef struct AwPosInt2 {
+    i32 x;
+    i32 y;
+} AwPosInt2;
+
+PTP_EXPORT PTPResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier);
+PTP_EXPORT PTPResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier);
+PTP_EXPORT AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // String conversion, value helpers
@@ -311,7 +365,7 @@ PTP_EXPORT char* PTP_GetDataTypeStr(PTPDataType dataType);
 PTP_EXPORT char* PTP_GetFormFlagStr(PTPFormFlag formFlag);
 PTP_EXPORT char* PTP_GetPropIsEnabledStr(u8 propIsEnabled);
 
-PTP_EXPORT void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen);
+PTP_EXPORT void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* outBuffer, size_t bufferLen);
 PTP_EXPORT b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2);
 PTP_EXPORT b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value);
 
