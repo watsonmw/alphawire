@@ -349,24 +349,32 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
 
     if (c.showWindowPropDebug) {
         char text[32];
-
         PTP_GetPropValueStr((PTPDataType) property->dataType, property->defaultValue, text,
                             sizeof(text));
         ImGui::Text("Default: %s", text);
 
-        // Set value
-        if (property->dataType == PTP_DT_STR) {
-            static char strBuf[200];
-            ImGui::InputText("String:", strBuf, sizeof(strBuf), ImGuiInputTextFlags_CharsNoBlank);
-            ImGui::SameLine();
-            if (ImGui::Button("Send")) {
-                PTPControl_SetPropertyStrRaw(&c.ptp, property, MStr{strBuf, MCStrLen(strBuf)});
-            }
-        } else {
-            ImGuiInputIntDuel(property->dataType, &property->value);
-            ImGui::SameLine();
-            if (ImGui::Button("Send")) {
-                PTPControl_SetPropertyValue(&c.ptp, property, property->value);
+        switch (property->dataType) {
+            case PTP_DT_INT8:
+            case PTP_DT_UINT8:
+            case PTP_DT_INT16:
+            case PTP_DT_UINT16:
+            case PTP_DT_INT32:
+            case PTP_DT_UINT32:
+            case PTP_DT_INT64:
+            case PTP_DT_UINT64:
+                ImGuiInputIntDuel(property->dataType, &property->value);
+                ImGui::SameLine();
+                if (ImGui::Button("Send")) {
+                    PTPControl_SetPropertyValue(&c.ptp, property, property->value);
+                }
+                break;
+            case PTP_DT_STR: {
+                ImGui::InputText("Value", c.debugSetText, sizeof(c.debugSetText));
+                ImGui::SameLine();
+                if (ImGui::Button("Send")) {
+                    PTPControl_SetPropertyStrRaw(&c.ptp, property, MStr{c.debugSetText, MCStrLen(c.debugSetText), MCStrLen(c.debugSetText)});
+                }
+                break;
             }
         }
 
@@ -603,6 +611,8 @@ void ShowDebugPropertyListTab(AppContext& c) {
                     c.selectedControl = nullptr;
                     c.selectedControlValue = {};
                     c.showWindowDebugPropertyOrControl = true;
+                    c.debugSetText[0] = '\0';
+                    PTP_GetPropValueStr((PTPDataType)property->dataType, property->defaultValue, c.debugSetText,sizeof(c.debugSetText));
                 }
 
                 ImGui::TableNextColumn();
@@ -1427,6 +1437,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                             c.selectedControl = control;
                             c.selectedProperty = nullptr;
                             c.showWindowDebugPropertyOrControl = true;
+                            c.debugSetText[0] = '\0';
                         }
 
                         ImGui::TableNextColumn();

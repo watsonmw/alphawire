@@ -65,7 +65,7 @@ MStr WinUtils_BSTRWithSizeToUTF8(MAllocator* allocator, BSTR bstr, i32 size) {
     }
 
     // Allocate buffer and convert
-    MStrInit(allocator, r, len);
+    r = MStrInit(allocator, len);
     if (!r.str) {
         return r;
     }

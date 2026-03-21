@@ -2989,13 +2989,7 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR: {
-            size_t len = value.str.size;
-            if (len == 0) {
-                return 0;
-            } else {
-                return len + 2;
-            }
-            break;
+            return 1 + (UTF8_GetConvertToUTF16Len(value.str.str, value.str.size) * 2);
         }
         default:
             return 0;
@@ -3061,7 +3055,7 @@ void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums
     PTP_FreePropValueEnums(self->allocator, outEnums);
 }
 
-static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* r) {
+static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* outStr) {
     u8 len = 0;
     MMemReadU8(memIo, &len);
 
@@ -3069,20 +3063,20 @@ static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* r) {
         u16* buffer = (u16*) MMemReadAdvance(memIo, len * 2);
         size_t utf8Len = UTF8_GetConvertFromUTF16Len(buffer, len);
         if (utf8Len) {
-            if (r->capacity < utf8Len) {
-                r->str = MRealloc(allocator, r->str, r->capacity, utf8Len);
-                r->capacity = utf8Len;
+            if (outStr->capacity < utf8Len) {
+                outStr->str = MRealloc(allocator, outStr->str, outStr->capacity, utf8Len);
+                outStr->capacity = utf8Len;
             }
-            if (UTF8_ConvertFromUTF16(buffer, len, r->str, r->capacity) == 0) {
-                MStrFree(allocator, *r);
+            if (UTF8_ConvertFromUTF16(buffer, len, outStr->str, outStr->capacity) == 0) {
+                MStrFree(allocator, *outStr);
                 return FALSE;
             } else {
                 // We allow string to be nul terminated but don't require it
                 // MStr.size must be the length of the string, not including nul terminator
-                if (utf8Len > 0 && r->str[utf8Len - 1] == '\0') {
-                    r->size = utf8Len - 1;
+                if (utf8Len > 0 && outStr->str[utf8Len - 1] == '\0') {
+                    outStr->size = utf8Len - 1;
                 } else {
-                    r->size = utf8Len;
+                    outStr->size = utf8Len;
                 }
                 return TRUE;
             }
@@ -3707,9 +3701,7 @@ static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 
             MMemWriteU64LE(&memIo, value.u64);
             break;
         case PTP_DT_STR: {
-            u8 strSize = value.str.size;
-            MMemWriteU8(&memIo, strSize);
-            MMemWriteI8CopyN(&memIo, value.str.str, strSize);
+            WritePtpString(value.str, &memIo);
             break;
         }
     }
@@ -4862,7 +4854,7 @@ PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, P
     }
     PTPResult r = SDIO_SetExtDevicePropValue(self, property->propCode, property->dataType, value);
     if (r == PTP_OK) {
-        property->value = value; // TODO : Copy func so we dont steal string ptr
+        // property->value = value; // TODO : Copy func so we dont steal string ptr
     }
     return r;
 }

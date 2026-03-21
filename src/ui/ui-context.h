@@ -210,6 +210,9 @@ struct AppContext {
     PTPPropValue selectedControlValue;
     PropTable propTable{};
 
+    // Debug set props
+    char debugSetText[256];
+
     // Live View state
     bool liveViewOpen = false;
     double liveViewLastTime = 0.;
