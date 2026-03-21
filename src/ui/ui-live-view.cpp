@@ -198,7 +198,7 @@ void UiPtpLiveViewShow(AppContext& c) {
                 // Check if click is within image bounds
                 if (relX >= 0 && relX <= renderWidth && relY >= 0 && relY <= renderHeight) {
                     switch (c.liveViewClickAction) {
-                        case LiveViewClickAction_FOCUS: {
+                        case LiveViewClickAction_MOVE_FOCUS: {
                             // If no touch focus mode is set - set one
                             // Still need to be set to a flexible spot mode
                             PTPProperty* liveViewTouchOp =

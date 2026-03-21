@@ -4341,6 +4341,10 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         self->transactionId = 0;
         u32 sessionId = 0x1;
         r = OpenSession(self, sessionId);
+        if (r == PTP_SESSION_ALREADY_OPEN) {
+            r = CloseSession(self);
+            r = OpenSession(self, sessionId);
+        }
         if (r == PTP_AW_TIMEOUT || r == PTP_SESSION_ALREADY_OPEN) {
             // Maybe we should just always call Reset() or do it by default, since it can't really do much harm and can
             // only help avoid a timeout on initial connection.
@@ -4522,6 +4526,17 @@ b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode) {
 }
 
 b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property) {
+    if (!property) {
+        return FALSE;
+    }
+    if (property->dataType == PTP_DT_UINT8) {
+        return property->value.u8 == SD_Enabled;
+    }
+    return FALSE;
+}
+
+b32 PTPControl_PropertyEnabledByCode(PTPControl* self, u16 propCode) {
+    PTPProperty* property = PTPControl_GetPropertyByCode(self, propCode);
     if (!property) {
         return FALSE;
     }

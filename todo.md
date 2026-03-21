@@ -1,6 +1,8 @@
 UI
 ===
 
+- Settings apply
+- Set Date/Time / Copyright / Photographer 
 - Build list of property editors / widgets?
   - Debug Set widgets
   - Enum List Read only support (except in debug)
@@ -8,7 +10,6 @@ UI
 - Timing / Position
 - Connect multiple cameras
 - Simple bool setter for properties that have an on/off enabled/disabled state
-- Settings apply
 - Detect transport errors and disconnect
 
 Backends
@@ -23,6 +24,6 @@ Backends
 Commands
 ===
 
-Shutdown - 0x9280
+- Shutdown - 0x9280
 
 

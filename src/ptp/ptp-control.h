@@ -133,8 +133,22 @@ PTP_EXPORT PTPResult PTPControl_Cleanup(PTPControl* self);
 PTP_EXPORT b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode);
 PTP_EXPORT b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode);
 PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode);
+
+/**
+ * Check if a feature state property indicates that a feature is enabled/disabled.
+ * @param property Feature enable prop such as DPC_REMOTE_TOUCH_ENABLE, DPC_CAMERA_SETTING_SAVE_ENABLED,
+ *                 DPC_MANUAL_FOCUS_ADJUST_ENABLED
+ * @return TRUE if the feature is available and currently enabled.
+ */
 PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property);
 
+/**
+ * Check if a feature state property indicates that a feature is enabled/disabled.
+ * @param propCode Feature enable prop such as DPC_REMOTE_TOUCH_ENABLE, DPC_CAMERA_SETTING_SAVE_ENABLED,
+ *                 DPC_MANUAL_FOCUS_ADJUST_ENABLED
+ * @return TRUE if the feature is available and currently enabled.
+ */
+PTP_EXPORT b32 PTPControl_PropertyEnabledByCode(PTPControl* self, u16 propCode);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Generic property getter and setters

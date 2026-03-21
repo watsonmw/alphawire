@@ -863,14 +863,26 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         ImGuiBuildPropertyCombo(c, DPC_LIVE_VIEW_QUALITY, "Quality");
 
-        ImGui::PushID("clickAction");
-        ImGui::RadioButton("None", &c.liveViewClickAction, LiveViewClickAction_NONE); ImGui::SameLine();
-        ImGui::RadioButton("Click to Focus", &c.liveViewClickAction, LiveViewClickAction_FOCUS); ImGui::SameLine();
-        ImGui::RadioButton("Click to Magnify", &c.liveViewClickAction, LiveViewClickAction_MAGNIFY);
-        ImGui::PopID();
+        bool touchEnabled = PTPControl_PropertyEnabledByCode(&c.ptp, DPC_REMOTE_TOUCH_ENABLED);
+        bool focusMagnifyEnabled = PTPControl_SupportsProperty(&c.ptp, DPC_FOCUS_MAGNIFY);
+        if (focusMagnifyEnabled || touchEnabled) {
+            ImGui::PushID("clickAction");
+            ImGui::Text("Click:");
+            ImGui::SameLine();
+            ImGui::RadioButton("None", &c.liveViewClickAction, LiveViewClickAction_NONE); ImGui::SameLine();
+            if (touchEnabled) {
+                ImGui::RadioButton("Focus Area", &c.liveViewClickAction, LiveViewClickAction_MOVE_FOCUS); ImGui::SameLine();
+            }
+            if (focusMagnifyEnabled) {
+                ImGui::RadioButton("Magnify", &c.liveViewClickAction, LiveViewClickAction_MAGNIFY);
+            }
+            ImGui::PopID();
+        }
 
         ImGui::PushID("overlayAction");
-        ImGui::RadioButton("No Overlay", &c.liveViewOverlayMode, LiveViewOverlayMode_NONE); ImGui::SameLine();
+        ImGui::Text("Overlay:");
+        ImGui::SameLine();
+        ImGui::RadioButton("None", &c.liveViewOverlayMode, LiveViewOverlayMode_NONE); ImGui::SameLine();
         ImGui::RadioButton("X", &c.liveViewOverlayMode, LiveViewOverlayMode_X); ImGui::SameLine();
         ImGui::RadioButton("Crosshair", &c.liveViewOverlayMode, LiveViewOverlayMode_CROSSHAIR); ImGui::SameLine();
         ImGui::PopID();
@@ -919,7 +931,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         PtpControl* focusAdjust = PTPControl_GetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST);
         if (focusAdjust) {
             PTPPropValue focusAdjustVal{};
-            bool enable = PTPControl_PropertyEnabled(&c.ptp, PTPControl_GetPropertyByCode(&c.ptp, DPC_MANUAL_FOCUS_ADJUST_ENABLED));
+            bool enable = PTPControl_PropertyEnabledByCode(&c.ptp, DPC_MANUAL_FOCUS_ADJUST_ENABLED);
             if (!enable) {
                 ImGui::BeginDisabled();
             }

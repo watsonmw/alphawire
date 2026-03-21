@@ -170,7 +170,7 @@ struct LogWindow {
 
 enum LiveViewClickAction {
     LiveViewClickAction_NONE = 0,
-    LiveViewClickAction_FOCUS = 1,
+    LiveViewClickAction_MOVE_FOCUS = 1,
     LiveViewClickAction_MAGNIFY = 2,
 };
 
@@ -275,8 +275,8 @@ struct AppContext {
         }
         propTable.reset();
         if (connected) {
-            cameraSettingsSaveEnabled = PTPControl_PropertyEnabled(&ptp, PTPControl_GetPropertyByCode(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED));
-            cameraSettingsReadEnabled = PTPControl_PropertyEnabled(&ptp, PTPControl_GetPropertyByCode(&ptp, DPC_CAMERA_SETTING_READ_ENABLED));
+            cameraSettingsSaveEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
+            cameraSettingsReadEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
         }
     }
 
