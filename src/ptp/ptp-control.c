@@ -166,7 +166,7 @@ static MStr GetWhiteBalanceABAsString(PTPControl* self, MAllocator* allocator, P
     }
 
     int len = 6;
-    MStrInit(allocator, r, len);
+    r = MStrInit(allocator, len);
 
     if (value > 0) {
         r.str[0] = 'A';
@@ -191,8 +191,10 @@ static MStr GetWhiteBalanceABAsString(PTPControl* self, MAllocator* allocator, P
             r.str[pos++] = '7'; r.str[pos++] = '5';
         }
         r.str[pos] = 0;
+        r.size = pos - 1;
     } else {
         r.str[1] = 0;
+        r.size = 0;
     }
 
     return r;
@@ -3059,13 +3061,13 @@ void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums
     PTP_FreePropValueEnums(self->allocator, outEnums);
 }
 
-static int ReadPtpString8(MAllocator* allocator, MMemIO* memIo, MStr* r) {
+static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* r) {
     u8 len = 0;
     MMemReadU8(memIo, &len);
 
     if (len) {
         u16* buffer = (u16*) MMemReadAdvance(memIo, len * 2);
-        size_t utf8Len = UTF8_GetConvertUTF16Len(buffer, len);
+        size_t utf8Len = UTF8_GetConvertFromUTF16Len(buffer, len);
         if (utf8Len) {
             if (r->capacity < utf8Len) {
                 r->str = MRealloc(allocator, r->str, r->capacity, utf8Len);
@@ -3089,7 +3091,7 @@ static int ReadPtpString8(MAllocator* allocator, MMemIO* memIo, MStr* r) {
     return TRUE;
 }
 
-static char* ReadPtpString16(MAllocator* allocator, MMemIO* memIo) {
+static char* ReadPtpString16BitLen(MAllocator* allocator, MMemIO* memIo) {
     u16 utf8Len = 0;
     MMemReadU16(memIo, &utf8Len);
     if (utf8Len) {
@@ -3098,6 +3100,20 @@ static char* ReadPtpString16(MAllocator* allocator, MMemIO* memIo) {
         return utf8;
     }
     return NULL;
+}
+
+static int WritePtpString(MStr str, MMemIO* memIo) {
+    MMemWriteU8(memIo, str.size);
+
+    size_t len = UTF8_GetConvertToUTF16Len(str.str, str.size);
+    if (len) {
+        MMemGrowBytes(memIo, len * 2);
+        size_t utf16Len = UTF8_ConvertToUTF16(str.str, str.size, memIo->mem + memIo->size, len);
+        if (utf16Len) {
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, PTPPropValue* value) {
@@ -3152,7 +3168,7 @@ static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType,
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR:
-            ReadPtpString8(allocator, memIo, &value->str);
+            ReadPtpString8BitLen(allocator, memIo, &value->str);
             break;
         default:
             break;
@@ -3214,7 +3230,7 @@ static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
             break;
         case PTP_DT_STR:
             MLogf(" %s", value->str);
-           break;
+            break;
         default:
             break;
     }
@@ -3391,7 +3407,7 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
     MMemReadU16LE(&r.memIo, &vendorExtensionVersion);
     self->vendorExtensionVersion = vendorExtensionVersion;
 
-    ReadPtpString8(self->allocator, &r.memIo, &self->vendorExtension);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &self->vendorExtension);
 
     u16 functionalMode = 0;
     MMemReadU16LE(&r.memIo, &functionalMode);
@@ -3436,10 +3452,10 @@ static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
         MArrayAdd(self->allocator, self->imageFormats, imageFormat);
     }
 
-    ReadPtpString8(self->allocator, &r.memIo, &self->manufacturer);
-    ReadPtpString8(self->allocator, &r.memIo, &self->model);
-    ReadPtpString8(self->allocator, &r.memIo, &self->deviceVersion);
-    ReadPtpString8(self->allocator, &r.memIo, &self->serialNumber);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &self->manufacturer);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &self->model);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &self->deviceVersion);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &self->serialNumber);
 
     return r.result;
 }
@@ -3732,9 +3748,7 @@ static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType
             MMemWriteI32LE(&memIo, value.i32);
             break;
         case PTP_DT_STR: {
-            u8 strSize = value.str.size;
-            MMemWriteU8(&memIo, strSize);
-            MMemWriteI8CopyN(&memIo, value.str.str, strSize);
+            WritePtpString(value.str, &memIo);
             break;
         }
     }
@@ -3777,7 +3791,7 @@ static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayLis
             for (int k = 0; k < displayStringNum; k++) {
                 PTPPropValue value;
                 ReadPropertyValue(self->allocator, &r.memIo, dataType, &value);
-                char* str = ReadPtpString16(self->allocator, &r.memIo);
+                char* str = ReadPtpString16BitLen(self->allocator, &r.memIo);
                 MLogf(" -- %s", str);
             }
         }
@@ -3888,10 +3902,10 @@ static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObject
     MMemReadU32LE(&r.memIo, &objectInfo->associationDesc);
     MMemReadU32LE(&r.memIo, &objectInfo->sequenceNumber);
 
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->filename);
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->captureDateTime);
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->modDateTime);
-    ReadPtpString8(self->allocator, &r.memIo, &objectInfo->keywords);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &objectInfo->filename);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &objectInfo->captureDateTime);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &objectInfo->modDateTime);
+    ReadPtpString8BitLen(self->allocator, &r.memIo, &objectInfo->keywords);
 
     return r.result;
 }

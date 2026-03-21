@@ -792,8 +792,16 @@ void MCStrCopyN(char* dest, const char* src, size_t size);
 void MCStrU32ToBinary(u32 val, i32 outSize, char* outStr);
 
 // Alloc space for string of given size
-#define MStrInit(a, s, len) ((s).str = (char*)M_Malloc(MDEBUG_SOURCE_MACRO (a), (len)), \
-    (s).size = (s).capacity = ((s).str) ? (len) : 0)
+MINLINE MStr M_StrMake(MDEBUG_SOURCE_DEFINE MAllocator* alloc, u32 len) {
+    MStr r = {};
+    r.str = (char*)M_Malloc(MDEBUG_SOURCE_PASS alloc, len);
+    r.size = 0;
+    r.capacity = len;
+    return r;
+}
+
+// Alloc space for string of given size
+#define MStrInit(alloc, len) M_StrMake(MDEBUG_SOURCE_MACRO alloc, len)
 
 // Free allocated string
 #define MStrFree(a, s) ((s).capacity ? (M_Free(MDEBUG_SOURCE_MACRO (a), (void*)(s).str, (s).capacity), \
@@ -806,8 +814,7 @@ MINLINE MStr MStrMakeEmpty() {
 // Make a MStr copy from a C string - expects nul-terminator on 'c'
 // Strings made this way keep the nul-terminator
 MINLINE MStr MStrMakeCopyLenNul(MAllocator* alloc, const char* c, u32 len) {
-    MStr r = {};
-    MStrInit(alloc, r, len + 1);
+    MStr r = MStrInit(alloc, len + 1);
     if (!r.str) {return r;}
     memcpy((void*)r.str, c, len + 1);
     r.size = len;
@@ -823,12 +830,21 @@ MINLINE MStr MStrMakeCopyCStrNul(MAllocator* alloc, const char* c) {
 
 // Make a MStr copy from a string of given length - no nul-terminator
 MINLINE MStr MStrMakeCopyLen(MAllocator* alloc, const char* c, u32 len) {
-    MStr r = {};
-    MStrInit(alloc, r, len);
+    MStr r = MStrInit(alloc, len);
     if (!r.str) {return r;}
     memcpy((void*)r.str, c, len);
     r.size = len;
     r.capacity = len;
+    return r;
+}
+
+// Make a MStr copy from a string of given length - no nul-terminator
+MINLINE MStr MStrMakeCopyStr(MAllocator* alloc, MStr str) {
+    MStr r = MStrInit(alloc, str.capacity);
+    if (!r.str) {return r;}
+    memcpy((void*)r.str, str.str, str.size);
+    r.size = str.size;
+    r.capacity = str.capacity;
     return r;
 }
 

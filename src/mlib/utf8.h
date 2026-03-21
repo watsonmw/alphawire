@@ -7,10 +7,16 @@ extern "C" {
 #endif
 
 // Returns required size for UTF-8 output buffer, or 0 on error
-size_t UTF8_GetConvertUTF16Len(const u16* utf16, size_t utf16Len);
+size_t UTF8_GetConvertFromUTF16Len(const u16* utf16, size_t utf16Len);
 
-// Returns number of bytes written to utf8_out, or 0 on error
+// Returns number of bytes written to utf8Out, or 0 on error
 size_t UTF8_ConvertFromUTF16(const u16* utf16In, size_t inLen, char* utf8Out, size_t outLen);
+
+// Returns required size for UTF-16 output buffer, or 0 on error
+size_t UTF8_GetConvertToUTF16Len(const char* utf8, size_t utf8Len);
+
+// Returns number of bytes written to utf16Out, or 0 on error
+size_t UTF8_ConvertToUTF16(const char* utf8In, size_t inLen, u16* utf16Out, size_t outLen);
 
 // Compare two UTF-8 strings
 // Returns: -1 if str1 < str2, 0 if str1 == str2, 1 if str1 > str2

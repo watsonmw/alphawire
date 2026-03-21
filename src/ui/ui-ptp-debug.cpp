@@ -354,12 +354,23 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                             sizeof(text));
         ImGui::Text("Default: %s", text);
 
-        ImGuiInputIntDuel(property->dataType, &property->value);
-        ImGui::SameLine();
-        if (ImGui::Button("Send")) {
-            PTPControl_SetPropertyValue(&c.ptp, property, property->value);
+        // Set value
+        if (property->dataType == PTP_DT_STR) {
+            static char strBuf[200];
+            ImGui::InputText("String:", strBuf, sizeof(strBuf), ImGuiInputTextFlags_CharsNoBlank);
+            ImGui::SameLine();
+            if (ImGui::Button("Send")) {
+                PTPControl_SetPropertyStrRaw(&c.ptp, property, MStr{strBuf, MCStrLen(strBuf)});
+            }
+        } else {
+            ImGuiInputIntDuel(property->dataType, &property->value);
+            ImGui::SameLine();
+            if (ImGui::Button("Send")) {
+                PTPControl_SetPropertyValue(&c.ptp, property, property->value);
+            }
         }
 
+        // Show range or enums
         switch (property->formFlag) {
             case PTP_FORM_FLAG_RANGE: {
                 PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.min, text,

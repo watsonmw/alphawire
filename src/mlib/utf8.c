@@ -1,6 +1,6 @@
 #include "mlib/utf8.h"
 
-size_t UTF8_GetConvertUTF16Len(const u16* utf16, size_t utf16Len) {
+size_t UTF8_GetConvertFromUTF16Len(const u16* utf16, size_t utf16Len) {
     size_t utf8Len = 0;
     u32 codePoint;
 
@@ -102,6 +102,61 @@ size_t UTF8_ConvertFromUTF16(const u16* utf16In, size_t inLen, char* utf8Out, si
     }
 
     return outPos;
+}
+
+size_t UTF8_GetConvertToUTF16Len(const char* utf8, size_t utf8Len) {
+    if (!utf8) {
+        return 0;
+    }
+    size_t utf16Len = 0;
+    size_t i = 0;
+    while (i < utf8Len && utf8[i] != '\0') {
+        size_t consumed = 0;
+        u32 cp = UTF8_Decode((const u8*)&utf8[i], &consumed);
+        if (consumed == 0) {
+            break; // Error or end of string
+        }
+
+        if (cp <= 0xFFFF) {
+            utf16Len += 1;
+        } else {
+            utf16Len += 2;
+        }
+        i += consumed;
+    }
+    return utf16Len;
+}
+
+size_t UTF8_ConvertToUTF16(const char* utf8In, size_t inLen, u16* utf16Out, size_t outLen) {
+    if (!utf8In || !utf16Out) return 0;
+    size_t utf8Idx = 0;
+    size_t utf16Idx = 0;
+
+    while (utf8Idx < inLen && utf8In[utf8Idx] != '\0') {
+        size_t consumed = 0;
+        u32 cp = UTF8_Decode((const u8*)&utf8In[utf8Idx], &consumed);
+        if (consumed == 0) {
+            break;
+        }
+
+        if (cp <= 0xFFFF) {
+            if (utf16Idx >= outLen) {
+                return 0; // Buffer too small
+            }
+            utf16Out[utf16Idx++] = (u16)cp;
+        } else {
+            if (utf16Idx + 1 >= outLen) {
+                return 0; // Buffer too small
+            }
+            // Encode as surrogate pair
+            cp -= 0x10000;
+            utf16Out[utf16Idx++] = (u16)((cp >> 10) + 0xD800);
+            utf16Out[utf16Idx++] = (u16)((cp & 0x3FF) + 0xDC00);
+        }
+        utf8Idx += consumed;
+    }
+
+    return utf16Idx;
 }
 
 u32 UTF8_Decode(const u8* str, size_t* len) {
