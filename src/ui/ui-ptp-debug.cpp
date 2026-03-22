@@ -1,4 +1,5 @@
 #include <string>
+#include <time.h>
 #include <SDL3/SDL_time.h>
 #include <SDL3/SDL_timer.h>
 
@@ -1196,6 +1197,87 @@ void ShowCameraControlsWindow(AppContext& c) {
 
     ImGui::Spacing();
 
+    if (ImGui::CollapsingHeader("Metadata")) {
+        ImGui::Spacing();
+
+        if (ImGui::Button("Set Time Now")) {
+            // Get current time in nanosecs
+            SDL_Time nowNanos = 0;
+            SDL_GetCurrentTime(&nowNanos);
+
+            time_t nowSec = (time_t)(nowNanos / 1000000000LL);
+            struct tm* localDateTime = localtime(&nowSec);
+
+            // Calculate timezone offset in hours and minutes
+            extern long _timezone;
+            long offset = -_timezone / 60; // Convert to minutes
+            if (localDateTime->tm_isdst > 0) {
+                offset += 60; // Adjust for Daylight Savings
+            }
+            int offsetHours = (int)(offset / 60);
+            int offsetMinutes = (int)(offset % 60);
+
+            // Calculate the decimal part of the current second
+            long deciSec = (nowNanos / 100000000LL) % 10L;
+
+            // Format: YYYYmmddTHHMMSS.m+HHMM
+            char timeBuffer[64];
+            snprintf(timeBuffer, sizeof(timeBuffer),
+                     "%04d%02d%02dT%02d%02d%02d.%01ld%+03d%02d",
+                     localDateTime->tm_year + 1900,
+                     localDateTime->tm_mon + 1,
+                     localDateTime->tm_mday,
+                     localDateTime->tm_hour,
+                     localDateTime->tm_min,
+                     localDateTime->tm_sec,
+                     deciSec,
+                     offsetHours,
+                     (offsetMinutes < 0 ? -offsetMinutes : offsetMinutes));
+
+            MStr time = MStrMakeStaticCStr(timeBuffer);
+            PTPProperty* dateTimeProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_DATE_TIME_SET);
+            if (dateTimeProperty) {
+                PTPControl_SetPropertyStrRaw(&c.ptp, dateTimeProperty, time);
+            }
+        }
+
+        PTPProperty* copyrightProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_COPYRIGHT);
+        if (copyrightProperty) {
+            bool set = false;
+            if (ImGui::InputText("Copyright", c.copyrightEdit, sizeof(c.copyrightEdit),
+                ImGuiInputTextFlags_EnterReturnsTrue)) {
+                set = true;
+            }
+            ImGui::SameLine();
+            ImGui::PushID("copyright");
+            if (ImGui::Button("Set")) {
+                set = true;
+            }
+            if (set) {
+                PTPControl_SetPropertyStrRaw(&c.ptp, copyrightProperty, MStrMakeStaticCStr(c.copyrightEdit));
+            }
+            ImGui::PopID();
+        }
+
+        PTPProperty* photographerProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_PHOTOGRAPHER);
+        if (photographerProperty) {
+            bool set = false;
+            if (ImGui::InputText("Photographer", c.photographerEdit, sizeof(c.photographerEdit),
+                ImGuiInputTextFlags_EnterReturnsTrue)) {
+                set = true;
+            }
+            ImGui::SameLine();
+            ImGui::PushID("photographer");
+            if (ImGui::Button("Set")) {
+                set = true;
+            }
+            if (set) {
+                PTPControl_SetPropertyStrRaw(&c.ptp, photographerProperty, MStrMakeStaticCStr(c.photographerEdit));
+            }
+            ImGui::PopID();
+        }
+    }
+
     if (ImGui::CollapsingHeader("Settings File")) {
         ImGui::Spacing();
 
@@ -1650,7 +1732,6 @@ void UiPtpShow(AppContext& c) {
 
     if (c.connected) {
         double currentTime = ImGui::GetTime();
-
         FetchEvents(c, currentTime);
         RefreshProperties(c, currentTime);
 

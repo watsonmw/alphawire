@@ -223,23 +223,23 @@ PTP_EXPORT PTPResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* pr
 PTP_EXPORT PTPResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch);
 
 MINLINE PTPResult PTPControl_SetPropertyU8(PTPControl* self, PTPProperty* property, u8 value) {
-    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u8 = value});
+    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u8 = value});
 }
 
 MINLINE PTPResult PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
-    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u16 = value});
+    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u16 = value});
 }
 
 MINLINE PTPResult PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
-    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u32 = value});
+    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u32 = value});
 }
 
 MINLINE PTPResult PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
-    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.u64 = value});
+    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u64 = value});
 }
 
 MINLINE PTPResult PTPControl_SetPropertyStrRaw(PTPControl* self, PTPProperty* property, MStr value) {
-    return PTPControl_SetPropertyValue(self, property, (PTPPropValue){.str = value});
+    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.str = value});
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////

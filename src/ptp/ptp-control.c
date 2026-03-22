@@ -2112,12 +2112,12 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD1C7, "APS-C/Super 35mm Shooting"},
     {0xD1C8, "Recording File Number (Still)"},
     {0xD1C9, "Forced File Number Reset Enable Status"},
-    {0xD1CA, "Recording Setting File Name"},
+    {DPC_FILE_NAME_PREFIX, "File Name Prefix"},
     {0xD1CB, "Recording Folder Format"},
     {0xD1CC, "StreamSettingList Operation Enable Status"},
     {0xD1CD, "Write Copyright Info"},
-    {0xD1CE, "Set Photographer"},
-    {0xD1CF, "Set Copyright"},
+    {DPC_PHOTOGRAPHER, "Photographer"},
+    {DPC_COPYRIGHT, "Copyright"},
     {0xD1D0, "File Settings Camera ID"},
     {0xD1D1, "File Settings Reel Number"},
     {0xD1D2, "File Settings Camera Position"},
@@ -2578,7 +2578,8 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_FOCUS_STEP_FAR,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Step Far", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_AWB_LOCK,                     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AWBL Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_FOCUS_AREA_X_Y,               PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "AF Area Position (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
-    {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Unknown Button", PROP_ENUM_SET(sControl_UpDown)},
+    {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reboot First Start", PROP_ENUM_SET(sControl_UpDown)},
+    {0xd2f6,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Burst?", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_ZOOM,                         PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Zoom Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
     {DPC_CUSTOM_WB_CAPTURE_STANDBY,    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Custom WB Capture Standby", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_CUSTOM_WB_CAPTURE_STANDBY_CANCEL, PTP_DT_UINT16, SDI_CONTROL_BUTTON, PTP_FORM_FLAG_ENUM, "Custom WB Capture Standby Cancel", PROP_ENUM_SET(sControl_UpDown)},
@@ -2989,7 +2990,9 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR: {
-            return 1 + (UTF8_GetConvertToUTF16Len(value.str.str, value.str.size) * 2);
+            size_t size = UTF8_GetConvertToUTF16Len(value.str.str, value.str.size);
+            size = size ? size + 1 : 0;
+            return 1 + (size * 2);
         }
         default:
             return 0;
@@ -3087,7 +3090,7 @@ static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* outS
 
 static char* ReadPtpString16BitLen(MAllocator* allocator, MMemIO* memIo) {
     u16 utf8Len = 0;
-    MMemReadU16(memIo, &utf8Len);
+    MMemReadU16LE(memIo, &utf8Len);
     if (utf8Len) {
         char* utf8 = MMalloc(allocator, utf8Len);
         MMemReadCharCopyN(memIo, utf8, utf8Len);
@@ -3101,8 +3104,10 @@ static int WritePtpString(MStr str, MMemIO* memIo) {
 
     size_t len = UTF8_GetConvertToUTF16Len(str.str, str.size);
     if (len) {
-        MMemGrowBytes(memIo, len * 2);
-        size_t utf16Len = UTF8_ConvertToUTF16(str.str, str.size, memIo->mem + memIo->size, len);
+        MMemGrowBytes(memIo, (len + 1) * 2);
+        size_t utf16Len = UTF8_ConvertToUTF16(str.str, str.size, (u16*)(memIo->mem + memIo->size), len);
+        memIo->size += utf16Len * 2;
+        MMemWriteU16LE(memIo, 0);
         if (utf16Len) {
             return TRUE;
         }
@@ -4189,6 +4194,7 @@ PTPResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier) {
             (((magnifier.x & 0xffff) << 16) | (magnifier.y & 0xffff));
         return PTPControl_SetPropertyValue(self, propMag, (PTPPropValue){.u64 = newValue});
     }
+    return PTP_GENERAL_ERROR;
 }
 
 AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos) {
@@ -4316,6 +4322,11 @@ static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
         }
         if (!found) {
             memset(control, 0, sizeof(PtpControl));
+            control->dataType = PTP_DT_UINT16;
+            control->controlType = SDI_CONTROL_BUTTON;
+            control->formFlag = PTP_FORM_FLAG_ENUM;
+            control->form.enums.values = sControl_UpDown;
+            control->form.enums.size = MStaticArraySize(sControl_UpDown);
             control->controlCode = controlCode;
         }
     }

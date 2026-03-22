@@ -211,7 +211,11 @@ struct AppContext {
     PropTable propTable{};
 
     // Debug set props
-    char debugSetText[256];
+    char debugSetText[512] = {};
+
+    // Text shadows
+    char copyrightEdit[512] = {};
+    char photographerEdit[512] = {};
 
     // Live View state
     bool liveViewOpen = false;
@@ -280,6 +284,26 @@ struct AppContext {
         if (connected) {
             cameraSettingsSaveEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
             cameraSettingsReadEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
+
+            PTPProperty* photographerProperty = PTPControl_GetPropertyByCode(&ptp, DPC_PHOTOGRAPHER);
+            if (photographerProperty) {
+                size_t size = photographerProperty->value.str.size;
+                if (size >= sizeof(photographerEdit)) {
+                    size = sizeof(photographerEdit) - 1;
+                }
+                memcpy(photographerEdit, photographerProperty->value.str.str, size);
+                photographerEdit[size] = 0;
+            }
+
+            PTPProperty* copyrightProperty = PTPControl_GetPropertyByCode(&ptp, DPC_COPYRIGHT);
+            if (copyrightProperty) {
+                size_t size = copyrightProperty->value.str.size;
+                if (size >= sizeof(copyrightEdit)) {
+                    size = sizeof(copyrightEdit) - 1;
+                }
+                memcpy(copyrightEdit, copyrightProperty->value.str.str, size);
+                copyrightEdit[size] = 0;
+            }
         }
     }
 
