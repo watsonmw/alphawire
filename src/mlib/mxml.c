@@ -88,7 +88,7 @@ MXmlToken MXml_NextToken(MXml* p) {
         return token;
     }
 
-    char* textStart = p->cur;
+    const char* textStart = p->cur;
     MXml_SkipWS(p);
 
     if (*p->cur == '\0') {

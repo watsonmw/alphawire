@@ -122,7 +122,7 @@ void UiPtpLiveViewShow(AppContext& c) {
         }
 
         // Indicate detected focus frames
-        if (MArraySize(c.liveViewFrames.focus.frames)) {
+        if (c.liveFocusOverlay && MArraySize(c.liveViewFrames.focus.frames)) {
             ImDrawList *drawList = ImGui::GetWindowDrawList();
             ImVec2 windowPos = ImGui::GetWindowPos();
 
@@ -164,8 +164,8 @@ void UiPtpLiveViewShow(AppContext& c) {
         if (c.liveViewOverlayMode != LiveViewOverlayMode_NONE) {
             ImDrawList *drawList = ImGui::GetWindowDrawList();
             ImVec2 windowPos = ImGui::GetWindowPos();
-            ImU32 green = IM_COL32(0, 255, 0, 255);
-            float thickness = 0.8f;
+            ImU32 overlayColor = ImColor(c.liveViewOverlayColor[0], c.liveViewOverlayColor[1], c.liveViewOverlayColor[2]);
+            float thickness = c.liveViewOverlayThickness;
 
             ImVec2 topLeft(windowPos.x + imagePos.x, windowPos.y + imagePos.y);
             ImVec2 topRight(windowPos.x + imagePos.x + renderWidth, windowPos.y + imagePos.y);
@@ -176,12 +176,12 @@ void UiPtpLiveViewShow(AppContext& c) {
             if (c.liveViewOverlayMode == LiveViewOverlayMode_CROSSHAIR) {
                 float crosshairLen = renderHeight * 0.05f;
                 drawList->AddLine(ImVec2(center.x, center.y - crosshairLen),
-                    ImVec2(center.x, center.y + crosshairLen), green, thickness);
+                    ImVec2(center.x, center.y + crosshairLen), overlayColor, thickness);
                 drawList->AddLine(ImVec2(center.x - crosshairLen, center.y),
-                    ImVec2(center.x + crosshairLen, center.y), green, thickness);
+                    ImVec2(center.x + crosshairLen, center.y), overlayColor, thickness);
             } else if (c.liveViewOverlayMode == LiveViewOverlayMode_X) {
-                drawList->AddLine(topLeft, bottomRight, green, thickness);
-                drawList->AddLine(topRight, bottomLeft, green, thickness);
+                drawList->AddLine(topLeft, bottomRight, overlayColor, thickness);
+                drawList->AddLine(topRight, bottomLeft, overlayColor, thickness);
             }
         }
 

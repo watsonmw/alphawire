@@ -1614,7 +1614,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("image-file-format", DPC_COMPRESSION_SETTING, sProp_CompressionSetting),
     META_ENUM_U8 ("image-file-format", DPC_IMAGE_FILE_FORMAT, sProp_ImageFileFormat),
     META_ENUM_U8 ("raw-file-type", DPC_RAW_FILE_TYPE, sProp_RawFileType),
-    META_ENUM_U8 ("compressed-file-type", DPC_COMPRESSED_IMAGE_FILE_FORMAT, sProp_CompressedImageFileFormat),
+    META_ENUM_U8 ("compressed-file-type", DPC_IMAGE_COMPRESSED_FILE_TYPE, sProp_CompressedImageFileFormat),
     META_ENUM_U8 ("image-quality", DPC_IMAGE_QUALITY, sProp_ImageQuality),
     META_ENUM_U8 ("image-size", DPC_IMAGE_SIZE, sProp_ImageSize),
     META_ENUM_U16("image-save-destination", DPC_IMAGE_SAVE_DESTINATION, sProp_PcRemoteSaveDest),
@@ -1630,6 +1630,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_FUNC_U32("shutter-speed", DPC_SHUTTER_SPEED, NULL, GetShutterSpeedAsString),
     META_FUNC_U32("iso", DPC_ISO, NULL, GetIsoAsString),
     META_FUNC_U32("iso-current", DPC_ISO_CURRENT, NULL, GetIsoAsString),
+    META_ENUM_U8 ("image-stabilization", DPC_IMAGE_STABILIZATION, sProp_OnOff1),
     META_ENUM_U8 ("shutter-mode", DPC_SHUTTER_MODE, sProp_ShutterMode),
     META_ENUM_U8 ("shutter-type", DPC_SHUTTER_TYPE, sProp_ShutterType),
     META_ENUM_U8 ("shutter-mode-setting", DPC_SHUTTER_MODE_SETTING, sProp_ShutterModeSetting),
@@ -1907,7 +1908,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD0D6, "Time Code Run"},
     {0xD0D7, "Time Code Make"},
     {0xD0D8, "User Bit Time Rec"},
-    {0xD0D9, "Image Stabilization Steady Shot"},
+    {DPC_IMAGE_STABILIZATION, "Image Stabilization Steady Shot"},
     {0xD0DA, "Movie Stabilization Steady Shot"},
     {DPC_SILENT_MODE, "Silent Mode"},
     {DPC_SILENT_MODE_APERTURE_DRIVE_AF, "Aperture Drive AF"},
@@ -2234,10 +2235,10 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD24F, "Interval REC (Still) Mode"},
     {0xD250, "Interval REC (Still) Status"},
     {0xD251, "Device Overheating State"},
-    {0xD252, "Still Image Quality"},
-    {0xD253, "File Format (Still)"},
+    {DPC_IMAGE_QUALITY, "Image Quality"},
+    {DPC_IMAGE_FILE_FORMAT, "Image File Format"},
     {0xD254, "Focus Magnifier Setting"},
-    {0xD255, "AF Tracking Sensitivity (Still)"},
+    {0xD255, "AF Tracking Sensitivity (Image)"},
     {DPC_INTERVAL_RECORD_MODE, "Interval Record Mode"},
     {DPC_INTERVAL_RECORD_STATUS, "Interval Record Status"},
     {DPC_DEVICE_OVERHEATING_STATE, "Device Overheating State"},
@@ -2291,7 +2292,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {DPC_REMOTE_TOUCH_ENABLED, "Remote Touch Enabled"},
     {DPC_REMOTE_TOUCH_CANCEL_ENABLED, "Remote Touch Cancel Enabled"},
     {DPC_MOVIE_FRAME_RATE, "Movie Frame Rate"},
-    {DPC_COMPRESSED_IMAGE_FILE_FORMAT, "Image Compression File Format"},
+    {DPC_IMAGE_COMPRESSED_FILE_TYPE, "Image Compressed File Type"},
     {DPC_RAW_FILE_TYPE, "RAW File Type"},
     {0xD289, "Media Slot 1 RAW File Type"},
     {0xD28A, "Media Slot 2 RAW File Type"},
@@ -2579,7 +2580,7 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_AWB_LOCK,                     PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AWBL Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_FOCUS_AREA_X_Y,               PTP_DT_UINT32, SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_RANGE, "AF Area Position (x, y)", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
     {0xD2DB,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reboot First Start", PROP_ENUM_SET(sControl_UpDown)},
-    {0xd2f6,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Burst?", PROP_ENUM_SET(sControl_UpDown)},
+    {0xd2f6,                           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Spot Boosting", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_ZOOM,                         PTP_DT_INT8,   SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE, "Zoom Operation", .form.range={.min.i8=-1,.max.i8=1,.step.i8=1}},
     {DPC_CUSTOM_WB_CAPTURE_STANDBY,    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Custom WB Capture Standby", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_CUSTOM_WB_CAPTURE_STANDBY_CANCEL, PTP_DT_UINT16, SDI_CONTROL_BUTTON, PTP_FORM_FLAG_ENUM, "Custom WB Capture Standby Cancel", PROP_ENUM_SET(sControl_UpDown)},
@@ -2599,7 +2600,7 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_SETTINGS_RESET,               PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Settings Reset", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_PIXEL_MAPPING,                PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Pixel Mapping", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_POWER_OFF,                    PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Power Off", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_TIME_CODE_PRESET_RESET,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Time Code Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
+    { DPC_TIME_CODE_PRESET_RESET,       PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Time Code Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_USER_BIT_PRESET_RESET,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "User Bit Preset Reset", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_SENSOR_CLEANING,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Sensor Cleaning", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_RESET_PICTURE_PROFILE,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Picture Profile", PROP_ENUM_SET(sControl_UpDown)},
@@ -2636,7 +2637,7 @@ char* PTP_GetEventLabel(u16 eventCode) {
         }
     }
 
-    return "SDIE_UnknownEvent";
+    return NULL;
 }
 
 typedef struct {

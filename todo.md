@@ -2,7 +2,6 @@ UI
 ===
 
 - Settings apply
-- Set Date/Time / Copyright / Photographer 
 - Build list of property editors / widgets?
   - Debug Set widgets
   - Enum List Read only support (except in debug)
@@ -11,6 +10,9 @@ UI
 - Connect multiple cameras
 - Simple bool setter for properties that have an on/off enabled/disabled state
 - Detect transport errors and disconnect
+- Button list and control 
+  - Add buttons UI
+- Add all new controls
 
 Backends
 ===

@@ -225,6 +225,7 @@ struct AppContext {
     ImTextureID liveViewImageGLId = 0;
     i32 liveViewImageWidth = 0;
     i32 liveViewImageHeight = 0;
+    bool liveFocusOverlay = true;
     bool osdEnabled = false;
     bool osdCaptured = false;
     MMemIO osdImage{};
@@ -233,6 +234,8 @@ struct AppContext {
     i32 osdImageHeight = 0;
     i32 liveViewClickAction = LiveViewClickAction_NONE;
     i32 liveViewOverlayMode = LiveViewOverlayMode_NONE;
+    float liveViewOverlayColor[3] = { 0, 255, 0 };
+    float liveViewOverlayThickness = 0.8f;
 
     // Camera settings file
     bool cameraSettingsSaveEnabled = false;

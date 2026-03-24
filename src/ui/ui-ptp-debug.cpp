@@ -705,7 +705,11 @@ static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* lab
             }
         }
 
-        ImGui::Text("%s: %.*s", label, currentValAsStr.size, currentValAsStr.str);
+        if (currentValAsStr.size) {
+            ImGui::Text("%s: %.*s", label, currentValAsStr.size, currentValAsStr.str);
+        } else {
+            ImGui::Text("%s: N/A", label);
+        }
         if (PTPControl_IsPropertyNotch(&c.ptp, property)) {
             ImGui::PushID(propCode);
             ImGui::SameLine();
@@ -857,6 +861,12 @@ void ShowCameraControlsWindow(AppContext& c) {
             }
             ImGui::EndDisabled();
         }
+
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!c.liveViewOpen);
+        ImGui::Checkbox("Show Focus", &c.liveFocusOverlay);
+        ImGui::EndDisabled();
+
         if (!c.liveViewOpen) {
             ImGui::BeginDisabled();
         }
@@ -872,7 +882,17 @@ void ShowCameraControlsWindow(AppContext& c) {
             }
         }
 
-        ImGuiBuildPropertyCombo(c, DPC_LIVE_VIEW_QUALITY, "Quality");
+        ImGui::PushID("overlayAction");
+        ImGui::Text("Overlay:");
+        ImGui::SameLine();
+        ImGui::RadioButton("None", &c.liveViewOverlayMode, LiveViewOverlayMode_NONE); ImGui::SameLine();
+        ImGui::RadioButton("X", &c.liveViewOverlayMode, LiveViewOverlayMode_X); ImGui::SameLine();
+        ImGui::RadioButton("Crosshair", &c.liveViewOverlayMode, LiveViewOverlayMode_CROSSHAIR); ImGui::SameLine();
+        ImGui::ColorEdit3("##Color", c.liveViewOverlayColor, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoInputs);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(150.0f);
+        ImGui::SliderFloat("##Size", &c.liveViewOverlayThickness, 0.1, 20.0, "%0.2f");
+        ImGui::PopID();
 
         bool touchEnabled = PTPControl_PropertyEnabledByCode(&c.ptp, DPC_REMOTE_TOUCH_ENABLED);
         bool focusMagnifyEnabled = PTPControl_SupportsProperty(&c.ptp, DPC_FOCUS_MAGNIFY);
@@ -890,16 +910,11 @@ void ShowCameraControlsWindow(AppContext& c) {
             ImGui::PopID();
         }
 
-        ImGui::PushID("overlayAction");
-        ImGui::Text("Overlay:");
-        ImGui::SameLine();
-        ImGui::RadioButton("None", &c.liveViewOverlayMode, LiveViewOverlayMode_NONE); ImGui::SameLine();
-        ImGui::RadioButton("X", &c.liveViewOverlayMode, LiveViewOverlayMode_X); ImGui::SameLine();
-        ImGui::RadioButton("Crosshair", &c.liveViewOverlayMode, LiveViewOverlayMode_CROSSHAIR); ImGui::SameLine();
-        ImGui::PopID();
         if (!c.liveViewOpen) {
             ImGui::EndDisabled();
         }
+
+        ImGuiBuildPropertyCombo(c, DPC_LIVE_VIEW_QUALITY, "Quality");
     }
 
     ImGui::Spacing();
@@ -1077,7 +1092,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         AwMagnifier magnifier = {};
         if (PTPControl_GetMagnifier(&c.ptp, &magnifier) == PTP_OK) {
             if (magnifier.ratio.ratioByTen == 0) {
-                ImGui::Text("Magnifier: Off (%d, %d)", magnifier.ratio.ratio, magnifier.x, magnifier.y);
+                ImGui::Text("Magnifier: Off (%d, %d)", magnifier.x, magnifier.y);
             } else {
                 ImGui::Text("Magnifier: x%0.1f (%d, %d)", magnifier.ratio.ratio, magnifier.x, magnifier.y);
             }
@@ -1193,10 +1208,13 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGuiBuildPropertyCombo(c, DPC_ISO, "ISO");
         ImGuiBuildPropertyCombo(c, DPC_SHUTTER_SPEED, "Shutter Speed");
         ImGuiBuildPropertyCombo(c, DPC_F_NUMBER, "F-Number");
+        ImGuiBuildPropertyCombo(c, DPC_SHUTTER_TYPE, "Shutter Type");
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_STABILIZATION, "Image Stabilization");
+        ImGuiBuildPropertyCombo(c, DPC_SILENT_MODE, "Silent Mode");
+        ImGuiBuildPropertyCombo(c, DPC_ASPECT_RATIO, "Aspect Ratio");
     }
 
     ImGui::Spacing();
-
     if (ImGui::CollapsingHeader("Metadata")) {
         ImGui::Spacing();
 
@@ -1278,6 +1296,17 @@ void ShowCameraControlsWindow(AppContext& c) {
         }
     }
 
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Image Type")) {
+        ImGui::Spacing();
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_FILE_FORMAT, "Image File Format");
+        ImGuiBuildPropertyCombo(c, DPC_RAW_FILE_TYPE, "Raw File Type");
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_COMPRESSED_FILE_TYPE, "Compressed File Type");
+        ImGuiBuildPropertyCombo(c, DPC_COMPRESSION_SETTING, "Image Compression");
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_QUALITY, "Image Compression Quality");
+    }
+
+    ImGui::Spacing();
     if (ImGui::CollapsingHeader("Settings File")) {
         ImGui::Spacing();
 
@@ -1325,10 +1354,14 @@ void ShowCameraControlsWindow(AppContext& c) {
 static void FetchEvents(AppContext& c, float currentTime) {
     if (currentTime - c.eventRefreshTime >= AUTO_EVENT_FETCH_INTERVAL_SECS) {
         PTPEvent* events = NULL;
-        PTPResult r = PTPControl_ReadEvents(&c.ptp, 10, c.autoReleasePool, &events);
+        PTPControl_ReadEvents(&c.ptp, 10, c.autoReleasePool, &events);
         for (int i = 0; i < MArraySize(events); ++i) {
             PTPEvent* event = events + i;
-            PTP_LOG_INFO_F(&c.ptp.logger, "%s(%04x) 0x%08x 0x%08x 0x%08x", PTP_GetEventLabel(event->code), event->code, event->param1, event->param2, event->param3);
+            const char* eventName = PTP_GetEventLabel(event->code);
+            if (!eventName) {
+                eventName = "UnknownEvent";
+            }
+            PTP_LOG_INFO_F(&c.ptp.logger, "%s(%04x) 0x%08x 0x%08x 0x%08x", eventName, event->code, event->param1, event->param2, event->param3);
         }
         c.eventRefreshTime = currentTime;
     }
