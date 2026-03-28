@@ -1177,8 +1177,8 @@ void ShowCameraControlsWindow(AppContext& c) {
                 if (set) {
                     AwOSDClamp(&x, &y);
                     AwMagnifierSet magnifierSet = {
-                        .x = magnifier.x,
-                        .y = magnifier.y,
+                        .x = x,
+                        .y = y,
                         .ratio = magnifier.ratio,
                     };
                     PTPControl_SetMagnifier(&c.ptp, magnifierSet);

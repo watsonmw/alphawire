@@ -4932,13 +4932,28 @@ b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MA
     return strOut->str != NULL;
 }
 
+static void UpdateStr(MAllocator* allocator, MStr* strIn, MStr* strOut) {
+    size_t size = strIn->size + 1;
+    if (strOut->capacity < size) {
+        strOut->str = MRealloc(allocator, strOut->str, strOut->capacity, size);
+        strOut->capacity = size;
+    }
+    memcpy(strOut->str, strIn->str, strIn->size);
+    strOut->str[strIn->size] = '\0';
+    strOut->size = strIn->size;
+}
+
 PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value) {
     if (!property) {
         return PTP_GENERAL_ERROR;
     }
     PTPResult r = SDIO_SetExtDevicePropValue(self, property->propCode, property->dataType, value);
     if (r == PTP_OK) {
-        // property->value = value; // TODO : Copy func so we dont steal string ptr
+        if (property->dataType == PTP_DT_STR) {
+            UpdateStr(self->allocator, &value.str, &property->value.str);
+        } else {
+            property->value = value;
+        }
     }
     return r;
 }
