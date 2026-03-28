@@ -68,6 +68,7 @@ bool LoadTextureFromMemory(const MMemIO* memIo, ImTextureID* out_texture, i32* o
 void UiPtpLiveViewShow(AppContext& c) {
     ImGui::SetNextWindowPos(ImVec2(910, 0), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(1000, 660), ImGuiCond_FirstUseEver);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     ImGui::Begin("Live View");
 
@@ -92,25 +93,28 @@ void UiPtpLiveViewShow(AppContext& c) {
         }
     }
 
+
     if (c.liveViewImage.size != 0) {
         // Calculate scaled dimensions while maintaining aspect ratio
-        ImVec2 windowSize = ImGui::GetWindowSize();
-        float windowAspect = windowSize.x / windowSize.y;
+        ImVec2 windowContentSize = ImGui::GetContentRegionAvail();
+        float windowAspect = windowContentSize.x / windowContentSize.y;
         float aspectRatio = (float)c.liveViewImageWidth / (float)c.liveViewImageHeight;
         float renderWidth, renderHeight;
         if (windowAspect > aspectRatio) {
             // Window is wider than image
-            renderHeight = windowSize.y;
+            renderHeight = windowContentSize.y;
             renderWidth = renderHeight * aspectRatio;
         } else {
             // Window is taller than image
-            renderWidth = windowSize.x;
+            renderWidth = windowContentSize.x;
             renderHeight = renderWidth / aspectRatio;
         }
+        ImVec2 cursor = ImGui::GetCursorPos();
+
         // Center the image
         ImVec2 imagePos(
-                (windowSize.x - renderWidth) * 0.5f,
-                (windowSize.y - renderHeight) * 0.5f);
+                cursor.x + (windowContentSize.x - renderWidth) * 0.5f,
+                cursor.y + (windowContentSize.y - renderHeight) * 0.5f);
 
         ImGui::SetCursorPos(imagePos);
         ImGui::Image(c.liveViewImageGLId, ImVec2(renderWidth, renderHeight));
@@ -244,4 +248,5 @@ void UiPtpLiveViewShow(AppContext& c) {
     }
 
     ImGui::End();
+    ImGui::PopStyleVar();
 }
