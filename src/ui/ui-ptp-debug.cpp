@@ -244,6 +244,16 @@ bool ImGuiSlider(u16 dataType, PTPPropValue* value, PTPPropValue minV, PTPPropVa
     return false;
 }
 
+static void ImGuiShowPropertyText(AppContext& c, u16 propCode) {
+    MStr str = {};
+    PTPProperty* propAfStatus = PTPControl_GetPropertyByCode(&c.ptp, propCode);
+    if (propAfStatus) {
+        PTPControl_GetPropertyValueAsStr(&c.ptp, propAfStatus, c.autoReleasePool, &str);
+        const char* label = PTP_GetPropertyLabel(propCode);
+        ImGui::Text("%s: %.*s", label, str.size, str.str);
+    }
+}
+
 void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
     char* label = PTP_GetPropertyLabel(property->propCode);
     ImGui::AlignTextToFramePadding();
@@ -943,17 +953,14 @@ void ShowCameraControlsWindow(AppContext& c) {
         // Focus Area
         ImGuiBuildPropertyCombo(c, DPC_FOCUS_AREA, "Focus Area");
 
-        MStr afStatus = {};
-        PTPProperty* propAfStatus = PTPControl_GetPropertyByCode(&c.ptp, DPC_AUTO_FOCUS_STATUS);
-        PTPControl_GetPropertyValueAsStr(&c.ptp, propAfStatus, c.autoReleasePool, &afStatus);
-        ImGui::Text("Focus State: %.*s", afStatus.size, afStatus.str);
+        // Current focus status
+        ImGuiShowPropertyText(c, DPC_AUTO_FOCUS_STATUS);
 
         if (ImGui::Checkbox("AF-On", &c.autoFocusButton)) {
             PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
         }
 
         // Manual Focus Adjust
-
         PtpControl* focusAdjust = PTPControl_GetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST);
         if (focusAdjust) {
             PTPPropValue focusAdjustVal{};
@@ -1026,6 +1033,10 @@ void ShowCameraControlsWindow(AppContext& c) {
                 ImGui::EndDisabled();
             }
         }
+
+        ImGuiShowPropertyText(c, DPC_FOCAL_DISTANCE_METER);
+        ImGuiShowPropertyText(c, DPC_FOCUS_POSITION);
+        ImGuiShowPropertyText(c, DPC_FOCUS_POSITION_ABS);
     }
 
     ImGui::Spacing();
@@ -1483,18 +1494,18 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                     for (int i = 0; i < MArraySize(c.ptp.supportedOperations); i++) {
                         ImGui::TableNextRow();
 
-                        u16 propertyCode = c.ptp.supportedOperations[i];
+                        u16 opCode = c.ptp.supportedOperations[i];
 
                         ImGui::TableNextColumn();
 
                         char label[32];
-                        snprintf(label, sizeof(label), "0x%04x", propertyCode);
+                        snprintf(label, sizeof(label), "0x%04x", opCode);
 
                         ImGui::SameLine();
                         ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
-                        char *opName = PTP_GetOperationLabel(propertyCode);
+                        char *opName = PTP_GetOperationLabel(opCode);
                         if (opName == NULL) {
                             opName = label;
                         }

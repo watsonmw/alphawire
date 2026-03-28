@@ -1598,6 +1598,28 @@ static MStr GetFocusSpotPos(PTPControl* self, MAllocator* allocator, PTPProperty
     return r;
 }
 
+static MStr GetFocalDistanceMeters(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+    MStr r = {};
+    char text[32];
+    u32 value = propValue.u32;
+    u32 valueWhole = value / 1000;
+    u32 valueDecimal = (value % 1000) / 100;
+    int len = 0;
+    if (value == 0xffffffff) {
+        len = snprintf(text, sizeof(text), "Infinity");
+    } else {
+        if (valueDecimal) {
+            len = snprintf(text, sizeof(text), "%u.%um", valueWhole, valueDecimal);
+        } else {
+            len = snprintf(text, sizeof(text), "%um", valueWhole);
+        }
+    }
+    if (len > 0) {
+        r = MStrMakeCopyLenNul(allocator, text, len);
+    }
+    return r;
+}
+
 #define META_ENUM_U8(n, c, e) {n, c, PTP_DT_UINT8, .fixedEnums.u8=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_I16(n, c, e) {n, c, PTP_DT_IINT16, .fixedEnums.i16=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_U16(n, c, e) {n, c, PTP_DT_UINT16, .fixedEnums.u16=(e), .fixedEnumsSize=MStaticArraySize(e)}
@@ -1665,6 +1687,9 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_FUNC_U32("focus-magnify-pos", DPC_FOCUS_MAGNIFY_POS, NULL, GetFocusMagnifyPos),
     META_FUNC_U64("focus-magnify", DPC_FOCUS_MAGNIFY, NULL, GetFocusMagnify),
     META_FUNC_U32("focus-spot-pos", DPC_FOCUS_AREA_POS_OLD, NULL, GetFocusSpotPos),
+    META_FUNC_U8("focus-position", DPC_FOCUS_POSITION, NULL, NULL),
+    META_FUNC_U16("focus-position-abs", DPC_FOCUS_POSITION_ABS, NULL, NULL),
+    META_FUNC_U32("focal-distance-meters", DPC_FOCAL_DISTANCE_METER, NULL, GetFocalDistanceMeters),
 
     META_ENUM_U16("flash-mode", DPC_FLASH_MODE, sProp_FlashMode),
     META_ENUM_U8 ("wireless-flash", DPC_WIRELESS_FLASH, sProp_OnOff0),
@@ -2230,14 +2255,14 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {DPC_MEDIA_SLOT1_STATUS, "Media Slot 1 Status"},
     {0xD249, "Media Slot 1 Remaining Shots"},
     {0xD24A, "Media Slot 1 Remaining Record Time"},
-    {DPC_FOCAL_POSITION, "Focal position"},
+    {DPC_FOCUS_POSITION, "Focus Position"},
     {DPC_AWB_LOCK_STATUS, "AWBLock Indication"},
     {0xD24F, "Interval REC (Still) Mode"},
     {0xD250, "Interval REC (Still) Status"},
     {0xD251, "Device Overheating State"},
     {DPC_IMAGE_QUALITY, "Image Quality"},
     {DPC_IMAGE_FILE_FORMAT, "Image File Format"},
-    {0xD254, "Focus Magnifier Setting"},
+    {DPC_FOCUS_MAGNIFY, "Focus Magnifier"},
     {0xD255, "AF Tracking Sensitivity (Image)"},
     {DPC_INTERVAL_RECORD_MODE, "Interval Record Mode"},
     {DPC_INTERVAL_RECORD_STATUS, "Interval Record Status"},
@@ -2402,8 +2427,8 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xE03F, "LensAssignable Button Indicator 1"},
     {0xE040, "Zoom Position Setting"},
     {0xE041, "Zoom Position Current Value"},
-    {0xE042, "Focus Position Setting"},
-    {0xE043, "Focus Position Current Value"},
+    {DPC_FOCUS_POSITION_ABS_SET, "Focus Position Abs Set"},
+    {DPC_FOCUS_POSITION_ABS, "Focus Position Abs"},
     {0xE044, "Focus Mode status"},
     {0xE045, "Focus Operation with INT16 Enable Status"},
     {0xE048, "Audio Input CH1 Level Control"},
@@ -4823,6 +4848,7 @@ b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MA
     char* str = NULL;
     PTPPropertyMetadata* meta = property->meta;
     if (!meta) {
+        // No metadata / unrecognised property  but its a string - just return
         if (property->dataType == PTP_DT_STR) {
             if (MStrIsEmpty(property->value.str)) {
                 *strOut = MStrMakeEmpty();
@@ -4849,6 +4875,52 @@ b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MA
         }
     } else if (meta->valueAsStringFunc) {
         *strOut = meta->valueAsStringFunc(self, allocator, property, property->value);
+    } else {
+        // Metadata / recognised property - but no string value func - use the default
+        char buffer[32] = {};
+        int len = 0;
+        switch (property->dataType) {
+            case PTP_DT_STR: {
+                if (MStrIsEmpty(property->value.str)) {
+                    *strOut = MStrMakeEmpty();
+                } else {
+                    *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
+                }
+                return TRUE;
+            }
+            case PTP_DT_INT8:
+                len = snprintf(buffer, sizeof(buffer), "%hhd",  property->value.i8);
+                break;
+            case PTP_DT_UINT8:
+                len = snprintf(buffer, sizeof(buffer), "%hhu",  property->value.u8);
+                break;
+            case PTP_DT_INT16:
+                len = snprintf(buffer, sizeof(buffer), "%hd", property->value.i16);
+                break;
+            case PTP_DT_UINT16:
+                len = snprintf(buffer, sizeof(buffer), "%hu", property->value.u16);
+                break;
+            case PTP_DT_INT32:
+                len = snprintf(buffer, sizeof(buffer), "%d", property->value.i32);
+                break;
+            case PTP_DT_UINT32:
+                len = snprintf(buffer, sizeof(buffer), "%u", property->value.u32);
+                break;
+            case PTP_DT_INT64:
+                len = snprintf(buffer, sizeof(buffer), "%lld", property->value.i64);
+                break;
+            case PTP_DT_UINT64:
+                len = snprintf(buffer, sizeof(buffer), "%llu", property->value.u64);
+                break;
+            default:
+                return FALSE;
+        }
+        if (len > 0) {
+            *strOut = MStrMakeCopyLenNul(allocator, buffer, len);
+        } else {
+            *strOut = MStrMakeEmpty();
+        }
+        return TRUE;
     }
 
     if (!strOut->str) {
