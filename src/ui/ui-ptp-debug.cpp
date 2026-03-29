@@ -16,9 +16,6 @@
 #ifdef PTP_ENABLE_WIA
 #include "platform/windows/ptp-backend-wia.h"
 #endif
-#ifdef PTP_ENABLE_LIBUSBK
-#include "platform/windows/ptp-backend-libusbk.h"
-#endif
 
 const float AUTO_PROP_REFRESH_INTERVAL_SECS = 1.0f;
 const float AUTO_EVENT_FETCH_INTERVAL_SECS = 0.05f;
@@ -1315,6 +1312,36 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGuiBuildPropertyCombo(c, DPC_IMAGE_COMPRESSED_FILE_TYPE, "Compressed File Type");
         ImGuiBuildPropertyCombo(c, DPC_COMPRESSION_SETTING, "Image Compression");
         ImGuiBuildPropertyCombo(c, DPC_IMAGE_QUALITY, "Image Compression Quality");
+    }
+
+    if (c.remoteButtonsEnabled) {
+        ImGui::Spacing();
+        if (ImGui::CollapsingHeader("Buttons", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Spacing();
+            PTPProperty* buttonList = PTPControl_GetPropertyByCode(&c.ptp, DPC_BUTTON_LIST);
+
+            ImGui::PushID("remoteButtons");
+            PTPPropValueEnums buttonListEnum = {};
+            if (PTPControl_GetEnumsForProperty(&c.ptp, buttonList, c.autoReleasePool, &buttonListEnum)) {
+                for (size_t i = 0; i < MArraySize(buttonListEnum.values); ++i) {
+                    MStr* buttonName = &buttonListEnum.values[i].str;
+                    char buffer[256];
+                    if (snprintf(buffer, sizeof(buffer), "%.*s", buttonName->size, buttonName->str) >= 0) {
+                        if (ImGui::Button(buffer)) {
+                            PTPControl_RemoteButtonPress(&c.ptp, buttonListEnum.values[i].propValue.u16, TRUE);
+                        }
+                        if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                            PTPControl_RemoteButtonPress(&c.ptp, buttonListEnum.values[i].propValue.u16, FALSE);
+                        }
+                    }
+                    if ((i + 1) % 5) {
+                        ImGui::SameLine();
+                    }
+                }
+            }
+            ImGui::PopID();
+            ImGui::Spacing();
+        }
     }
 
     ImGui::Spacing();

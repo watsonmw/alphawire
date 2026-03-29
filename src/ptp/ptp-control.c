@@ -1529,6 +1529,51 @@ static EnumValueU8 sProp_DialOverride[] = {
     {0x01, "Remote"},
 };
 
+static EnumValueU16 sProp_ButtonList[] = {
+    { 0x0001, "Up"},
+    { 0x0002, "Down"},
+    { 0x0003, "Left"},
+    { 0x0004, "Right"},
+    { 0x0005, "ENTER"},
+    { 0x0006, "MENU"},
+    { 0x0007, "Multi Up"},
+    { 0x0008, "Multi Down"},
+    { 0x0009, "Multi Left"},
+    { 0x000A, "Multi Right"},
+    { 0x000B, "Multi Enter"},
+    { 0x000C, "Multi Right Up"},
+    { 0x000D, "Multi Right Down"},
+    { 0x000E, "Multi Left Up"},
+    { 0x000F, "Multi Left Down"},
+    { 0x0010, "Fn"},
+    { 0x0011, "Playback"},
+    { 0x0012, "Delete"},
+    { 0x0013, "Mode"},
+    { 0x0014, "C1"},
+    { 0x0015, "C2"},
+    { 0x0016, "C3"},
+    { 0x0017, "C4"},
+    { 0x0018, "C5"},
+    { 0x0019, "C6"},
+    { 0x001A, "MOVIE"},
+    { 0x001B, "AEL"},
+    { 0x001C, "AF-ON"},
+    { 0x001D, "Home"},
+    { 0x001E, "Clips"},
+    { 0x001F, "Slot-Select"},
+    { 0x0020, "Display"},
+    { 0x0021, "C7"},
+    { 0x0022, "Cancel/Back"},
+    { 0x0023, "Thumbnail"},
+};
+
+static EnumValueU16 sProp_DialList[] = {
+    { 0x4001, "Control Wheel"},
+    { 0x4002, "Front Dial"},
+    { 0x4003, "Rear Dial L"},
+    { 0x4004, "Rear Dial R"},
+};
+
 static MStr GetFocusMagnifyScale(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
@@ -1750,7 +1795,12 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_FUNC_U32("zoom-bar-info", DPC_ZOOM_BAR_INFO, NULL, GetZoomBarInfo),
 
     META_ENUM_U8 ("remote-restrict-status", DPC_REMOTE_RESTRICT_STATUS, sProp_EnabledDisabled),
+    META_ENUM_U16("button-list", DPC_BUTTON_LIST, sProp_ButtonList),
+    META_ENUM_U16("button-list-multi", DPC_BUTTON_LIST_MULTI, sProp_ButtonList),
+    META_ENUM_U16("dial-list", DPC_DIAL_LIST, sProp_DialList),
+
     META_ENUM_U8 ("lens-info-enabled", DPC_LENS_INFORMATION_ENABLED, sProp_EnabledDisabled),
+
     META_ENUM_U8 ("camera-settings-save-enabled", DPC_CAMERA_SETTING_SAVE_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("camera-settings-read-enabled", DPC_CAMERA_SETTING_READ_ENABLED, sProp_EnabledDisabled),
 };
@@ -2195,11 +2245,11 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD204, "Total Battery Remaining"},
     {0xD205, "Total Battery Level Indicator"},
     {DPC_OSD_IMAGE_MODE, "OSD Image Mode"},
-    {0xD208, "Camera Button Function capability"},
-    {0xD209, "Camera Button Function Multi capability"},
-    {0xD20A, "Camera Dial Function capability"},
-    {0xD20B, "Camera Lever Function capability"},
-    {0xD20C, "Camera Button Function Status"},
+    {DPC_BUTTON_LIST, "Button List"},
+    {DPC_BUTTON_LIST_MULTI, "Multi Button List"},
+    {DPC_DIAL_LIST, "Dial List"},
+    {DPC_LEVER_LIST, "Lever List"},
+    {0xD20C, "Camera Button Status"},
     {DPC_SHUTTER_SPEED, "Shutter Speed"},
     {DPC_BATTERY_LEVEL, "Battery Level Indicator"},
     {DPC_COLOR_TEMPERATURE, "Color Temperature"},
@@ -2630,9 +2680,12 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_SENSOR_CLEANING,              PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Sensor Cleaning", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_RESET_PICTURE_PROFILE,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Picture Profile", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_RESET_CREATIVE_LOOK,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Reset Creative Look", PROP_ENUM_SET(sControl_UpDown)},
-    {DPC_SHUTTER_ECS_NUMBER_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Shutter ECS Number Step", .form.range={.min.i16=-32768,.max.i16=32767,.step.i16=1}},
+    {DPC_SHUTTER_ECS_NUMBER_STEP,      PTP_DT_INT16,  SDI_CONTROL_NOTCH,    PTP_FORM_FLAG_ENUM,  "Shutter ECS Number Step", .form.range={.min.i16=I16_MIN,.max.i16=I16_MAX,.step.i16=1}},
     {DPC_MOVIE_RECORD_TOGGLE,          PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Movie Record Toggle", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_FOCUS_POSITION_CANCEL,        PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Focus Position Cancel", PROP_ENUM_SET(sControl_UpDown)},
+    {DPC_REMOTE_BUTTON,                PTP_DT_UINT32, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE,  "Remote Button", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
+    {DPC_REMOTE_BUTTON_MULTI,          PTP_DT_UINT32, SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE,  "Remote Button Multi", .form.range={.min.u32=0,.max.u32=0xffffffff,.step.u32=1}},
+    {DPC_REMOTE_DIAL_ADJUST,           PTP_DT_INT32,  SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE,  "Remote Dial Adjust", .form.range={.min.i32=I32_MIN,.max.i32=I32_MAX,.step.i32=1}},
 };
 
 char* PTP_GetPropertyLabel(u16 propCode) {
@@ -5054,4 +5107,13 @@ b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValu
     }
 
     return FALSE;
+}
+
+PTP_EXPORT b32 PTPControl_RemoteButtonEnable(PTPControl* self) {
+    return PTPControl_SupportsControl(self, DPC_REMOTE_BUTTON);
+}
+
+PTPResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed) {
+    u32 value = (((u32)button) << 16) | (pressed ? 2 : 1);
+    return SDIO_ControlDevice(self, DPC_REMOTE_BUTTON, PTP_DT_UINT32, (PTPPropValue){.u32=value});
 }

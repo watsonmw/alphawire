@@ -192,7 +192,7 @@ static DWORD WINAPI EventThreadProc(LPVOID lpParameter) {
     PTPUsbkDeviceUsbk* dev = (PTPUsbkDeviceUsbk*)lpParameter;
 
     while (TRUE) {
-        // Check if we should stop
+        // Check if we should stop (use standard WaitForSingleObject for stop event)
         if (WaitForSingleObject(dev->eventThreadStopEvent, 0) == WAIT_OBJECT_0) {
             break;
         }
@@ -292,6 +292,7 @@ static PTPResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMillisecon
             *event = outEvent;
         }
     } else {
+        // Check if event is ready (non-blocking check)
         DWORD result = WaitForSingleObject(dev->eventOverlapped.hEvent, 0);
         if (result == WAIT_OBJECT_0) {
             // Get results
@@ -328,6 +329,13 @@ b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkBackend* self) {
 
 b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices) {
     PTP_TRACE("PTPUsbkDeviceList_RefreshList");
+
+    // Print libusbk version number
+    if (!self->libkVersion.Major || !self->libkVersion.Minor || !self->libkVersion.Micro || !self->libkVersion.Nano) {
+        LibK_GetVersion(&self->libkVersion);
+        PTP_INFO_F("LibK version: %d.%d.%d.%d", self->libkVersion.Major, self->libkVersion.Minor,
+            self->libkVersion.Micro, self->libkVersion.Nano);
+    }
 
     KLST_HANDLE deviceList = NULL;
     KLST_DEVINFO_HANDLE deviceInfo = NULL;
@@ -534,22 +542,22 @@ static PTPResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* re
     result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
                           sizeof(PTPContainerHeader) + dataOutSize, &actual, &overlapped);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
-        CloseHandle(overlapped.hEvent);
         WinUtils_LogLastError(&self->logger, "Failed to read PTP response");
+        CloseHandle(overlapped.hEvent);
         return PTP_GENERAL_ERROR;
     }
 
     waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
     if (waitResult != WAIT_OBJECT_0) {
+        PTP_ERROR("Timeout or error while reading PTP response");
         UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
         CloseHandle(overlapped.hEvent);
-        PTP_ERROR("Timeout or error while reading PTP response");
         return PTP_AW_TIMEOUT;
     }
 
     if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
-        CloseHandle(overlapped.hEvent);
         WinUtils_LogLastError(&self->logger, "Failed to get overlapped result");
+        CloseHandle(overlapped.hEvent);
         return PTP_GENERAL_ERROR;
     }
 
@@ -564,8 +572,8 @@ static PTPResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* re
             result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)cp, payloadLength - actual,
                 &dataTransfer, &overlapped);
             if (!result && GetLastError() != ERROR_IO_PENDING) {
-                CloseHandle(overlapped.hEvent);
                 WinUtils_LogLastError(&self->logger, "Failed to read PTP response data");
+                CloseHandle(overlapped.hEvent);
                 return PTP_GENERAL_ERROR;
             }
 
@@ -578,8 +586,8 @@ static PTPResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* re
             }
 
             if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &dataTransfer, FALSE)) {
-                CloseHandle(overlapped.hEvent);
                 WinUtils_LogLastError(&self->logger, "Failed to get overlapped result for data");
+                CloseHandle(overlapped.hEvent);
                 return PTP_GENERAL_ERROR;
             }
 
@@ -596,22 +604,22 @@ static PTPResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* re
         result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
                               responseSize, &actual, &overlapped);
         if (!result && GetLastError() != ERROR_IO_PENDING) {
-            CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger, "Failed to read final PTP response");
+            CloseHandle(overlapped.hEvent);
             return PTP_GENERAL_ERROR;
         }
 
         waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
         if (waitResult != WAIT_OBJECT_0) {
+            WinUtils_LogLastError(&self->logger,"Timeout or error while reading final PTP response");
             UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
             CloseHandle(overlapped.hEvent);
-            WinUtils_LogLastError(&self->logger,"Timeout or error while reading final PTP response");
             return PTP_AW_TIMEOUT;
         }
 
         if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
-            CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger, "Failed to get overlapped result for final response");
+            CloseHandle(overlapped.hEvent);
             return PTP_GENERAL_ERROR;
         }
     }
@@ -646,6 +654,11 @@ static b32 FindBulkInOutEndpoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandle, U
     USB_CONFIGURATION_DESCRIPTOR configDesc = {};
     OVERLAPPED overlapped = {0};
     UINT transferred = 0;
+
+    *bulkIn = 0;
+    *bulkOut = 0;
+    *interruptOut = 0;
+    *interruptIntervalOut = 0;
 
     // Create event for overlapped I/O
     overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -827,9 +840,9 @@ b32 PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) {
         SetEvent(deviceUsbk->eventThreadStopEvent);
 
         // Wait for thread to exit (with timeout)
-        DWORD waitResult = WaitForSingleObject(deviceUsbk->eventThread, 5000);
+        DWORD waitResult = WaitForSingleObject(deviceUsbk->eventThread, 10000);
         if (waitResult == WAIT_TIMEOUT) {
-            PTP_WARNING("Event thread did not exit in time, terminating");
+            PTP_ERROR("Event thread did not exit in time, terminating");
             TerminateThread(deviceUsbk->eventThread, 1);
         }
 

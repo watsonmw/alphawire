@@ -237,6 +237,9 @@ struct AppContext {
     float liveViewOverlayColor[3] = { 0, 255, 0 };
     float liveViewOverlayThickness = 0.8f;
 
+    // Remote buttons press features available for current device
+    bool remoteButtonsEnabled = false;
+
     // Camera settings file
     bool cameraSettingsSaveEnabled = false;
     bool cameraSettingsReadEnabled = false;
@@ -260,6 +263,7 @@ struct AppContext {
 
     void RefreshDevices() {
         selectedDeviceIndex = -1;
+        // ptpDeviceList.backendConfig.disallowSpawnEventThread = TRUE;
         PTPDeviceList_RefreshList(&ptpDeviceList);
     }
 
@@ -287,6 +291,7 @@ struct AppContext {
         if (connected) {
             cameraSettingsSaveEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
             cameraSettingsReadEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
+            remoteButtonsEnabled = PTPControl_RemoteButtonEnable(&ptp);
 
             PTPProperty* photographerProperty = PTPControl_GetPropertyByCode(&ptp, DPC_PHOTOGRAPHER);
             if (photographerProperty) {

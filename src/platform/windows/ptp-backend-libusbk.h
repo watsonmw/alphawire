@@ -3,6 +3,15 @@
 #include "mlib/mlib.h"
 #include "ptp/ptp-const.h"
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#endif
+#include <libusbk.h>
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +45,7 @@ typedef struct {
 
 typedef struct {
     UsbkDeviceInfo* deviceList;
+    KLIB_VERSION libkVersion;
     PTPUsbkDeviceUsbk* openDevices;
     void* deviceListHandle; // USBK Device list handle
     u32 timeoutMilliseconds;
