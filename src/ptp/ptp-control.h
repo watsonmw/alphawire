@@ -101,7 +101,7 @@ typedef struct {
  *
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator);
+PTP_EXPORT AwResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator);
 
 /**
  * Establishes a connection with a Sony device over PTP (Picture Transfer Protocol), on the previously setup transport.
@@ -114,7 +114,7 @@ PTP_EXPORT PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAlloc
  *                SDI_EXTENSION_VERSION_200 protocol.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version);
+PTP_EXPORT AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version);
 
 /**
  * Cleanup the PTPControl structure.
@@ -124,14 +124,31 @@ PTP_EXPORT PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion ve
  *
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT PTPResult PTPControl_Cleanup(PTPControl* self);
+PTP_EXPORT AwResult PTPControl_Cleanup(PTPControl* self);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Check support for various events, controls, and properties
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Check if the device supports a specific PTP event.
+ * @param eventCode The PTP event code to check.
+ * @return TRUE if the event is supported, FALSE otherwise.
+ */
 PTP_EXPORT b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode);
+
+/**
+ * Check if the device supports a specific control operation.
+ * @param controlCode The control code to check.
+ * @return TRUE if the control is supported, FALSE otherwise.
+ */
 PTP_EXPORT b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode);
+
+/**
+ * Check if the device supports a specific property.
+ * @param propCode The property code to check.
+ * @return TRUE if the property is supported, FALSE otherwise.
+ */
 PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode);
 
 /**
@@ -166,7 +183,7 @@ PTP_EXPORT size_t PTPControl_NumProperties(PTPControl* self);
  * @param index
  * @return property at index
  */
-PTP_EXPORT PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index);
+PTP_EXPORT PTPProperty* PTPControl_GetPropertyByIndex(PTPControl* self, u16 index);
 
 /**
  * Pull latest property values from device
@@ -175,7 +192,7 @@ PTP_EXPORT PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 inde
  *                    may not update when 'fullRefresh' is set to FALSE.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT PTPResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh);
+PTP_EXPORT AwResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh);
 
 /**
  * Get property by property code
@@ -213,32 +230,80 @@ PTP_EXPORT void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnum
  */
 PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outEnums);
 
+/**
+ * Get the property value as a human-readable string.
+ * @param property The property to convert.
+ * @param allocator Allocator to use for the output string.
+ * @param outStr Output string containing the property value.
+ * @return TRUE on success, FALSE on failure.
+ */
 PTP_EXPORT b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* outStr);
+
+/**
+ * Check if a property can be written/modified.
+ * @param property The property to check.
+ * @return TRUE if the property is writable, FALSE otherwise.
+ */
 PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property);
+
+/**
+ * Check if a property uses notch-style adjustment (for older Sony 2.0 interface).
+ * @param property The property to check.
+ * @return TRUE if the property uses notch adjustment, FALSE otherwise.
+ */
 PTP_EXPORT b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* property);
+
+/**
+ * Get the string identifier for a property.
+ * @param property The property to query.
+ * @param strOut Output string containing the property ID.
+ * @return TRUE on success, FALSE on failure.
+ */
 PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut);
 
-PTP_EXPORT PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value);
-PTP_EXPORT PTPResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value);
-PTP_EXPORT PTPResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch);
+/**
+ * Set a property value on the device.
+ * @param property The property to modify.
+ * @param value The new value to set.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value);
 
-MINLINE PTPResult PTPControl_SetPropertyU8(PTPControl* self, PTPProperty* property, u8 value) {
+/**
+ * Set a property value using a string representation.
+ * @param property The property to modify.
+ * @param value The string value to set.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value);
+
+/**
+ * Adjust 'notch' properties that are used for some shot settings when using older Sony 2.0 PTP interface.
+ * This is the only interface supported by pre-2020 cameras.
+ * @param property
+ * @param notch 1: notch one setting up, -1: notch one setting down, 2: notch two setting up twice,
+ *              -2: notch two setting down twice
+ * @return
+ */
+PTP_EXPORT AwResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch);
+
+MINLINE AwResult PTPControl_SetPropertyU8(PTPControl* self, PTPProperty* property, u8 value) {
     return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u8 = value});
 }
 
-MINLINE PTPResult PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
+MINLINE AwResult PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
     return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u16 = value});
 }
 
-MINLINE PTPResult PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
+MINLINE AwResult PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
     return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u32 = value});
 }
 
-MINLINE PTPResult PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
+MINLINE AwResult PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
     return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u64 = value});
 }
 
-MINLINE PTPResult PTPControl_SetPropertyStrRaw(PTPControl* self, PTPProperty* property, MStr value) {
+MINLINE AwResult PTPControl_SetPropertyStrRaw(PTPControl* self, PTPProperty* property, MStr value) {
     return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.str = value});
 }
 
@@ -259,11 +324,37 @@ PTP_EXPORT size_t PTPControl_NumControls(PTPControl* self);
  * @param index
  * @return property at index
  */
-PTP_EXPORT PtpControl* PTPControl_GetControlAtIndex(PTPControl* self, u16 index);
+PTP_EXPORT PtpControl* PTPControl_GetControlByIndex(PTPControl* self, u16 index);
 
-PTP_EXPORT PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode);
-PTP_EXPORT PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PTPPropValue value);
-PTP_EXPORT PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed);
+/**
+ * Get a control by its control code.
+ * @param controlCode The control code to look up.
+ * @return Pointer to the control if found, NULL otherwise.
+ */
+PTP_EXPORT PtpControl* PTPControl_GetControlByCode(PTPControl* self, u16 controlCode);
+
+/**
+ * Set a control value on the device.
+ * @param controlCode The control code to modify.
+ * @param value The new value to set.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_SetControlValue(PTPControl* self, u16 controlCode, PTPPropValue value);
+
+/**
+ * Toggle a control on or off.
+ * @param controlCode The control code to toggle.
+ * @param pressed TRUE to press/enable, FALSE to release/disable.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed);
+
+/**
+ * Get available enum values for a control.
+ * @param controlCode The control code to query.
+ * @param outEnums Output structure containing the available enum values.
+ * @return TRUE if enums are available, FALSE otherwise.
+ */
 PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums);
 
 
@@ -281,6 +372,23 @@ PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, 
 PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
 
 /**
+ * Downloads an image from the cameras buffer.
+ *
+ * NOTE: downloading an image while there are no images available can cause issues on older pre-2020 camera, including
+ * camera crashes and the pending file count to go negative.
+ *
+ * @param outFile The image contents after it has been downloaded
+ * @param outCii Info about the downloaded image
+ * @return
+ */
+PTP_EXPORT AwResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* outFile, PTPCapturedImageInfo* outCii);
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Live View
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
  * Get the live view image from the camera (if available)
  *
  * May have to retry if calling straight away after connecting to the camera.
@@ -289,7 +397,7 @@ PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
  * @param outLiveViewFrames NULL or output pointer to the focus frames (if available for your camera model and mode)
  * @return
  */
-PTP_EXPORT PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* outFile, LiveViewFrames* outLiveViewFrames);
+PTP_EXPORT AwResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* outFile, LiveViewFrames* outLiveViewFrames);
 
 /**
  * Free live view frames returned by PTPControl_GetLiveViewImage()
@@ -302,50 +410,72 @@ PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* 
  * @param outFile The PNG image
  * @return
  */
-PTP_EXPORT PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* outFile);
+PTP_EXPORT AwResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* outFile);
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// Camera Settings File Get / Put
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Downloads an image from the cameras buffer.
- *
- * NOTE: downloading an image while there are no images available can cause issues on older pre-2020 camera, including
- * camera crashes and the pending file count to go negative.
- *
- * @param outFile The image contents after it has been downloaded
- * @param outCii Info about the downloaded image
- * @return
+ * Download camera settings file from the device.
+ * @param outFile MemIO to write the settings file to.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* outFile, PTPCapturedImageInfo* outCii);
+PTP_EXPORT AwResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* outFile);
 
-PTP_EXPORT PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* outFile);
-PTP_EXPORT PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* file);
+/**
+ * Upload camera settings file to the device.
+ * @param file MemIO containing the settings file data.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* file);
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Events
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-PTP_EXPORT PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents);
+/**
+ * Read pending PTP events from the device.
+ * @param timeoutMilliseconds Maximum time to wait for events in milliseconds.
+ * @param alloc Allocator to use for the event array.
+ * @param outEvents Output pointer to array of events (caller must free).
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents);
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Magnifier
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Magnifier zoom ratio information.
+ */
 typedef struct AwMagnifierRatio {
-    i32 ratioByTen;
-    float ratio;
+    float ratio;     // Direct zoom ratio multiplier (e.g., 1.5)
+    i32 ratioByTen;  // Ratio multiplied by 10 (e.g., 15 for 1.5x)
 } AwMagnifierRatio;
 
+/**
+ * Live view magnifier state and capabilities.
+ */
 typedef struct AwMagnifier {
-    i32 x;
-    i32 y;
-    i32 width;
-    i32 height;
-    AwMagnifierRatio ratio;
-    b32 canSet;
-    size_t numRatios;
-    i32 ratioIndex;
-    AwMagnifierRatio ratios[8];
+    i32 x;                        // X position of magnifier viewport
+    i32 y;                        // Y position of magnifier viewport
+    i32 width;                    // Width of magnifier viewport
+    i32 height;                   // Height of magnifier viewport
+    AwMagnifierRatio ratio;       // Current zoom ratio
+    b32 canSet;                   // Whether magnifier can be controlled
+    size_t numRatios;             // Number of available zoom ratios
+    i32 ratioIndex;               // Index of current ratio in ratios array
+    AwMagnifierRatio ratios[8];   // Available zoom ratios
 } AwMagnifier;
 
+/**
+ * Parameters for setting magnifier position and zoom.
+ */
 typedef struct AwMagnifierSet {
     i32 x;
     i32 y;
@@ -362,8 +492,26 @@ typedef struct AwPosInt2 {
     i32 y;
 } AwPosInt2;
 
-PTP_EXPORT PTPResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier);
-PTP_EXPORT PTPResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier);
+/**
+ * Get current magnifier state from the device.
+ * @param outMagnifier Output structure to receive magnifier state.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier);
+
+/**
+ * Set magnifier position and zoom level.
+ * @param magnifier Magnifier parameters to set.
+ * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ */
+PTP_EXPORT AwResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier);
+
+/**
+ * Calculate new viewport position when moving magnifier by a relative amount.
+ * @param magnifier Current magnifier state.
+ * @param pos Relative movement position (normalized coordinates).
+ * @return New integer viewport position.
+ */
 PTP_EXPORT AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -371,7 +519,7 @@ PTP_EXPORT AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 PTP_EXPORT b32 PTPControl_RemoteButtonEnable(PTPControl* self);
-PTP_EXPORT PTPResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed);
+PTP_EXPORT AwResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // String conversion, value helpers

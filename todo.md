@@ -2,6 +2,9 @@ UI
 ===
 
 - Settings apply
+  - Str setter (match based on enums)
+  - int setter (try to find matching enum)
+  - bool setter
 - Build list of property editors / widgets?
   - Debug Set widgets
   - Enum List Read only support (except in debug)
@@ -20,7 +23,6 @@ Backends
 - IP: Don't copy packet buffer so much
 - IP: Connect via IP only?
 - IP: Connect with password (TLS)
-- Split PTPResult and AW results
 - Events for libusb and IOKit
 
 Commands

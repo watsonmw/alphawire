@@ -59,7 +59,7 @@ PTP_EXPORT b32 PTPUsbkDeviceList_Open(PTPUsbkBackend* self);
 PTP_EXPORT b32 PTPUsbkDeviceList_Close(PTPUsbkBackend* self);
 PTP_EXPORT b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices);
 PTP_EXPORT void PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self);
-PTP_EXPORT b32 PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
+PTP_EXPORT AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
 PTP_EXPORT b32 PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device);
 
 #ifdef __cplusplus

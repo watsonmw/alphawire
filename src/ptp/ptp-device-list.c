@@ -206,13 +206,14 @@ b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTP
 
     PTPBackend* backend = PTPDeviceList_GetBackend(self, deviceInfo->backendType);
     PTPDevice* device = MArrayAddPtrZ(self->allocator, self->openDevices);
-    b32 r = backend->openDevice(backend, deviceInfo, &device);
-    if (r) {
+    AwResult r = backend->openDevice(backend, deviceInfo, &device);
+    if (r.code == AW_RESULT_OK) {
         *deviceOut = device;
+        return TRUE;
     } else {
         MArrayPop(self->openDevices);
+        return FALSE;
     }
-    return r;
 }
 
 b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device) {

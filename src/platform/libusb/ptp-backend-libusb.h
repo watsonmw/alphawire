@@ -48,8 +48,8 @@ PTP_EXPORT b32 PTPLibusbDeviceList_Open(PTPLibusbDeviceList* self);
 PTP_EXPORT b32 PTPLibusbDeviceList_Close(PTPLibusbDeviceList* self);
 PTP_EXPORT b32 PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** devices);
 PTP_EXPORT void PTPLibusbDeviceList_ReleaseList(PTPLibusbDeviceList* self);
-PTP_EXPORT b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
-PTP_EXPORT b32 PTPLibusbDeviceList_DisconnectDevice(PTPLibusbDeviceList* self, PTPDevice* device);
+PTP_EXPORT AwResult PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+PTP_EXPORT b32 PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device);
 
 PTP_EXPORT b32 PTPLibusbDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
 

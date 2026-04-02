@@ -166,12 +166,12 @@ static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
 // <len      > <data more> <tid      > <data       |           > <len      > <data end > <tid      > | <len      > <cmd   res> <res> <tid      >
 //
 
-static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                         PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                         size_t* actualDataOutSize) {
+static AwResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                        PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                        size_t* actualDataOutSize) {
     PTPIpDevice* dev = (PTPIpDevice*)self->device;
     MAllocator* allocator = self->transport.allocator;
-    PTPResult error = PTP_OK;
+    AwResult error = {AW_RESULT_OK, PTP_OK};
 
     MMemIO in = {0};
     MMemIO out;
@@ -189,10 +189,10 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
     }
     int s = TcpSendAllBytes(dev->dataSock, out.mem, out.size);
     if (s == MSOCK_ERROR) {
-        error = PTP_AW_TIMEOUT;
+        error.code = AW_RESULT_TIMEOUT;
         goto exitWithError;
     } else if (s == 0) {
-        error = PTP_AW_CONNECTION_CLOSED;
+        error.code = AW_RESULT_CONNECTION_CLOSED;
         goto exitWithError;
     }
 
@@ -232,10 +232,10 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
     while (TRUE) {
         int r = TcpReadBytesIntoBuffer(dev->dataSock, &in, &inRead, 8);
         if (r == MSOCK_ERROR) {
-            error = PTP_AW_TIMEOUT;
+            error.code = AW_RESULT_TIMEOUT;
             goto exitWithError;
         } else if (r == 0) {
-            error = PTP_AW_CONNECTION_CLOSED;
+            error.code = AW_RESULT_CONNECTION_CLOSED;
             goto exitWithError;
         }
 
@@ -243,7 +243,7 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
         MMemReadU32LE(&inRead, &responseLen);
         MMemReadU32LE(&inRead, &responseType);
         if (responseLen < 8) {
-            error = PTP_AW_MALFORMED_RESPONSE;
+            error.code = AW_RESULT_MALFORMED_RESPONSE;
             goto exitWithError;
         }
 
@@ -251,10 +251,10 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
         r = TcpReadBytesIntoBuffer(dev->dataSock, &in, &inRead, payloadLen);
         inRead.mem = in.mem;
         if (r == MSOCK_ERROR) {
-            error = PTP_AW_TIMEOUT;
+            error.code = AW_RESULT_TIMEOUT;
             goto exitWithError;
         } else if (r == 0) {
-            error = PTP_AW_CONNECTION_CLOSED;
+            error.code = AW_RESULT_CONNECTION_CLOSED;
             goto exitWithError;
         }
 
@@ -277,7 +277,7 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
                     }
                 }
             } else {
-                error = PTP_AW_MALFORMED_RESPONSE;
+                error.code = AW_RESULT_MALFORMED_RESPONSE;
                 goto exitWithError;
             }
             break;
@@ -291,7 +291,7 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
                     PTP_WARNING_F("Response data size: %llu but buffer out only: %llu", transferLen, (u64)dataOutSize);
                 }
             } else {
-                error = PTP_AW_MALFORMED_RESPONSE;
+                error.code = AW_RESULT_MALFORMED_RESPONSE;
                 goto exitWithError;
             }
         } else if (responseType == PTPIP_TYPE_DATA_PACKET) {
@@ -308,7 +308,7 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
                     }
                 }
             } else {
-                error = PTP_AW_MALFORMED_RESPONSE;
+                error.code = AW_RESULT_MALFORMED_RESPONSE;
                 goto exitWithError;
             }
         } else if (responseType == PTPIP_TYPE_DATA_PACKET_END) {
@@ -316,11 +316,11 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
                 u32 transactionId;
                 MMemReadU32LE(&inRead, &transactionId);
             } else {
-                error = PTP_AW_MALFORMED_RESPONSE;
+                error.code = AW_RESULT_MALFORMED_RESPONSE;
                 goto exitWithError;
             }
         } else {
-            error = PTP_AW_MALFORMED_RESPONSE;
+            error.code = AW_RESULT_MALFORMED_RESPONSE;
             goto exitWithError;
         }
 
@@ -337,7 +337,12 @@ static PTPResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
 
     *actualDataOutSize = dataOutCurrent - dataOut;
     MMemFree(&in);
-    return response->ResponseCode;
+
+    if (response->ResponseCode == PTP_OK) {
+        return (AwResult){.code=AW_RESULT_OK,.ptp=PTP_OK};
+    } else {
+        return (AwResult){.code=AW_RESULT_PTP_FAILURE,.ptp=response->ResponseCode};
+    }
 
 exitWithError:
     MMemFree(&out);
@@ -346,15 +351,15 @@ exitWithError:
 }
 
 // TODO fix PTPResult it's really two things AW error + PTP error code
-static PTPResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents) {
+static AwResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents) {
     if (!outEvents) {
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_UNSUPPORTED};
     }
     b32 gotEvent = FALSE;
 
     PTPIpDevice* dev = (PTPIpDevice*)self->device;
     if (!dev || dev->eventSock == MSOCK_INVALID) {
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     // Initialize event buffer on first use
@@ -440,23 +445,23 @@ static PTPResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds
         MSockError e = MSockGetLastError();
         if (e.timeout) {
             if (gotEvent) {
-                return PTP_OK;
+                return (AwResult){.code=AW_RESULT_OK};
             } else {
-                return PTP_AW_TIMEOUT;
+                return (AwResult){.code=AW_RESULT_TIMEOUT};
             }
         }
     } else if (r == 0) {
-        return PTP_AW_CONNECTION_CLOSED;
+        return (AwResult){.code=AW_RESULT_CONNECTION_CLOSED};
     } else {
-        return PTP_OK;
+        return (AwResult){.code=AW_RESULT_OK};
     }
 }
 
-static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPIp_OpenDevice");
     MMemIO out = {0};
     MMemIO in = {0};
-    PTPResult error = PTP_OK;
+    AwResult error = {AW_RESULT_OK };
 
     PTPIpDevice dev = {};
     dev.eventSock = MSOCK_INVALID;
@@ -488,10 +493,10 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     
     int s = TcpSendAllBytes(dev.dataSock, out.mem, out.size);
     if (s == MSOCK_ERROR) {
-        error = PTP_AW_TIMEOUT;
+        error.code = AW_RESULT_TIMEOUT;
         goto exitWithError;
     } else if (s == 0) {
-        error = PTP_AW_CONNECTION_CLOSED;
+        error.code = AW_RESULT_CONNECTION_CLOSED;
         goto exitWithError;
     }
 
@@ -503,10 +508,10 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     // Wait for Init Command Ack
     int r = TcpReadBytesIntoBuffer(dev.dataSock, &in, &inRead, 8);
     if (r == MSOCK_ERROR) {
-        error = PTP_AW_TIMEOUT;
+        error.code = AW_RESULT_TIMEOUT;
         goto exitWithError;
     } else if (r == 0) {
-        error = PTP_AW_CONNECTION_CLOSED;
+        error.code = AW_RESULT_CONNECTION_CLOSED;
         goto exitWithError;
     }
 
@@ -514,17 +519,17 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     MMemReadU32LE(&inRead, &responseLen);
     MMemReadU32LE(&inRead, &responseType);
     if (responseLen < 8) {
-        error = PTP_AW_MALFORMED_RESPONSE;
+        error.code = AW_RESULT_MALFORMED_RESPONSE;
         goto exitWithError;
     }
 
     u32 payloadLen = responseLen - 8;
     r = TcpReadBytesIntoBuffer(dev.dataSock, &in, &inRead, payloadLen);
     if (r == MSOCK_ERROR) {
-        error = PTP_AW_TIMEOUT;
+        error.code = AW_RESULT_TIMEOUT;
         goto exitWithError;
     } else if (r == 0) {
-        error = PTP_AW_CONNECTION_CLOSED;
+        error.code = AW_RESULT_CONNECTION_CLOSED;
         goto exitWithError;
     }
 
@@ -563,10 +568,10 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
 
     s = TcpSendAllBytes(dev.eventSock, out.mem, out.size);
     if (s == MSOCK_ERROR) {
-        error = PTP_AW_TIMEOUT;
+        error.code = AW_RESULT_TIMEOUT;
         goto exitWithError;
     } else if (s == 0) {
-        error = PTP_AW_CONNECTION_CLOSED;
+        error.code = AW_RESULT_CONNECTION_CLOSED;
         goto exitWithError;
     }
     MMemFree(&out);
@@ -577,17 +582,17 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     // Wait for Init Event Ack
     r = TcpReadBytesIntoBuffer(dev.eventSock, &in, &inRead, 8);
     if (r == MSOCK_ERROR) {
-        error = PTP_AW_TIMEOUT;
+        error.code = AW_RESULT_TIMEOUT;
         goto exitWithError;
     } else if (r == 0) {
-        error = PTP_AW_CONNECTION_CLOSED;
+        error.code = AW_RESULT_CONNECTION_CLOSED;
         goto exitWithError;
     }
 
     MMemReadU32LE(&inRead, &responseLen);
     MMemReadU32LE(&inRead, &responseType);
     if (responseLen < 8) {
-        error = PTP_AW_MALFORMED_RESPONSE;
+        error.code = AW_RESULT_MALFORMED_RESPONSE;
         goto exitWithError;
     }
 
@@ -612,7 +617,7 @@ static b32 PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDe
     device->transport.requiresSessionOpenClose = TRUE;
     device->logger = self->logger;
     device->disconnected = FALSE;
-    return TRUE;
+    return error;
 
 exitWithError:
     MMemFree(&out);
@@ -620,7 +625,7 @@ exitWithError:
 
     MSockClose(dev.dataSock);
     MSockClose(dev.eventSock);
-    return FALSE;
+    return error;
 }
 
 static b32 PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
@@ -840,7 +845,7 @@ static void PTPIp_ReleaseList_(PTPBackend* backend) {
     PTPIp_ReleaseList(self);
 }
 
-static b32 PTPIp_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+static AwResult PTPIp_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTPIpBackend* self = backend->self;
     return PTPIp_OpenDevice(self, deviceInfo, deviceOut);
 }

@@ -401,9 +401,9 @@ static void PTPDeviceWia_FreeBuffers(PTPDevice* self, PTPBufferType type, void* 
     }
 }
 
-static PTPResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                          PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                          size_t* actualDataOutSize) {
+static AwResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                         PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                         size_t* actualDataOutSize) {
 
     WiaPtpRequest* requestData = (WiaPtpRequest*)(dataIn-sizeof(WiaPtpRequest));
 
@@ -434,14 +434,18 @@ static PTPResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* req
         for (int i = 0; i < PTP_MAX_PARAMS; i++) {
             response->Params[i] = responseData->Params[i];
         }
-        return PTP_OK;
+        if (response->ResponseCode == PTP_OK) {
+            return (AwResult){.code=AW_RESULT_OK,.ptp=responseData->ResponseCode};
+        } else {
+            return (AwResult){.code=AW_RESULT_PTP_FAILURE,.ptp=responseData->ResponseCode};
+        }
     } else {
         WinUtils_LogLastError(&wia->logger, "Error sending WIA request");
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 }
 
-b32 PTPWiaDeviceList_ConnectDevice(PTPWiaDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+AwResult PTPWiaDeviceList_OpenDevice(PTPWiaDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     HRESULT hr = 0;
     IWiaItem* pWiaItemRoot = NULL;
     IWiaItemExtras* pWiaItemExtras = NULL;
@@ -487,10 +491,14 @@ cleanup:
         pWiaItemExtras->lpVtbl->Release(pWiaItemExtras);
     }
 
-    return SUCCEEDED(hr);
+    if (SUCCEEDED(hr)) {
+        return (AwResult){.code=AW_RESULT_OK};
+    } else {
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
+    }
 }
 
-b32 PTPWiaDeviceList_DisconnectDevice(PTPWiaDeviceList* self, PTPDevice* device) {
+b32 PTPWiaDeviceList_CloseDevice(PTPWiaDeviceList* self, PTPDevice* device) {
     PTPDeviceWia* deviceWia = device->device;
     if (deviceWia->device) {
         deviceWia->device->lpVtbl->Release(deviceWia->device);
@@ -553,14 +561,14 @@ static void PTPWiaDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPWiaDeviceList_ReleaseList(self);
 }
 
-static b32 PTPWiaDeviceList_ConnectDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+static AwResult PTPWiaDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_ConnectDevice(self, deviceInfo, deviceOut);
+    return PTPWiaDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static b32 PTPWiaDeviceList_DisconnectDevice_(PTPBackend* backend, PTPDevice* device) {
+static b32 PTPWiaDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_DisconnectDevice(self, device);
+    return PTPWiaDeviceList_CloseDevice(self, device);
 }
 
 b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
@@ -570,8 +578,8 @@ b32 PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
     backend->refreshList = PTPWiaDeviceList_RefreshList_;
     backend->needsRefresh = PTPWiaDeviceList_NeedsRefresh_;
     backend->releaseList = PTPWiaDeviceList_ReleaseList_;
-    backend->openDevice = PTPWiaDeviceList_ConnectDevice_;
-    backend->closeDevice = PTPWiaDeviceList_DisconnectDevice_;
+    backend->openDevice = PTPWiaDeviceList_OpenDevice_;
+    backend->closeDevice = PTPWiaDeviceList_CloseDevice_;
     deviceList->logger = backend->logger;
     deviceList->allocator = backend->allocator;
     return PTPWiaDeviceList_Open(deviceList);

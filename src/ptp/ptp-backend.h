@@ -13,12 +13,12 @@ typedef void* (*PTP_Device_ReallocBuffer_t)(struct PTPDevice* device, PTPBufferT
                                             size_t dataOldSize, size_t dataNewSize);
 typedef void (*PTP_Device_FreeBuffer_t)(struct PTPDevice* device, PTPBufferType type, void* dataMem,
                                         size_t dataOldSize);
-typedef PTPResult (*PTP_Device_SendAndRecv_t)(struct PTPDevice* device, PTPRequestHeader* request, u8* dataIn,
-                                              size_t dataInSize, PTPResponseHeader* response, u8* dataOut,
-                                              size_t dataOutSize, size_t* actualDataOutSize);
+typedef AwResult (*PTP_Device_SendAndRecv_t)(struct PTPDevice* device, PTPRequestHeader* request, u8* dataIn,
+                                             size_t dataInSize, PTPResponseHeader* response, u8* dataOut,
+                                             size_t dataOutSize, size_t* actualDataOutSize);
 typedef b32 (*PTP_Device_Reset_t)(struct PTPDevice* device);
-typedef PTPResult (*PTP_Device_ReadEvents_Func_t)(struct PTPDevice* device, int timeoutMilliseconds, MAllocator* alloc,
-                                                  PTPEvent** outEventList);
+typedef AwResult (*PTP_Device_ReadEvents_Func_t)(struct PTPDevice* device, int timeoutMilliseconds, MAllocator* alloc,
+                                                 PTPEvent** outEventList);
 
 // Device transport for communicating with a device
 typedef struct {
@@ -73,7 +73,7 @@ typedef b32 (*PTPBackend_NeedsRefresh_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
 typedef b32 (*PTPBackend_PollListUpdates_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
 typedef void (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
-typedef b32 (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+typedef AwResult (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
 
 // Generic backend

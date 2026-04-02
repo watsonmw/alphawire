@@ -278,10 +278,10 @@ struct AppContext {
 #ifdef M_MEM_DEBUG
                 MMemDebugInit(&deviceAllocator);
 #endif
-                PTPResult r = PTPControl_Init(&ptp, device, &deviceAllocator);
-                if (r == PTP_OK) {
+                AwResult r = PTPControl_Init(&ptp, device, &deviceAllocator);
+                if (r.code == AW_RESULT_OK) {
                     r = PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
-                    if (r == PTP_OK) {
+                    if (r.code == AW_RESULT_OK) {
                         connected = true;
                     }
                 }

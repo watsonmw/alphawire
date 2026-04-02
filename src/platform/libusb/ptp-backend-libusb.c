@@ -185,9 +185,9 @@ static void PTPDeviceLibusb_FreeBuffer(PTPDevice* self, PTPBufferType type, void
     }
 }
 
-static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                             PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                             size_t* actualDataOutSize) {
+static AwResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                            PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                            size_t* actualDataOutSize) {
     PTPDeviceLibusb* deviceLibusb = self->device;
     libusb_device_handle* handle = deviceLibusb->handle;
     int transferred = 0;
@@ -208,7 +208,7 @@ static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* 
         (int)requestSize, &transferred, deviceLibusb->timeoutMilliseconds);
     if (r != 0) {
         PTP_LOG_ERROR_F(&self->logger, "Failed to send PTP request: %s", libusb_error_name(r));
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     if (dataInSize) {
@@ -223,7 +223,7 @@ static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* 
             (int)fullDataSize, &transferred, deviceLibusb->timeoutMilliseconds);
         if (r != 0) {
             PTP_LOG_ERROR_F(&self->logger, "Failed to send PTP data: %s", libusb_error_name(r));
-            return PTP_GENERAL_ERROR;
+            return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
     }
 
@@ -232,7 +232,7 @@ static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* 
         (int)(sizeof(PTPContainerHeader) + dataOutSize), &transferred, deviceLibusb->timeoutMilliseconds);
     if (r != 0) {
         PTP_LOG_ERROR_F(&self->logger, "Failed to read PTP response: %s", libusb_error_name(r));
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     u32 dataBytesTransferred = 0;
@@ -247,7 +247,7 @@ static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* 
                 &chunk, deviceLibusb->timeoutMilliseconds);
             if (r != 0) {
                 PTP_LOG_ERROR_F(&self->logger, "Failed to read PTP response data: %s", libusb_error_name(r));
-                return PTP_GENERAL_ERROR;
+                return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
             }
             actual += chunk;
             cp += chunk;
@@ -260,7 +260,7 @@ static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* 
             (int)finalResponseSize, &transferred, deviceLibusb->timeoutMilliseconds);
         if (r != 0) {
             PTP_LOG_ERROR_F(&self->logger, "Failed to read final PTP response: %s", libusb_error_name(r));
-            return PTP_GENERAL_ERROR;
+            return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
     }
 
@@ -274,7 +274,11 @@ static PTPResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* 
         response->Params[i] = resParams[i];
     }
 
-    return PTP_OK;
+    if (response->ResponseCode == PTP_OK) {
+        return (AwResult){.code=AW_RESULT_OK,.ptp=PTP_OK};
+    } else {
+        return (AwResult){.code=AW_RESULT_PTP_FAILURE,.ptp=(PTPResult)response->ResponseCode};
+    }
 }
 
 static b32 PTPDeviceLibusb_Reset(PTPDevice* self) {
@@ -362,12 +366,12 @@ static void* EventThreadProc(void* lpParameter) {
     return NULL;
 }
 
-static PTPResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc,
-                                            PTPEvent** outEvents) {
+static AwResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc,
+                                           PTPEvent** outEvents) {
     PTPDeviceLibusb* dev = self->device;
 
     if (outEvents == NULL) {
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_UNSUPPORTED};
     }
 
     // If event thread is running, return stored events
@@ -385,7 +389,7 @@ static PTPResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMillisec
         }
 
         pthread_mutex_unlock(&dev->eventLock);
-        return PTP_OK;
+        return (AwResult){.code=AW_RESULT_OK};
     }
 
     // Non-threaded mode - this may miss some events if ReadEvents is not called frequently enough
@@ -407,11 +411,11 @@ static PTPResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMillisec
         }
     }
 
-    return PTP_OK;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTP_TRACE("PTPLibusbDeviceList_ConnectDevice");
+b32 PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+    PTP_TRACE("PTPLibusbDeviceList_OpenDevice");
     LibusbDeviceInfo* info = deviceInfo->device;
     libusb_device* dev = info->device;
     libusb_device_handle* handle = NULL;
@@ -485,8 +489,8 @@ b32 PTPLibusbDeviceList_ConnectDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* 
     return TRUE;
 }
 
-b32 PTPLibusbDeviceList_DisconnectDevice(PTPLibusbDeviceList* self, PTPDevice* device) {
-    PTP_TRACE("PTPLibusbDeviceList_DisconnectDevice");
+b32 PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device) {
+    PTP_TRACE("PTPLibusbDeviceList_CloseDevice");
     PTPDeviceLibusb* deviceLibusb = device->device;
 
     // Stop event thread if running
@@ -549,14 +553,14 @@ static void PTPLibusbDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPLibusbDeviceList_ReleaseList(self);
 }
 
-static b32 PTPLibusbDeviceList_ConnectDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+static b32 PTPLibusbDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTPLibusbDeviceList* self = backend->self;
-    return PTPLibusbDeviceList_ConnectDevice(self, deviceInfo, deviceOut);
+    return PTPLibusbDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static b32 PTPLibusbDeviceList_DisconnectDevice_(PTPBackend* backend, PTPDevice* device) {
+static b32 PTPLibusbDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPLibusbDeviceList* self = backend->self;
-    return PTPLibusbDeviceList_DisconnectDevice(self, device);
+    return PTPLibusbDeviceList_CloseDevice(self, device);
 }
 
 b32 PTPLibusbDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
@@ -575,8 +579,8 @@ b32 PTPLibusbDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds
     backend->refreshList = PTPLibusbDeviceList_RefreshList_;
     backend->needsRefresh = PTPLibusbDeviceList_NeedsRefresh_;
     backend->releaseList = PTPLibusbDeviceList_ReleaseList_;
-    backend->openDevice = PTPLibusbDeviceList_ConnectDevice_;
-    backend->closeDevice = PTPLibusbDeviceList_DisconnectDevice_;
+    backend->openDevice = PTPLibusbDeviceList_OpenDevice_;
+    backend->closeDevice = PTPLibusbDeviceList_CloseDevice_;
 
     return PTPLibusbDeviceList_Open(self);
 }

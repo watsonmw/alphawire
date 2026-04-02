@@ -3403,28 +3403,32 @@ static PTPRequestHeader BuildReq(PTPControl* self, size_t dataInSize, size_t dat
 }
 
 typedef struct {
-    PTPResult result;
+    AwResult result;
     PTPResponseHeader* dataOut;
     MMemIO memIo;
 } PTPResponse;
 
-#define OK(a) ((a) == PTP_OK)
-#define RETURN_IF_FAIL(r) if ((r).result != PTP_OK || (r).memIo.mem == NULL) { return (r).result; }
+#define IS_OK(r) ((r).code == AW_RESULT_OK)
+#define RETURN_IF_FAIL(r) if ((r).result.code != AW_RESULT_OK || (r).memIo.mem == NULL) { return (r).result; }
+#define RESULT(c, p) ((AwResult){.code = (c), .ptp = (p)})
+#define RESULT_CODE(c) ((AwResult){.code = (c), .ptp = PTP_OK})
+#define RESULT_PTP(p) ((AwResult){.code = AW_RESULT_PTP_FAILURE, .ptp = (p)})
+#define RESULT_OK() ((AwResult){.code = AW_RESULT_OK})
 
 static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
     size_t actualDataOutSize = 0;
-    PTPResult r = self->device->transport.sendAndRecv(self->device,
+    AwResult r = self->device->transport.sendAndRecv(self->device,
         request, self->dataInMem, self->dataInSize,
         &self->ptpResponse, self->dataOutMem, self->dataOutSize,
         &actualDataOutSize);
 
     PTPResponse response = {.result=r};
-    if (r != PTP_OK) {
+    if (!IS_OK(r)) {
         return response;
     }
 
     response.dataOut = &self->ptpResponse;
-    response.result = response.dataOut->ResponseCode;
+    response.result.ptp = response.dataOut->ResponseCode;
     if (actualDataOutSize > sizeof(PTPResponseHeader)) {
         MMemInitRead(&response.memIo, self->dataOutMem, actualDataOutSize);
     } else {
@@ -3450,26 +3454,26 @@ static PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInSize, si
     return SendReq(self, &req);
 }
 
-static PTPResult OpenSession(PTPControl* self, u32 sessionId) {
+static AwResult OpenSession(PTPControl* self, u32 sessionId) {
     PTPResponse r = DoRequest(self, PTP_OC_OpenSession, 0, 8, 1, sessionId);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-static PTPResult CloseSession(PTPControl* self) {
+static AwResult CloseSession(PTPControl* self) {
     PTPResponse r = DoRequest(self, PTP_OC_CloseSession, 0, 8, 0);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-static PTPResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
+static AwResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
     PTPResponse r = DoRequest(self, PTP_OC_SDIO_Connect, 0, 8,
                               3, phase, connectionId, connectionId);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-static PTPResult PTP_GetDeviceInfo(PTPControl* self) {
+static AwResult PTP_GetDeviceInfo(PTPControl* self) {
     PTPResponse r = DoRequest(self, PTP_OC_GetDeviceInfo, 0, 0x1000, 0);
     RETURN_IF_FAIL(r);
 
@@ -3552,7 +3556,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
             // Handle control
             PtpControl *control = NULL;
             if (!initial) {
-                control = PTPControl_GetControl(self, propCode);
+                control = PTPControl_GetControlByCode(self, propCode);
             }
             if (!control) {
                 control = MArrayAddPtr(self->allocator, self->controls);
@@ -3722,7 +3726,7 @@ enum GetAllExtDevicePropInfoUpdateMode {
     UPDATE_ALL
 };
 
-static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 initial, b32 incremental, b32 addExtended) {
+static AwResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 initial, b32 incremental, b32 addExtended) {
     PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
     if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
         req.Params[0] = incremental ? 0x1 : 0x0;
@@ -3749,7 +3753,7 @@ static PTPResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 initial, b32
     return r.result;
 }
 
-static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
+static AwResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
     size_t size = Ptp_PropValueSize(dataType, value);
 
     PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
@@ -3794,7 +3798,7 @@ static PTPResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 
     return r.result;
 }
 
-static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
+static AwResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
     size_t size = Ptp_PropValueSize(dataType, value);
 
     PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
@@ -3833,7 +3837,7 @@ static PTPResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType
     return r.result;
 }
 
-static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
+static AwResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetDisplayStringList,
                               0,
@@ -3876,7 +3880,7 @@ static PTPResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayLis
     return r.result;
 }
 
-static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
+static AwResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetLensInformation,
                               0,
@@ -3917,7 +3921,7 @@ static PTPResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUn
     return r.result;
 }
 
-static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
+static AwResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetExtDeviceInfo,
                               0,
@@ -3952,7 +3956,7 @@ static PTPResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b3
     return r.result;
 }
 
-static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
+static AwResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_GetObjectInfo,
                               0,
@@ -3986,7 +3990,7 @@ static PTPResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObject
     return r.result;
 }
 
-static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
+static AwResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
     fileOut->size = 0;
 
     PTPResponse r = DoRequest(self,
@@ -4070,7 +4074,7 @@ static PTPResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemI
     return r.result;
 }
 
-PTPResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
+AwResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
     PTP_TRACE("PTP_GetObject");
     fileOut->size = 0;
     fileOut->allocator = self->allocator;
@@ -4102,11 +4106,11 @@ int PTPControl_GetPendingFiles(PTPControl* self) {
     return 0;
 }
 
-PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
+AwResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
     PTP_TRACE("PTPControl_GetLiveViewImage");
     PTPObjectInfo objectInfo = {};
-    PTPResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
-    if (r != PTP_OK) {
+    AwResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
+    if (!IS_OK(r)) {
         return r;
     }
     // Free strings - we dont use them
@@ -4114,7 +4118,7 @@ PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveVie
     return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
 }
 
-PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut) {
+AwResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut) {
     PTP_TRACE("PTP_GetOSDImage");
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetOSDImage,
@@ -4146,11 +4150,11 @@ PTPResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut) {
     return r.result;
 }
 
-PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
+AwResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
     PTP_TRACE("PTPControl_GetCapturedImage");
     PTPObjectInfo objectInfo = {};
-    PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
-    if (r != PTP_OK) {
+    AwResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
+    if (!IS_OK(r)) {
         return r;
     }
     if (objectInfo.objectCompressedSize == 0 || MStrIsEmpty(objectInfo.filename)) {
@@ -4172,28 +4176,32 @@ PTPResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapt
     return r;
 }
 
-PTPResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
+AwResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
     PTP_TRACE("PTPControl_GetCameraSettingsFile");
     PTPObjectInfo objectInfo = {};
-    PTPResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
-    if (r != PTP_OK) {
+    AwResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
+    if (!IS_OK(r)) {
         return r;
     }
     PTP_FreeObjectInfo(self->allocator, &objectInfo);
     return PTP_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
 }
 
-PTPResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** eventsOut) {
+AwResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** eventsOut) {
     PTP_TRACE("PTPControl_ReadEvents");
 
-    if (!self->device->transport.readEvents || eventsOut == NULL) {
-        return PTP_GENERAL_ERROR;
+    if (!self->device->transport.readEvents) {
+        return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
+    }
+
+    if (eventsOut == NULL) {
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
 
     return self->device->transport.readEvents(self->device, timeoutMilliseconds, alloc, eventsOut);
 }
 
-PTPResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
+AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
     PTP_TRACE("PTPControl_GetMagnifier");
     PTPProperty* propMagPos = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_POS);
     if (propMagPos) {
@@ -4218,7 +4226,7 @@ PTPResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
         outMagnifier->ratio.ratioByTen = ratioNumerator;
         outMagnifier->canSet = FALSE;
 
-        return PTP_OK;
+        return RESULT_OK();
     } else {
         PTPProperty* propMag = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
         if (propMag) {
@@ -4259,13 +4267,13 @@ PTPResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
                 outMagnifier->width = AW_OSD_WIDTH;
                 outMagnifier->height = AW_OSD_HEIGHT;
             }
-            return PTP_OK;
+            return RESULT_OK();
         }
     }
-    return PTP_GENERAL_ERROR;
+    return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
 }
 
-PTPResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier) {
+AwResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier) {
     PTP_TRACE("PTPControl_SetMagnifier");
     PTPProperty* propMag = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
     if (propMag) {
@@ -4273,7 +4281,7 @@ PTPResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier) {
             (((magnifier.x & 0xffff) << 16) | (magnifier.y & 0xffff));
         return PTPControl_SetPropertyValue(self, propMag, (PTPPropValue){.u64 = newValue});
     }
-    return PTP_GENERAL_ERROR;
+    return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
 }
 
 AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos) {
@@ -4327,7 +4335,7 @@ AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos) {
     return (AwPosInt2){x, y};
 }
 
-PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
+AwResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
     PTPRequestHeader req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
     req.Params[0] = objectHandle;
     req.NumParams = 1;
@@ -4341,27 +4349,27 @@ PTPResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
     return r.result;
 }
 
-PTPResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
+AwResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
     PTP_TRACE("PTPControl_PutCameraSettingsFile");
     return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
 }
 
-PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator) {
+AwResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator) {
     if (!self || !device) {
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
 
     self->device = device;
     self->device->transport.allocator = allocator;
     self->logger = device->logger;
     self->allocator = allocator;
-    return PTP_OK;
+    return RESULT_OK();
 }
 
 static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
     for (int i = 0; i < numControls; i++) {
         u16 controlCode = self->supportedControls[i];
-        PtpControl* control = PTPControl_GetControl(self, controlCode);
+        PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
         if (!control) {
             control = MArrayAddPtr(self->allocator, self->controls);
 
@@ -4411,9 +4419,9 @@ static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
     }
 }
 
-PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
+AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     PTP_TRACE_F("PTPControl_Connect 0x04%x", version);
-    PTPResult r;
+    AwResult r;
 
     ////////////////////////////////////////////
     // Open Session (if not done by transport layer implicitly)
@@ -4423,15 +4431,15 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         self->transactionId = 0;
         u32 sessionId = 0x1;
         r = OpenSession(self, sessionId);
-        if (r == PTP_SESSION_ALREADY_OPEN) {
+        if (r.ptp == PTP_SESSION_ALREADY_OPEN) {
             r = CloseSession(self);
             r = OpenSession(self, sessionId);
         }
-        if (r == PTP_AW_TIMEOUT || r == PTP_SESSION_ALREADY_OPEN) {
+        if (r.code == AW_RESULT_TIMEOUT || r.ptp == PTP_SESSION_ALREADY_OPEN) {
             // Maybe we should just always call Reset() or do it by default, since it can't really do much harm and can
             // only help avoid a timeout on initial connection.
             if (self->device->transport.reset) {
-                if (r == PTP_AW_TIMEOUT) {
+                if (r.code == AW_RESULT_TIMEOUT) {
                     PTP_WARNING("Timeout while calling OpenSession() - will reset transport and retry...");
                 } else {
                     PTP_WARNING("Session already open while calling OpenSession() - will reset transport and retry...");
@@ -4440,7 +4448,7 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
             }
             r = OpenSession(self, sessionId);
         }
-        if (r != PTP_OK) {
+        if (r.code != AW_RESULT_OK) {
             return r;
         }
         self->sessionId = sessionId;
@@ -4453,14 +4461,14 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
     // 1. Authentication Packet 1
     r = SDIO_Connect(self, 1, connectionId);
-    if (r != PTP_OK) {
+    if (!IS_OK(r)) {
         PTP_WARNING_F("Auth phase 1 failed (0x%08x)...", r);
         return r;
     }
 
     // 2. Authentication Packet 2
     r = SDIO_Connect(self, 2, connectionId);
-    if (r != PTP_OK) {
+    if (!IS_OK(r)) {
         PTP_WARNING_F("Auth phase 2 failed (0x%08x)...", r);
         return r;
     }
@@ -4469,19 +4477,19 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     int retries = 10;
     b32 gotExtDeviceInfo = FALSE;
     for (int i = 0; i < retries; ++i) {
-        if (OK(SDIO_GetExtDeviceInfo(self, version, TRUE))) {
+        if (IS_OK(SDIO_GetExtDeviceInfo(self, version, TRUE))) {
             gotExtDeviceInfo = TRUE;
             break;
         }
     }
     if (!gotExtDeviceInfo) {
         PTP_WARNING_F("GetExtDeviceInfo failed after %d retries...", retries);
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_DEVICE_INFO_FAILURE);
     }
 
     // 4. Authentication Phase 3
     r = SDIO_Connect(self, 3, connectionId);
-    if (r != PTP_OK) {
+    if (!IS_OK(r)) {
         PTP_WARNING_F("Auth phase 3 failed (0x%08x)...", r);
         return r;
     }
@@ -4492,15 +4500,15 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
     // Get general device info
     r = PTP_GetDeviceInfo(self);
-    if (r != PTP_OK) {
-        PTP_WARNING_F("GetDeviceInfo failed: 0x%08x", r);
+    if (!IS_OK(r)) {
+        PTP_WARNING_F("GetDeviceInfo failed: 0x%08x 0x%08x", r.code, r.ptp);
         return r;
     }
 
     // Get property metadata & values
     r = SDIO_GetAllExtDevicePropInfo(self, TRUE, FALSE, TRUE);
-    if (r != PTP_OK) {
-        PTP_WARNING_F("GetAllExtDevicePropInfo failed: 0x%08x", r);
+    if (!IS_OK(r)) {
+        PTP_WARNING_F("GetAllExtDevicePropInfo failed: 0x%08x 0x%08x", r.code, r.ptp);
         return r;
     }
 
@@ -4519,10 +4527,10 @@ PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
     SetMetadataForProperties(self);
 
-    return PTP_OK;
+    return RESULT_OK();
 }
 
-PTPResult PTPControl_Cleanup(PTPControl* self) {
+AwResult PTPControl_Cleanup(PTPControl* self) {
     PTP_TRACE("PTPControl_Cleanup");
 
     ////////////////////////////////////////////
@@ -4577,7 +4585,7 @@ PTPResult PTPControl_Cleanup(PTPControl* self) {
     MStrFree(self->allocator, self->serialNumber);
     MStrFree(self->allocator, self->vendorExtension);
 
-    return PTP_OK;
+    return RESULT_OK();
 }
 
 b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode) {
@@ -4654,11 +4662,11 @@ size_t PTPControl_NumProperties(PTPControl* self) {
     return MArraySize(self->properties);
 }
 
-PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index) {
+PTPProperty* PTPControl_GetPropertyByIndex(PTPControl* self, u16 index) {
     return self->properties + index;
 }
 
-PTPResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh) {
+AwResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh) {
     PTP_TRACE("PTPControl_UpdateProperties");
     return SDIO_GetAllExtDevicePropInfo(self, FALSE, !fullRefresh, TRUE);
 }
@@ -4996,12 +5004,12 @@ static void UpdateStr(MAllocator* allocator, MStr* strIn, MStr* strOut) {
     strOut->size = strIn->size;
 }
 
-PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value) {
+AwResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value) {
     if (!property) {
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
-    PTPResult r = SDIO_SetExtDevicePropValue(self, property->propCode, property->dataType, value);
-    if (r == PTP_OK) {
+    AwResult r = SDIO_SetExtDevicePropValue(self, property->propCode, property->dataType, value);
+    if (!IS_OK(r)) {
         if (property->dataType == PTP_DT_STR) {
             UpdateStr(self->allocator, &value.str, &property->value.str);
         } else {
@@ -5011,19 +5019,19 @@ PTPResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, P
     return r;
 }
 
-PTPResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value) {
+AwResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value) {
     // TODO: generic and per prop string parsing
-    return FALSE;
+    return RESULT_OK();
 }
 
-PTPResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch) {
+AwResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch) {
     if (!property) {
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
     PTP_TRACE_F("PTPControl_SetPropertyNotch(%x, %d)", property->propCode, notch);
     if (!property->isNotch) {
         PTP_ERROR_F("Property %d is not a notch property", property->propCode);
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
     }
     return SDIO_ControlDevice(self, property->propCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
 }
@@ -5059,14 +5067,14 @@ size_t PTPControl_NumControls(PTPControl* self) {
     return MArraySize(self->controls);
 }
 
-PtpControl* PTPControl_GetControlAtIndex(PTPControl* self, u16 index) {
+PtpControl* PTPControl_GetControlByIndex(PTPControl* self, u16 index) {
     if (index >= MArraySize(self->controls)) {
         return NULL;
     }
     return self->controls + index;
 }
 
-PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode) {
+PtpControl* PTPControl_GetControlByCode(PTPControl* self, u16 controlCode) {
     for (int i = 0; i < MArraySize(self->controls); ++i) {
         if (self->controls[i].controlCode == controlCode) {
             return self->controls + i;
@@ -5075,26 +5083,26 @@ PtpControl* PTPControl_GetControl(PTPControl* self, u16 controlCode) {
     return NULL;
 }
 
-PTPResult PTPControl_SetControl(PTPControl* self, u16 controlCode, PTPPropValue value) {
-    PtpControl* control = PTPControl_GetControl(self, controlCode);
+AwResult PTPControl_SetControlValue(PTPControl* self, u16 controlCode, PTPPropValue value) {
+    PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
     if (control) {
         return SDIO_ControlDevice(self, controlCode, control->dataType, value);
     } else {
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
     }
 }
 
-PTPResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed) {
-    PtpControl* control = PTPControl_GetControl(self, controlCode);
+AwResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed) {
+    PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
     if (control) {
         return SDIO_ControlDevice(self, controlCode, control->dataType, (PTPPropValue){.u16=pressed?2:1});
     } else {
-        return PTP_GENERAL_ERROR;
+        return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
     }
 }
 
 b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums) {
-    PtpControl* control = PTPControl_GetControl(self, controlCode);
+    PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
     if (control->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
@@ -5113,7 +5121,7 @@ PTP_EXPORT b32 PTPControl_RemoteButtonEnable(PTPControl* self) {
     return PTPControl_SupportsControl(self, DPC_REMOTE_BUTTON);
 }
 
-PTPResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed) {
+AwResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed) {
     u32 value = (((u32)button) << 16) | (pressed ? 2 : 1);
     return SDIO_ControlDevice(self, DPC_REMOTE_BUTTON, PTP_DT_UINT32, (PTPPropValue){.u32=value});
 }

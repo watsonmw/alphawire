@@ -464,7 +464,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
                     }
 
                     if (ImGui::Selectable(str, false, selectFlags)) {
-                        PTPControl_SetControl(&c.ptp, control->controlCode, valueEnum->propValue);
+                        PTPControl_SetControlValue(&c.ptp, control->controlCode, valueEnum->propValue);
                     }
 
                     ImGui::TableNextColumn();
@@ -481,7 +481,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
             ImGuiInputIntDuel(control->dataType, &c.selectedControlValue);
             ImGui::SameLine();
             if (ImGui::Button("Set")) {
-                PTPControl_SetControl(&c.ptp, control->controlCode, c.selectedControlValue);
+                PTPControl_SetControlValue(&c.ptp, control->controlCode, c.selectedControlValue);
             }
         }
     } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
@@ -504,7 +504,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
         ImGui::SameLine();
 
         if (ImGui::Button("Set")) {
-            PTPControl_SetControl(&c.ptp, control->controlCode, c.selectedControlValue);
+            PTPControl_SetControlValue(&c.ptp, control->controlCode, c.selectedControlValue);
         }
         // Display current value
     }
@@ -958,7 +958,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         }
 
         // Manual Focus Adjust
-        PtpControl* focusAdjust = PTPControl_GetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST);
+        PtpControl* focusAdjust = PTPControl_GetControlByCode(&c.ptp, DPC_MANUAL_FOCUS_ADJUST);
         if (focusAdjust) {
             PTPPropValue focusAdjustVal{};
             bool enable = PTPControl_PropertyEnabledByCode(&c.ptp, DPC_MANUAL_FOCUS_ADJUST_ENABLED);
@@ -1022,9 +1022,9 @@ void ShowCameraControlsWindow(AppContext& c) {
             }
             if (focusAdjustVal.i16 != 0) {
                 PTPPropValue focusAdjustOff{};
-                PTPControl_SetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
-                PTPControl_SetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustVal);
-                PTPControl_SetControl(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
+                PTPControl_SetControlValue(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
+                PTPControl_SetControlValue(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustVal);
+                PTPControl_SetControlValue(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
             }
             if (!enable) {
                 ImGui::EndDisabled();
@@ -1071,10 +1071,10 @@ void ShowCameraControlsWindow(AppContext& c) {
             PTPCapturedImageInfo cii = {};
             SDL_Time startTime = 0;
             SDL_GetCurrentTime(&startTime);
-            PTPResult r = PTPControl_GetCapturedImage(&c.ptp, &fileContents, &cii);
+            AwResult r = PTPControl_GetCapturedImage(&c.ptp, &fileContents, &cii);
             SDL_Time dlTime = 0;
             SDL_GetCurrentTime(&dlTime);
-            if (r != PTP_OK) {
+            if (r.code != AW_RESULT_OK) {
                 MLogf("Error fetching image from camera: %04x", r);
             } else if (cii.filename.size) {
                 MLogf("Writing %.*s...", cii.filename.size, cii.filename.str);
@@ -1098,7 +1098,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::Spacing();
 
         AwMagnifier magnifier = {};
-        if (PTPControl_GetMagnifier(&c.ptp, &magnifier) == PTP_OK) {
+        if (PTPControl_GetMagnifier(&c.ptp, &magnifier).code == AW_RESULT_OK) {
             if (magnifier.ratio.ratioByTen == 0) {
                 ImGui::Text("Magnifier: Off (%d, %d)", magnifier.x, magnifier.y);
             } else {
@@ -1356,8 +1356,8 @@ void ShowCameraControlsWindow(AppContext& c) {
                 if (file.size > 0) {
                     MMemIO memIo{};
                     MMemInit(&memIo, c.ptp.allocator, file.data, file.size);
-                    PTPResult r = PTPControl_PutCameraSettingsFile(&c.ptp, &memIo);
-                    if (r != PTP_OK) {
+                    AwResult r = PTPControl_PutCameraSettingsFile(&c.ptp, &memIo);
+                    if (r.code != AW_RESULT_OK) {
                         MLogf("Error uploading file %s", c.cameraSettingsPathBuffer);
                     }
                     MMemFree(&memIo);
@@ -1369,8 +1369,8 @@ void ShowCameraControlsWindow(AppContext& c) {
             ImGui::SameLine();
             if (ImGui::Button("Save")) {
                 MMemIO memIo{};
-                PTPResult r = PTPControl_GetCameraSettingsFile(&c.ptp, &memIo);
-                if (r != PTP_OK) {
+                AwResult r = PTPControl_GetCameraSettingsFile(&c.ptp, &memIo);
+                if (r.code != AW_RESULT_OK) {
                     MLogf("Error fetching settings from camera: %d", r);
                 } else {
                     MFileWriteDataFully(c.cameraSettingsPathBuffer, memIo.mem, memIo.size);

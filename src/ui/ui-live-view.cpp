@@ -80,11 +80,11 @@ void UiPtpLiveViewShow(AppContext& c) {
     bool refresh = (currentTime - c.liveViewLastTime >= 0.1f);
     if (refresh) {
         c.liveViewLastTime = currentTime;
-        if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames) == PTP_OK) {
+        if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames).code == AW_RESULT_OK) {
             LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId, &c.liveViewImageWidth, &c.liveViewImageHeight);
         }
         if (c.osdEnabled) {
-            if (PTPControl_GetOSDImage(&c.ptp, &c.osdImage) == PTP_OK) {
+            if (PTPControl_GetOSDImage(&c.ptp, &c.osdImage).code == AW_RESULT_OK) {
                 LoadTextureFromMemory(&c.osdImage, &c.osdImageGLId, &c.osdImageWidth, &c.osdImageHeight);
                 c.osdCaptured = true;
             } else {
@@ -216,7 +216,7 @@ void UiPtpLiveViewShow(AppContext& c) {
                             AwPosInt2 newPos = AwMagnifierMoveViewport(&magnifier,
                                 AwPosFloat2{.x = relX / renderWidth, .y = relY / renderHeight});
                             u32 value = (u32)(newPos.x << 16) | newPos.y;
-                            PTPControl_SetControl(&c.ptp, DPC_REMOTE_TOUCH_XY, PTPPropValue{.u32=value});
+                            PTPControl_SetControlValue(&c.ptp, DPC_REMOTE_TOUCH_XY, PTPPropValue{.u32=value});
                             break;
                         }
                         case LiveViewClickAction_MAGNIFY: {

@@ -495,9 +495,9 @@ static void PTPDeviceIokit_FreeBuffer(PTPDevice* self, PTPBufferType type, void*
     }
 }
 
-static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                            PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
-                                            size_t* actualDataOutSize) {
+static AwResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                           PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+                                           size_t* actualDataOutSize) {
     PTPDeviceIOKit * deviceIokit = self->device;
     IOReturn result;
 
@@ -521,7 +521,7 @@ static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
     if (result != kIOReturnSuccess) {
         PTP_ERROR_F("Failed to send PTP request data: %s (%08x)",
             IOReturnToString(result), result);
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     // 2. Write additional data, if provided
@@ -539,7 +539,7 @@ static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
         if (result != kIOReturnSuccess) {
             PTP_ERROR_F("Failed to read PTP response data: %s (%08x)",
                 IOReturnToString(result), result);
-            return PTP_GENERAL_ERROR;
+            return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
     }
 
@@ -553,7 +553,7 @@ static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
     if (result != kIOReturnSuccess) {
         PTP_ERROR_F("Failed to read PTP response data: %s (%08x)",
             IOReturnToString(result), result);
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     u32 dataBytesTransferred = 0;
@@ -569,7 +569,7 @@ static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
             if (result != kIOReturnSuccess) {
                 PTP_ERROR_F("Failed to read PTP response data: %s (%08x)",
                     IOReturnToString(result), result);
-                return PTP_GENERAL_ERROR;
+                return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
             }
 
             readPipeDataSize += dataTransfer;
@@ -590,7 +590,7 @@ static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
         if (result != kIOReturnSuccess) {
             PTP_ERROR_F("Failed to read final PTP response: %s (%08x)",
                 IOReturnToString(result), result);
-            return PTP_GENERAL_ERROR;
+            return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
     }
 
@@ -607,7 +607,11 @@ static PTPResult PTPDeviceIokit_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
         MMemReadU32BE(&memIo, response->Params + i);
     }
 
-    return PTP_OK;
+    if (response->ResponseCode == PTP_OK) {
+        return (AwResult){.code=AW_RESULT_OK,.ptp=PTP_OK};
+    } else {
+        return (AwResult){.code=AW_RESULT_PTP_FAILURE,.ptp=(PTPResult)response->ResponseCode};
+    }
 }
 
 static b32 PTPDeviceIokit_Reset(PTPDevice* dev) {
@@ -703,12 +707,12 @@ static void* EventThreadProc(void* lpParameter) {
     return NULL;
 }
 
-static PTPResult PTPDeviceIokit_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc,
-                                            PTPEvent** outEvents) {
+static AwResult PTPDeviceIokit_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc,
+                                          PTPEvent** outEvents) {
     PTPDeviceIOKit* dev = self->device;
 
     if (outEvents == NULL) {
-        return PTP_GENERAL_ERROR;
+        return (AwResult){.code=AW_RESULT_UNSUPPORTED};
     }
 
     // If event thread is running, return stored events
@@ -726,7 +730,7 @@ static PTPResult PTPDeviceIokit_ReadEvents(PTPDevice* self, int timeoutMilliseco
         }
 
         pthread_mutex_unlock(&dev->eventLock);
-        return PTP_OK;
+        return (AwResult){.code=AW_RESULT_OK};
     }
 
     // Non-threaded mode - this may miss some events if ReadEvents is not called frequently enough
@@ -750,7 +754,7 @@ static PTPResult PTPDeviceIokit_ReadEvents(PTPDevice* self, int timeoutMilliseco
         }
     }
 
-    return PTP_OK;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static char* USBTransferTypeAsStr(u8 transferType) {
@@ -779,8 +783,8 @@ static char* USBDirectionAsStr(u8 direction) {
     }
 }
 
-b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTP_TRACE("PTPIokitDeviceList_ConnectDevice");
+AwResult PTPIokitDeviceList_OpenDevice(PTPIokitDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+    PTP_TRACE("PTPIokitDeviceList_OpenDevice");
     IOKitDeviceInfo* device = deviceInfo->device;
 
     IOCFPlugInInterface** usbDevicePlugin = NULL;
@@ -799,7 +803,7 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
     if ((kr != kIOReturnSuccess) || !usbDevicePlugin) {
         PTP_ERROR_F("Failed to connect to device: Unable to open IOKit USB Device: %s (%08x)",
             IOReturnToString(kr), kr);
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     IOUSBDeviceInterface** ioUsbDev = NULL;
@@ -813,7 +817,7 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
         PTP_ERROR_F("Failed to connect to device: Unable to open IOKit USB Device: %s (%08x)",
             IOReturnToString(kr), kr);
         (*ioUsbDev)->Release(ioUsbDev);
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     kr = (*ioUsbDev)->USBDeviceOpen(ioUsbDev);
@@ -979,7 +983,7 @@ b32 PTPIokitDeviceList_ConnectDevice(PTPIokitDeviceList* self, PTPDeviceInfo* de
                 IOObjectRelease(interfaceIter);
             }
 
-            return TRUE;
+            return (AwResult){.code=AW_RESULT_OK};
         }
     }
 
@@ -993,11 +997,11 @@ fail:
     if (ioUsbDev) {
         (*ioUsbDev)->USBDeviceClose(ioUsbDev);
     }
-    return FALSE;
+    return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
 }
 
-b32 PTPIokitDeviceList_DisconnectDevice(PTPIokitDeviceList* self, PTPDevice* device) {
-    PTP_TRACE("PTPIokitDeviceList_DisconnectDevice");
+b32 PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device) {
+    PTP_TRACE("PTPIokitDeviceList_CloseDevice");
     PTPDeviceIOKit* deviceIokit = device->device;
 
     // Stop event thread if running
@@ -1066,14 +1070,14 @@ void PTPIokitDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPIokitDeviceList_ReleaseList(self);
 }
 
-b32 PTPIokitDeviceList_ConnectDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+AwResult PTPIokitDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTPIokitDeviceList* self = backend->self;
-    return PTPIokitDeviceList_ConnectDevice(self, deviceInfo, deviceOut);
+    return PTPIokitDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-b32 PTPIokitDeviceList_DisconnectDevice_(PTPBackend* backend, PTPDevice* device) {
+b32 PTPIokitDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPIokitDeviceList* self = backend->self;
-    return PTPIokitDeviceList_DisconnectDevice(self, device);
+    return PTPIokitDeviceList_CloseDevice(self, device);
 }
 
 b32 PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
@@ -1098,8 +1102,8 @@ b32 PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds)
     backend->refreshList = PTPIokitDeviceList_RefreshList_;
     backend->needsRefresh = PTPIokitDeviceList_NeedsRefresh_;
     backend->releaseList = PTPIokitDeviceList_ReleaseList_;
-    backend->openDevice = PTPIokitDeviceList_ConnectDevice_;
-    backend->closeDevice = PTPIokitDeviceList_DisconnectDevice_;
+    backend->openDevice = PTPIokitDeviceList_OpenDevice_;
+    backend->closeDevice = PTPIokitDeviceList_CloseDevice_;
     deviceList->timeoutMilliseconds = timeoutMilliseconds;
     deviceList->allocator = backend->allocator;
     deviceList->logger = backend->logger;
