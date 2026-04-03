@@ -33,36 +33,55 @@ static void DrawRectCorners(ImDrawList *drawList, const ImVec2 &rectMin, const I
 }
 
 // Simple helper function to load an image into a OpenGL texture with common settings
-bool LoadTextureFromMemory(const MMemIO* memIo, ImTextureID* out_texture, i32* out_width, i32* out_height)
+static bool LoadTextureFromMemory(const MMemIO* memIo, ImTextureID* inOutTexture, i32* outWidth, i32* outHeight)
 {
-    // Load from file
-    int image_width = 0;
-    int image_height = 0;
-    unsigned char* image_data = stbi_load_from_memory((const unsigned char*)memIo->mem, (int)memIo->size,
-                                                      &image_width, &image_height, NULL, 4);
-    if (image_data == NULL)
+    int imageWidth = 0;
+    int imageHeight = 0;
+    u8* imageData = stbi_load_from_memory((const u8*)memIo->mem, (int)memIo->size, &imageWidth,
+        &imageHeight, NULL, 4);
+    if (imageData == NULL)
+    {
         return false;
+    }
 
     // Create a OpenGL texture identifier
-    GLuint image_texture;
-    glGenTextures(1, &image_texture);
-    glBindTexture(GL_TEXTURE_2D, image_texture);
+    GLuint imageTexture = *inOutTexture;
 
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (imageTexture)
+    {
+        glBindTexture(GL_TEXTURE_2D, imageTexture);
+    }
+    else
+    {
+        glGenTextures(1, &imageTexture);
+        *inOutTexture = (ImTextureID)(intptr_t)imageTexture;
+        glBindTexture(GL_TEXTURE_2D, imageTexture);
+        // Setup filtering parameters for display
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // Upload pixels into texture
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-    stbi_image_free(image_data);
+        // Upload pixels into texture
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    }
 
-    *out_texture = (ImTextureID)(intptr_t)image_texture;
-    *out_width = image_width;
-    *out_height = image_height;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imageWidth, imageHeight, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+
+    stbi_image_free(imageData);
+
+    *outWidth = imageWidth;
+    *outHeight = imageHeight;
 
     return true;
+}
+
+void TextureRelease(ImTextureID* outTexture)
+{
+    if (*outTexture != 0)
+    {
+        glDeleteTextures(1, (GLuint*)outTexture);
+        *outTexture = 0;
+    }
 }
 
 void UiPtpLiveViewShow(AppContext& c) {
@@ -92,7 +111,6 @@ void UiPtpLiveViewShow(AppContext& c) {
             }
         }
     }
-
 
     if (c.liveViewImage.size != 0) {
         // Calculate scaled dimensions while maintaining aspect ratio

@@ -16,6 +16,8 @@
 
 #include "imgui.h"
 
+void TextureRelease(ImTextureID* outTexture);
+
 struct UiPtpProperty {
     char propCode[32];
     char* propLabel;
@@ -263,7 +265,6 @@ struct AppContext {
 
     void RefreshDevices() {
         selectedDeviceIndex = -1;
-        // ptpDeviceList.backendConfig.disallowSpawnEventThread = TRUE;
         PTPDeviceList_RefreshList(&ptpDeviceList);
     }
 
@@ -354,5 +355,11 @@ struct AppContext {
     void CleanupAll() {
         DisconnectDevice();
         PTPDeviceList_Close(&ptpDeviceList);
+    }
+
+    void GraphicsCleanup()
+    {
+        TextureRelease(&liveViewImageGLId);
+        TextureRelease(&osdImageGLId);
     }
 };

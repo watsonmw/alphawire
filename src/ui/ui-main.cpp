@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
     c.autoReleasePool = &autoReleasePool.alloc;
     UiInitLogging(c);
 
+    // c.ptpDeviceList.backendConfig.disallowSpawnEventThread = TRUE;
     PTPDeviceList_Open(&c.ptpDeviceList, &allocator);
     PTPDeviceList_RefreshList(&c.ptpDeviceList);
 
@@ -186,6 +187,8 @@ int main(int argc, char** argv) {
 
         MArenaReset(&autoReleasePool);
     }
+
+    c.GraphicsCleanup();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
