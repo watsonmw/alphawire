@@ -80,22 +80,22 @@ typedef struct {
     PTPLog logger;
 } PTPIpBackend;
 
-static void PTPIp_ReleaseList(PTPIpBackend* backend) {
-
+static AwResult PTPIp_ReleaseList(PTPIpBackend* backend) {
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static b32 PTPIp_NeedsRefresh(PTPIpBackend* backend) {
     return FALSE;
 }
 
-static b32 PTPIp_Close(PTPIpBackend* backend) {
+static AwResult PTPIp_Close(PTPIpBackend* backend) {
     PTP_TRACE("PTPIp_Close");
     PTPIp_ReleaseList(backend);
     if (backend->openDevices) {
         MArrayFree(backend->allocator, backend->openDevices);
     }
     MSockDeinit();
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static void* PTPDeviceIp_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
@@ -628,7 +628,7 @@ exitWithError:
     return error;
 }
 
-static b32 PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
+static AwResult PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
     PTP_TRACE("PTPIp_CloseDevice");
     PTPIpDevice* dev = (PTPIpDevice*)device->device;
     MSockClose(dev->dataSock);
@@ -643,10 +643,10 @@ static b32 PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
             break;
         }
     }
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-static b32 PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
+static AwResult PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
     PTP_TRACE("PTPIp_RefreshList");
 
     self->isDiscoveryInProgress = TRUE;
@@ -659,7 +659,7 @@ static b32 PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
     MSockSetBroadcast(self->discoverySock, broadcast);
     MSockSetNonBlocking(self->discoverySock, TRUE);
 
-    const char* msg = 
+    const char* msg =
         "M-SEARCH * HTTP/1.1\r\n"
         "HOST: 239.255.255.250:1900\r\n"
         "MAN: \"ssdp:discover\"\r\n"
@@ -705,12 +705,12 @@ static b32 PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
     }
     MArrayFree(self->allocator, interfaces);
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 
 exitWithError:
     MSockClose(self->discoverySock);
     self->isDiscoveryInProgress = FALSE;
-    return FALSE;
+    return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
 }
 
 static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
@@ -813,14 +813,14 @@ static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList)
     return foundDevice;
 }
 
-static b32 PTPIp_Close_(PTPBackend* backend) {
+static AwResult PTPIp_Close_(PTPBackend* backend) {
     PTPIpBackend* self = backend->self;
-    b32 r = PTPIp_Close(self);
+    AwResult r = PTPIp_Close(self);
     MFree(self->allocator, self, sizeof(PTPIpBackend));
     return r;
 }
 
-static b32 PTPIp_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
+static AwResult PTPIp_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
     PTPIpBackend* self = backend->self;
     return PTPIp_RefreshList(self, deviceList);
 }
@@ -840,9 +840,9 @@ static b32 PTPIp_PollListUpdates_(PTPBackend* backend, PTPDeviceInfo** deviceLis
     return PTPIp_PollListUpdates(self, deviceList);
 }
 
-static void PTPIp_ReleaseList_(PTPBackend* backend) {
+static AwResult PTPIp_ReleaseList_(PTPBackend* backend) {
     PTPIpBackend* self = backend->self;
-    PTPIp_ReleaseList(self);
+    return PTPIp_ReleaseList(self);
 }
 
 static AwResult PTPIp_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
@@ -850,12 +850,12 @@ static AwResult PTPIp_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo
     return PTPIp_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static b32 PTPIp_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
+static AwResult PTPIp_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPIpBackend* self = backend->self;
     return PTPIp_CloseDevice(self, device);
 }
 
-b32 PTPIpDeviceList_OpenBackend(PTPBackend* backend, int timeoutMilliseconds) {
+AwResult PTPIpDeviceList_OpenBackend(PTPBackend* backend, int timeoutMilliseconds) {
     PTP_LOG_TRACE(&backend->logger, "PTPIpDeviceList_OpenBackend");
 
     if (timeoutMilliseconds == 0) {
@@ -877,5 +877,5 @@ b32 PTPIpDeviceList_OpenBackend(PTPBackend* backend, int timeoutMilliseconds) {
     self->logger = backend->logger;
     self->allocator = backend->allocator;
     MSockInit();
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }

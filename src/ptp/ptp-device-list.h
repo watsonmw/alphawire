@@ -137,18 +137,18 @@ PTP_EXPORT size_t PTPDeviceList_NumDevices(PTPDeviceList* self);
  *                   about the device to connect.
  * @param deviceOut A pointer to a pointer that will be set to the connected PTPDevice
  *                  instance if the connection is successful.
- * @return TRUE if the connection was successful.
+ * @return AwResult.code == AW_RESULT_OK if the device was successfully disconnected.
  */
-PTP_EXPORT b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+PTP_EXPORT AwResult PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
 
 /**
  * Disconnects from the specified device's transport.
  *
  * @param self Pointer to the PTPDeviceList which manages the devices.
  * @param device Pointer to the PTPDevice to be disconnected.
- * @return TRUE if the device was successfully disconnected.
+ * @return AwResult.code == AW_RESULT_OK if the device was successfully disconnected.
  */
-PTP_EXPORT b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
+PTP_EXPORT AwResult PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device);
 
 /**
  * Retrieves the backend of the specified type from the given PTPDeviceList.

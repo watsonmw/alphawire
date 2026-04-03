@@ -34,15 +34,15 @@ typedef struct {
     PTPLog logger;
 } PTPWiaDeviceList;
 
-b32 PTP_EXPORT PTPWiaDeviceList_OpenBackend(PTPBackend* backend);
+AwResult PTP_EXPORT PTPWiaDeviceList_OpenBackend(PTPBackend* backend);
 
-PTP_EXPORT b32 PTPWiaDeviceList_Open(PTPWiaDeviceList* self);
-PTP_EXPORT b32 PTPWiaDeviceList_Close(PTPWiaDeviceList* self);
-PTP_EXPORT b32 PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device);
-PTP_EXPORT b32 PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** devices);
-PTP_EXPORT void PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self);
+PTP_EXPORT AwResult PTPWiaDeviceList_Open(PTPWiaDeviceList* self);
+PTP_EXPORT AwResult PTPWiaDeviceList_Close(PTPWiaDeviceList* self);
+PTP_EXPORT AwResult PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device);
+PTP_EXPORT AwResult PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** devices);
+PTP_EXPORT AwResult PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self);
 PTP_EXPORT AwResult PTPWiaDeviceList_OpenDevice(PTPWiaDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
-PTP_EXPORT b32 PTPWiaDeviceList_CloseDevice(PTPWiaDeviceList* self, PTPDevice* device);
+PTP_EXPORT AwResult PTPWiaDeviceList_CloseDevice(PTPWiaDeviceList* self, PTPDevice* device);
 
 // Errors can occur in the WIA Service restart it
 PTP_EXPORT void PTPWiaServiceRestart();

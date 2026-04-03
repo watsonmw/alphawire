@@ -48,15 +48,15 @@ typedef struct {
     struct PTPBackend* backend; // Reference to parent backend
 } PTPIokitDeviceList;
 
-PTP_EXPORT b32 PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds);
-PTP_EXPORT b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self);
-PTP_EXPORT b32 PTPIokitDeviceList_Close(PTPIokitDeviceList* self);
-PTP_EXPORT b32 PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** devices);
-PTP_EXPORT void PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self);
+PTP_EXPORT AwResult PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds);
+PTP_EXPORT AwResult PTPIokitDeviceList_Open(PTPIokitDeviceList* self);
+PTP_EXPORT AwResult PTPIokitDeviceList_Close(PTPIokitDeviceList* self);
+PTP_EXPORT AwResult PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** devices);
+PTP_EXPORT AwResult PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self);
 PTP_EXPORT AwResult PTPIokitDeviceList_OpenDevice(PTPIokitDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
-PTP_EXPORT b32 PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device);
+PTP_EXPORT AwResult PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device);
 
-PTP_EXPORT b32 PTPIokitDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
+PTP_EXPORT AwResult PTPIokitDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
 
 #ifdef __cplusplus
 } // extern "C"

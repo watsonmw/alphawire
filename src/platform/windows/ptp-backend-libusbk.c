@@ -21,18 +21,18 @@
 #include "platform/windows/ptp-backend-libusbk.h"
 #include "platform/windows/win-utils.h"
 
-b32 PTPUsbkDeviceList_Open(PTPUsbkBackend* self) {
+AwResult PTPUsbkDeviceList_Open(PTPUsbkBackend* self) {
     PTP_TRACE("PTPUsbkDeviceList_Open");
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPUsbkDeviceList_Close(PTPUsbkBackend* self) {
+AwResult PTPUsbkDeviceList_Close(PTPUsbkBackend* self) {
     PTP_TRACE("PTPUsbkDeviceList_Close");
     PTPUsbkDeviceList_ReleaseList(self);
     if (self->openDevices) {
         MArrayFree(self->allocator, self->openDevices);
     }
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 // Check configuration descriptors for PTP support
@@ -327,7 +327,7 @@ b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkBackend* self) {
     return FALSE;
 }
 
-b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices) {
+AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices) {
     PTP_TRACE("PTPUsbkDeviceList_RefreshList");
 
     // Print libusbk version number
@@ -344,7 +344,7 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices)
     // Initialize the device list
     if (!LstK_Init(&deviceList, 0)) {
         PTP_ERROR("Failed to initialize device list.");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     self->deviceListHandle = deviceList;
@@ -368,7 +368,7 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices)
                     PTP_ERROR("Error getting device descriptor");
                     UsbK_Free(usbHandle);
                     LstK_Free(deviceList);
-                    return FALSE;
+                    return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
                 }
 
                 if (deviceDescriptor.iProduct > 0) {  // Check if product string exists
@@ -419,10 +419,10 @@ b32 PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices)
         WinUtils_LogLastError(&self->logger, "Failed to enumerate USB devices");
     }
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-void PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self) {
+AwResult PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self) {
     PTP_TRACE("PTPUsbkDeviceList_ReleaseList");
 
     // Free the device list
@@ -438,6 +438,7 @@ void PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self) {
         }
         MArrayFree(self->allocator, self->deviceList);
     }
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static void* PTPDeviceUsbk_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize,
@@ -834,7 +835,7 @@ AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* devic
     }
 }
 
-b32 PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) {
+AwResult PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) {
     PTP_TRACE("PTPUsbkDeviceList_CloseDevice");
     PTPUsbkDeviceUsbk* deviceUsbk = device->device;
 
@@ -879,17 +880,17 @@ b32 PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) {
         }
     }
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-static b32 PTPUsbkDeviceList_Close_(PTPBackend* backend) {
+static AwResult PTPUsbkDeviceList_Close_(PTPBackend* backend) {
     PTPUsbkBackend* self = backend->self;
-    b32 r = PTPUsbkDeviceList_Close(self);
+    AwResult r = PTPUsbkDeviceList_Close(self);
     MFree(self->allocator, self, sizeof(PTPUsbkBackend));
     return r;
 }
 
-static b32 PTPUsbkDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
+static AwResult PTPUsbkDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
     PTPUsbkBackend* self = backend->self;
     return PTPUsbkDeviceList_RefreshList(self, deviceList);
 }
@@ -899,9 +900,9 @@ static b32 PTPUsbkDeviceList_NeedsRefresh_(PTPBackend* backend) {
     return PTPUsbkDeviceList_NeedsRefresh(self);
 }
 
-static void PTPUsbkDeviceList_ReleaseList_(PTPBackend* backend) {
+static AwResult PTPUsbkDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPUsbkBackend* self = backend->self;
-    PTPUsbkDeviceList_ReleaseList(self);
+    return PTPUsbkDeviceList_ReleaseList(self);
 }
 
 static AwResult PTPUsbkDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
@@ -909,12 +910,12 @@ static AwResult PTPUsbkDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo
     return PTPUsbkDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static b32 PTPUsbkDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
+static AwResult PTPUsbkDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPUsbkBackend* self = backend->self;
     return PTPUsbkDeviceList_CloseDevice(self, device);
 }
 
-b32 PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
+AwResult PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
     PTP_LOG_TRACE(&backend->logger, "PTPUsbkDeviceList_OpenBackend");
 
     if (timeoutMilliseconds == 0) {

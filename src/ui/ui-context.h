@@ -272,14 +272,14 @@ struct AppContext {
         if (selectedDeviceIndex != -1 && MArraySize(ptpDeviceList.devices) > selectedDeviceIndex) {
             PTPDeviceInfo* deviceInfo = ptpDeviceList.devices + selectedDeviceIndex;
             DisconnectDevice();
-            b32 ok = PTPDeviceList_OpenDevice(&ptpDeviceList, deviceInfo, &device);
-            if (ok) {
+            AwResult r = PTPDeviceList_OpenDevice(&ptpDeviceList, deviceInfo, &device);
+            if (r.code == AW_RESULT_OK) {
                 MAllocatorMakeClibHeap(&deviceAllocator);
                 deviceAllocator.name = (char*)"PTPDevice";
 #ifdef M_MEM_DEBUG
                 MMemDebugInit(&deviceAllocator);
 #endif
-                AwResult r = PTPControl_Init(&ptp, device, &deviceAllocator);
+                r = PTPControl_Init(&ptp, device, &deviceAllocator);
                 if (r.code == AW_RESULT_OK) {
                     r = PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
                     if (r.code == AW_RESULT_OK) {

@@ -58,17 +58,17 @@ static b32 CheckDeviceHasPtpEndPoints(PTPLibusbDeviceList* self, libusb_device* 
     return hasPTP;
 }
 
-b32 PTPLibusbDeviceList_Open(PTPLibusbDeviceList* self) {
+AwResult PTPLibusbDeviceList_Open(PTPLibusbDeviceList* self) {
     PTP_TRACE("PTPLibusbDeviceList_Open");
     int r = libusb_init((libusb_context**)&self->context);
     if (r < 0) {
         PTP_ERROR("libusb_init failed");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPLibusbDeviceList_Close(PTPLibusbDeviceList* self) {
+AwResult PTPLibusbDeviceList_Close(PTPLibusbDeviceList* self) {
     PTP_TRACE("PTPLibusbDeviceList_Close");
     PTPLibusbDeviceList_ReleaseList(self);
     if (self->openDevices) {
@@ -78,19 +78,19 @@ b32 PTPLibusbDeviceList_Close(PTPLibusbDeviceList* self) {
         libusb_exit((libusb_context*)self->context);
         self->context = NULL;
     }
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 b32 PTPLibusbDeviceList_NeedsRefresh(PTPLibusbDeviceList* self) {
     return FALSE;
 }
 
-b32 PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** devices) {
+AwResult PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** devices) {
     PTP_TRACE("PTPLibusbDeviceList_RefreshList");
     libusb_device** list;
     ssize_t count = libusb_get_device_list((libusb_context*)self->context, &list);
     if (count < 0) {
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     for (ssize_t i = 0; i < count; i++) {
@@ -149,10 +149,10 @@ b32 PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** d
     }
 
     libusb_free_device_list(list, 1);
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-void PTPLibusbDeviceList_ReleaseList(PTPLibusbDeviceList* self) {
+AwResult PTPLibusbDeviceList_ReleaseList(PTPLibusbDeviceList* self) {
     PTP_TRACE("PTPLibusbDeviceList_ReleaseList");
     if (self->devices) {
         for (int i = 0; i < MArraySize(self->devices); i++) {
@@ -161,6 +161,7 @@ void PTPLibusbDeviceList_ReleaseList(PTPLibusbDeviceList* self) {
         MArrayFree(self->allocator, self->devices);
         self->devices = NULL;
     }
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static void* PTPDeviceLibusb_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
@@ -541,7 +542,7 @@ AwResult PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device) {
+AwResult PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device) {
     PTP_TRACE("PTPLibusbDeviceList_CloseDevice");
     PTPDeviceLibusb* deviceLibusb = device->device;
 
@@ -580,17 +581,17 @@ b32 PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device
             break;
         }
     }
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-static b32 PTPLibusbDeviceList_Close_(PTPBackend* backend) {
+static AwResult PTPLibusbDeviceList_Close_(PTPBackend* backend) {
     PTPLibusbDeviceList* self = backend->self;
-    b32 r = PTPLibusbDeviceList_Close(self);
+    AwResult r = PTPLibusbDeviceList_Close(self);
     MFree(self->allocator, self, sizeof(PTPLibusbDeviceList));
     return r;
 }
 
-static b32 PTPLibusbDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
+static AwResult PTPLibusbDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
     PTPLibusbDeviceList* self = backend->self;
     return PTPLibusbDeviceList_RefreshList(self, deviceList);
 }
@@ -600,9 +601,9 @@ static b32 PTPLibusbDeviceList_NeedsRefresh_(PTPBackend* backend) {
     return PTPLibusbDeviceList_NeedsRefresh(self);
 }
 
-static void PTPLibusbDeviceList_ReleaseList_(PTPBackend* backend) {
+static AwResult PTPLibusbDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPLibusbDeviceList* self = backend->self;
-    PTPLibusbDeviceList_ReleaseList(self);
+    return PTPLibusbDeviceList_ReleaseList(self);
 }
 
 static AwResult PTPLibusbDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
@@ -610,12 +611,12 @@ static AwResult PTPLibusbDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceIn
     return PTPLibusbDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static b32 PTPLibusbDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
+static AwResult PTPLibusbDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPLibusbDeviceList* self = backend->self;
     return PTPLibusbDeviceList_CloseDevice(self, device);
 }
 
-b32 PTPLibusbDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
+AwResult PTPLibusbDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
     PTP_LOG_TRACE(&backend->logger, "PTPLibusbDeviceList_OpenBackend");
     if (timeoutMilliseconds == 0) {
         timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;

@@ -233,7 +233,7 @@ static void PTPIokit_DeviceRemoved(void* deviceList, io_iterator_t deviceIter) {
     }
 }
 
-b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
+AwResult PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
     PTP_TRACE("PTPIokitDeviceList_Open");
 
     // Set up device attach notifications
@@ -241,13 +241,13 @@ b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
     kern_return_t kr = IOMainPort(MACH_PORT_NULL, &mainPort);
     if (kr != KERN_SUCCESS) {
         PTP_ERROR("Failed to get IOKit main port for notifications");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     self->notifyPort = IONotificationPortCreate(mainPort);
     if (!self->notifyPort) {
         PTP_ERROR("Failed to create IOKit notification port");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     self->runLoopSource = IONotificationPortGetRunLoopSource(self->notifyPort);
@@ -259,7 +259,7 @@ b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
     CFMutableDictionaryRef addDeviceMatchingDict = BuildSonyUSBDeviceMatchingDict();
     if (!addDeviceMatchingDict) {
         PTP_ERROR("Failed to create matching dictionary for notifications");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     // Register for matched (attach) notifications
@@ -273,7 +273,7 @@ b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
 
     if (kr != KERN_SUCCESS) {
         PTP_ERROR("Failed to add matched notification");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     // Arm the notification by draining existing matches
@@ -282,7 +282,7 @@ b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
     CFMutableDictionaryRef removeDeviceMatchingDict = BuildSonyUSBDeviceMatchingDict();
     if (!removeDeviceMatchingDict) {
         PTP_ERROR("Failed to create matching dictionary for notifications");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     kr = IOServiceAddMatchingNotification(
@@ -295,16 +295,16 @@ b32 PTPIokitDeviceList_Open(PTPIokitDeviceList* self) {
 
     if (kr != KERN_SUCCESS) {
         PTP_ERROR("Failed to add matched notification");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     // Arm the notification by draining existing matches
     PTPIokit_DeviceRemoved(self, self->deviceRemovedIter);
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPIokitDeviceList_Close(PTPIokitDeviceList* self) {
+AwResult PTPIokitDeviceList_Close(PTPIokitDeviceList* self) {
     PTP_TRACE("PTPIokitDeviceList_Close");
     PTPIokitDeviceList_ReleaseList(self);
     if (self->openDevices) {
@@ -327,7 +327,7 @@ b32 PTPIokitDeviceList_Close(PTPIokitDeviceList* self) {
         IONotificationPortDestroy(self->notifyPort);
         self->notifyPort = NULL;
     }
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static MStr CFStringToMStr(MAllocator* alloc, CFStringRef str) {
@@ -357,14 +357,14 @@ static MStr CFStringToMStr(MAllocator* alloc, CFStringRef str) {
     return r;
 }
 
-b32 PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** devices) {
+AwResult PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** devices) {
     PTP_TRACE("PTPIokitDeviceList_RefreshList");
 
     // Setup matching dictionary for USB devices
     CFMutableDictionaryRef matchingDict = BuildSonyUSBDeviceMatchingDict();
     if (!matchingDict) {
         PTP_ERROR("Failed to create matching dictionary");
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     // Initialize the device list
@@ -372,7 +372,7 @@ b32 PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** dev
     kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &usbDeviceIter);
     if (kr != KERN_SUCCESS) {
         PTP_ERROR_F("IOServiceGetMatchingServices failed: %s (0x%x)", IOReturnToString(kr), kr);
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     io_object_t usbDevice;
@@ -454,7 +454,7 @@ next:
     IOObjectRelease(usbDeviceIter);
     self->deviceListUpToDate = TRUE;
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 b32 PTPIokitDeviceList_NeedsRefresh(PTPIokitDeviceList* self) {
@@ -462,7 +462,7 @@ b32 PTPIokitDeviceList_NeedsRefresh(PTPIokitDeviceList* self) {
     return !self->deviceListUpToDate;
 }
 
-void PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self) {
+AwResult PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self) {
     PTP_TRACE("PTPIokitDeviceList_ReleaseList");
 
     if (self->devices) {
@@ -473,6 +473,7 @@ void PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self) {
         }
         MArrayFree(self->allocator, self->devices);
     }
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 static void* PTPDeviceIokit_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
@@ -1000,7 +1001,7 @@ fail:
     return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
 }
 
-b32 PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device) {
+AwResult PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device) {
     PTP_TRACE("PTPIokitDeviceList_CloseDevice");
     PTPDeviceIOKit* deviceIokit = device->device;
 
@@ -1045,17 +1046,17 @@ b32 PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device) 
         }
     }
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPIokitDeviceList_Close_(PTPBackend* backend) {
+AwResult PTPIokitDeviceList_Close_(PTPBackend* backend) {
     PTPIokitDeviceList* self = backend->self;
-    b32 r = PTPIokitDeviceList_Close(self);
+    AwResult r = PTPIokitDeviceList_Close(self);
     MFree(self->allocator, self, sizeof(PTPIokitDeviceList));
     return r;
 }
 
-b32 PTPIokitDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
+AwResult PTPIokitDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
     PTPIokitDeviceList* self = backend->self;
     return PTPIokitDeviceList_RefreshList(self, deviceList);
 }
@@ -1065,9 +1066,9 @@ b32 PTPIokitDeviceList_NeedsRefresh_(PTPBackend* backend) {
     return PTPIokitDeviceList_NeedsRefresh(self);
 }
 
-void PTPIokitDeviceList_ReleaseList_(PTPBackend* backend) {
+AwResult PTPIokitDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPIokitDeviceList* self = backend->self;
-    PTPIokitDeviceList_ReleaseList(self);
+    return PTPIokitDeviceList_ReleaseList(self);
 }
 
 AwResult PTPIokitDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
@@ -1075,12 +1076,12 @@ AwResult PTPIokitDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* devi
     return PTPIokitDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-b32 PTPIokitDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
+AwResult PTPIokitDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
     PTPIokitDeviceList* self = backend->self;
     return PTPIokitDeviceList_CloseDevice(self, device);
 }
 
-b32 PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
+AwResult PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
     PTP_LOG_TRACE(&backend->logger, "PTPIokitDeviceList_OpenBackend");
 
     if (timeoutMilliseconds == 0) {
@@ -1093,7 +1094,7 @@ b32 PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds)
     if (kr != KERN_SUCCESS) {
         PTP_LOG_ERROR_F(&backend->logger, "Failed to get IOKit master port %s (%08x)",
             IOReturnToString(kr), kr);
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     PTPIokitDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(PTPIokitDeviceList));

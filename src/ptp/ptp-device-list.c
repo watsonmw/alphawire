@@ -59,7 +59,8 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
             case PTP_BACKEND_LIBUSBK: {
 #ifdef PTP_ENABLE_LIBUSBK
                 PTPBackend *backend = AddBackendSlot(self, backendType);
-                if (PTPUsbkDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                AwResult result = PTPUsbkDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
+                if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
                 }
                 break;
@@ -68,7 +69,8 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
             case PTP_BACKEND_LIBUSB: {
 #ifdef PTP_ENABLE_LIBUSB
                 PTPBackend *backend = AddBackendSlot(self, backendType);
-                if (PTPLibusbDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                AwResult result = PTPLibusbDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
+                if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
                 }
 #endif
@@ -77,7 +79,8 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
             case PTP_BACKEND_WIA: {
 #ifdef PTP_ENABLE_WIA
                 PTPBackend *backend = AddBackendSlot(self, backendType);
-                if (PTPWiaDeviceList_OpenBackend(backend)) {
+                AwResult result = PTPWiaDeviceList_OpenBackend(backend);
+                if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
                 }
 #endif
@@ -86,7 +89,8 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
             case PTP_BACKEND_IOKIT: {
 #ifdef PTP_ENABLE_IOKIT
                 PTPBackend *backend = AddBackendSlot(self, backendType);
-                if (PTPIokitDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                AwResult result = PTPIokitDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
+                if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
                 }
 #endif
@@ -95,7 +99,8 @@ b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator) {
             case PTP_BACKEND_IP: {
 #ifdef PTP_ENABLE_IP
                 PTPBackend *backend = AddBackendSlot(self, backendType);
-                if (PTPIpDeviceList_OpenBackend(backend, self->timeoutMilliseconds)) {
+                AwResult result = PTPIpDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
+                if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
                 }
 #endif
@@ -199,7 +204,7 @@ b32 PTPDeviceList_IsRefreshingList(PTPDeviceList* self) {
     return FALSE;
 }
 
-b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+AwResult PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPDeviceList_OpenDevice");
     PTP_INFO_F("Opening device %.*s (%.*s)...", deviceInfo->product.size, deviceInfo->product.str,
         deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
@@ -209,14 +214,13 @@ b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTP
     AwResult r = backend->openDevice(backend, deviceInfo, &device);
     if (r.code == AW_RESULT_OK) {
         *deviceOut = device;
-        return TRUE;
     } else {
         MArrayPop(self->openDevices);
-        return FALSE;
     }
+    return r;
 }
 
-b32 PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device) {
+AwResult PTPDeviceList_CloseDevice(PTPDeviceList* self, PTPDevice* device) {
     PTP_TRACE_F("PTPDeviceList_CloseDevice: %p", device->device);
     PTPBackend* backend = PTPDeviceList_GetBackend(self, device->backendType);
 

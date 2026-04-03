@@ -23,7 +23,7 @@ Backends
 - IP: Don't copy packet buffer so much
 - IP: Connect via IP only?
 - IP: Connect with password (TLS)
-- Events for libusb and IOKit
+- Events for IOKit
 
 Commands
 ===

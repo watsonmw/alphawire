@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-b32 PTPIpDeviceList_OpenBackend(PTPBackend* backend, int timeoutMilliseconds);
+AwResult PTPIpDeviceList_OpenBackend(PTPBackend* backend, int timeoutMilliseconds);
 
 #ifdef __cplusplus
 }

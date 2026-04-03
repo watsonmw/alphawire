@@ -68,20 +68,21 @@ typedef struct MBackendConfig {
 
 struct PTPBackend;
 
-typedef b32 (*PTPBackend_Close_Func)(struct PTPBackend* backend);
+typedef AwResult (*PTPBackend_Close_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_NeedsRefresh_Func)(struct PTPBackend* backend);
-typedef b32 (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
+typedef AwResult (*PTPBackend_RefreshList_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
+typedef b32 (*PTPBackend_IsRefreshingList_Func)(struct PTPBackend* backend);
 typedef b32 (*PTPBackend_PollListUpdates_Func)(struct PTPBackend* backend, PTPDeviceInfo** deviceList);
-typedef void (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
+typedef AwResult (*PTPBackend_ReleaseList_Func)(struct PTPBackend* backend);
 typedef AwResult (*PTPBackend_OpenDevice_Func)(struct PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
-typedef b32 (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
+typedef AwResult (*PTPBackend_CloseDevice_Func)(struct PTPBackend* backend, PTPDevice* device);
 
 // Generic backend
 typedef struct PTPBackend {
     PTPBackend_Close_Func close;
     PTPBackend_NeedsRefresh_Func needsRefresh;
     PTPBackend_RefreshList_Func refreshList;
-    PTPBackend_NeedsRefresh_Func isRefreshingList;
+    PTPBackend_IsRefreshingList_Func isRefreshingList;
     PTPBackend_PollListUpdates_Func pollListUpdates;
     PTPBackend_ReleaseList_Func releaseList;
     PTPBackend_OpenDevice_Func openDevice;
