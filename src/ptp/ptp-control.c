@@ -1015,6 +1015,12 @@ static EnumValueU8 sProp_SilentModeAutoPixelMapping[] = {
     {0x02, "Off"},
 };
 
+static EnumValueU8 sProp_ShutterReleaseTiming[] = {
+    {0x01, "Auto/Off"},
+    {0x02, "Stable"},
+    {0x03, "Fastest"},
+};
+
 static EnumValueU8 sProp_ShutterType[] = {
     {0x01, "Auto"},
     {0x02, "Mechanical Shutter"},
@@ -1705,6 +1711,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("silent-mode-aperture-drive-af", DPC_SILENT_MODE_APERTURE_DRIVE_AF, sProp_ApertureDriveAF),
     META_ENUM_U8 ("silent-mode-power-off", DPC_SILENT_MODE_POWER_OFF, sProp_SilentModePowerOff),
     META_ENUM_U8 ("silent-mode-auto-pixel-mapping", DPC_SILENT_MODE_AUTO_PIXEL_MAPPING, sProp_SilentModeAutoPixelMapping),
+    META_ENUM_U8 ("shutter-release-timing", DPC_SHUTTER_RELEASE_TIMING, sProp_ShutterReleaseTiming),
 
     META_ENUM_U8 ("aspect-ratio", DPC_ASPECT_RATIO, sProp_AspectRatio),
     META_ENUM_U8 ("iris-mode", DPC_IRIS_MODE, sProp_IrisMode),
@@ -2159,7 +2166,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD157, "Subject Recognition in AF"},
     {0xD158, "Recognition Target"},
     {0xD155, "Synchroterminal Forced Output"},
-    {0xD156, "Shutter Release Time Lag Control"},
+    {DPC_SHUTTER_RELEASE_TIMING, "Shutter Release Timing"},
     {0xD159, "Right/Left Eye Select"},
     {0xD15F, "Recording Media - Image"},
     {0xD160, "Recording Media - Movie"},
