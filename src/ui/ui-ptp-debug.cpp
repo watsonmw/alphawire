@@ -1235,8 +1235,13 @@ void ShowCameraControlsWindow(AppContext& c) {
             struct tm* localDateTime = localtime(&nowSec);
 
             // Calculate timezone offset in hours and minutes
+#ifdef WIN32
             extern long _timezone;
             long offset = -_timezone / 60; // Convert to minutes
+#else
+            extern long timezone;
+            long offset = -timezone / 60; // Convert to minutes
+#endif
             if (localDateTime->tm_isdst > 0) {
                 offset += 60; // Adjust for Daylight Savings
             }
