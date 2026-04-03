@@ -1,6 +1,5 @@
 #pragma once
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -28,6 +27,15 @@ typedef MSTRUCTPACKED(struct {
     u16 code;
     u32 transactionId;
 }) PTPContainerHeader;
+
+typedef struct PTPUsbEndPoints {
+    u8 bulkIn;
+    u16 bulkInMaxPacketSize;
+    u8 bulkOut;
+    u16 bulkOutPacketSize;
+    u8 interruptIn;
+    u8 interruptInterval;
+} PTPUsbEndPoints;
 
 /**
  * Convert USB version to a string, the USB version is stored as BCD (binary code decimal).

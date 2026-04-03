@@ -8,7 +8,7 @@
 #include "platform/usb-const.h"
 #include "platform/libusb/ptp-backend-libusb.h"
 
-static b32 CheckDeviceHasPtpEndPoints(PTPLibusbDeviceList* self, libusb_device* device, u8* bulkIn, u8* bulkOut, u8* interruptIn) {
+static b32 CheckDeviceHasPtpEndPoints(PTPLibusbDeviceList* self, libusb_device* device, PTPUsbEndPoints* outEndPoints) {
     struct libusb_config_descriptor* config;
     int r = libusb_get_active_config_descriptor(device, &config);
     if (r != 0) {
@@ -26,25 +26,23 @@ static b32 CheckDeviceHasPtpEndPoints(PTPLibusbDeviceList* self, libusb_device* 
             if (iface_desc->bInterfaceClass == USB_CLASS_STILL_IMAGE &&
                 iface_desc->bInterfaceSubClass == USB_SUBCLASS_STILL_IMAGE &&
                 iface_desc->bInterfaceProtocol == USB_PROTOCOL_PTP) {
-                
+
+
                 hasPTP = TRUE;
                 for (int k = 0; k < iface_desc->bNumEndpoints; k++) {
                     const struct libusb_endpoint_descriptor* ep = &iface_desc->endpoint[k];
                     if ((ep->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_TRANSFER_TYPE_BULK) {
                         if (ep->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
-                            if (bulkIn) {
-                                *bulkIn = ep->bEndpointAddress;
-                            }
+                            outEndPoints->bulkIn = ep->bEndpointAddress;
+                            outEndPoints->bulkInMaxPacketSize = ep->wMaxPacketSize;
                         } else {
-                            if (bulkOut) {
-                                *bulkOut = ep->bEndpointAddress;
-                            }
+                            outEndPoints->bulkOut = ep->bEndpointAddress;
+                            outEndPoints->bulkOutPacketSize = ep->wMaxPacketSize;
                         }
                     } else if ((ep->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_TRANSFER_TYPE_INTERRUPT) {
                         if (ep->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
-                            if (interruptIn) {
-                                *interruptIn = ep->bEndpointAddress;
-                            }
+                            outEndPoints->interruptIn = ep->bEndpointAddress;
+                            outEndPoints->interruptInterval = ep->bInterval;
                         }
                     }
                 }
@@ -107,8 +105,8 @@ b32 PTPLibusbDeviceList_RefreshList(PTPLibusbDeviceList* self, PTPDeviceInfo** d
             continue;
         }
 
-        u8 bulkIn = 0, bulkOut = 0, interruptIn = 0;
-        if (CheckDeviceHasPtpEndPoints(self, dev, &bulkIn, &bulkOut, &interruptIn)) {
+        PTPUsbEndPoints endPoints;
+        if (CheckDeviceHasPtpEndPoints(self, dev, &endPoints)) {
             libusb_device_handle* handle = NULL;
             r = libusb_open(dev, &handle);
             if (r < 0) {
@@ -185,13 +183,38 @@ static void PTPDeviceLibusb_FreeBuffer(PTPDevice* self, PTPBufferType type, void
     }
 }
 
+static int BulkTransferOut(PTPDeviceLibusb* device, u8* data, size_t transferLen, int* outTransferred)
+{
+    int totalTransferred = 0;
+    int toTransfer = (int)transferLen;
+    u8 endPoint = device->usb.bulkOut;
+    u32 timeoutMilliseconds = device->timeoutMilliseconds;
+    libusb_device_handle* handle = device->handle;
+    do
+    {
+        int transferred = 0;
+        int chunkSize = toTransfer > (1 << 15) ? (1 << 15) : toTransfer;
+        // PTP_INFO_F("libusb_bulk_transfer 1 usbBulkIn: %d", chunkSize);
+        int r = libusb_bulk_transfer(handle, endPoint, data, chunkSize, &transferred, timeoutMilliseconds);
+        // PTP_INFO_F("libusb_bulk_transfer 1 usbBulkIn -> %d", transferred);
+        if (r != 0) {
+            *outTransferred = totalTransferred;
+            return r;
+        }
+        data += transferred;
+        totalTransferred += transferred;
+        toTransfer -= transferred;
+    } while (toTransfer > 0);
+
+    *outTransferred = totalTransferred;
+    return 0;
+}
+
 static AwResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
                                             PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                             size_t* actualDataOutSize) {
     PTPDeviceLibusb* deviceLibusb = self->device;
     libusb_device_handle* handle = deviceLibusb->handle;
-    int transferred = 0;
-    int r;
 
     size_t requestSize = sizeof(PTPContainerHeader) + (request->NumParams * sizeof(u32));
     PTPContainerHeader* requestData = alloca(requestSize);
@@ -204,10 +227,10 @@ static AwResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
         params[i] = request->Params[i];
     }
 
-    r = libusb_bulk_transfer(handle, deviceLibusb->usbBulkOut, (unsigned char*)requestData,
-        (int)requestSize, &transferred, deviceLibusb->timeoutMilliseconds);
+    int transferred = 0;
+    int r = BulkTransferOut(deviceLibusb, (u8*)requestData, requestSize, &transferred);
     if (r != 0) {
-        PTP_LOG_ERROR_F(&self->logger, "Failed to send PTP request: %s", libusb_error_name(r));
+        PTP_ERROR_F("Failed to send PTP request: %s", libusb_error_name(r));
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
@@ -219,19 +242,27 @@ static AwResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
         dataHeader->code = request->OpCode;
         dataHeader->transactionId = request->TransactionId;
 
-        r = libusb_bulk_transfer(handle, deviceLibusb->usbBulkOut, (unsigned char*)dataHeader,
-            (int)fullDataSize, &transferred, deviceLibusb->timeoutMilliseconds);
+        transferred = 0;
+        r = BulkTransferOut(deviceLibusb, (u8*)dataHeader, fullDataSize, &transferred);
         if (r != 0) {
-            PTP_LOG_ERROR_F(&self->logger, "Failed to send PTP data: %s", libusb_error_name(r));
+            PTP_ERROR_F("Failed to send PTP request: %s", libusb_error_name(r));
             return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
     }
 
     PTPContainerHeader* responseContainer = (PTPContainerHeader*)(dataOut - sizeof(PTPContainerHeader));
-    r = libusb_bulk_transfer(handle, deviceLibusb->usbBulkIn, (unsigned char*)responseContainer,
-        (int)(sizeof(PTPContainerHeader) + dataOutSize), &transferred, deviceLibusb->timeoutMilliseconds);
+    transferred = 0;
+    int chunkSize = (int)(sizeof(PTPContainerHeader) + dataOutSize);
+    chunkSize = chunkSize > (1 << 15) ? (1 << 15) : chunkSize;
+    r = libusb_bulk_transfer(handle, deviceLibusb->usb.bulkIn, (unsigned char*)responseContainer,
+        chunkSize, &transferred, deviceLibusb->timeoutMilliseconds);
     if (r != 0) {
-        PTP_LOG_ERROR_F(&self->logger, "Failed to read PTP response: %s", libusb_error_name(r));
+        PTP_ERROR_F("Failed to read PTP response: %s", libusb_error_name(r));
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
+    }
+
+    if (transferred < sizeof(PTPContainerHeader)) {
+        PTP_ERROR_F("Incomplete PTP response received: got: %d expected >= %d", transferred, (int)sizeof(PTPContainerHeader));
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
@@ -243,25 +274,44 @@ static AwResult PTPDeviceLibusb_SendAndRecv(PTPDevice* self, PTPRequestHeader* r
 
         while ((u32)actual < payloadLength) {
             int chunk = 0;
-            r = libusb_bulk_transfer(handle, deviceLibusb->usbBulkIn, cp, (int)(payloadLength - actual),
+            chunkSize = (int)(payloadLength - actual);
+            chunkSize = chunkSize > (1 << 15) ? (1 << 15) : chunkSize;
+            r = libusb_bulk_transfer(handle, deviceLibusb->usb.bulkIn, cp, chunkSize,
                 &chunk, deviceLibusb->timeoutMilliseconds);
             if (r != 0) {
-                PTP_LOG_ERROR_F(&self->logger, "Failed to read PTP response data: %s", libusb_error_name(r));
+                PTP_ERROR_F("Failed to read PTP response data: %s", libusb_error_name(r));
                 return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
             }
             actual += chunk;
+
             cp += chunk;
         }
         dataBytesTransferred = (actual > (int)sizeof(PTPContainerHeader)) ? (u32)(actual - sizeof(PTPContainerHeader)) : 0;
 
         size_t finalResponseSize = sizeof(PTPContainerHeader) + (PTP_MAX_PARAMS * sizeof(u32));
         responseContainer = alloca(finalResponseSize);
-        r = libusb_bulk_transfer(handle, deviceLibusb->usbBulkIn, (unsigned char*)responseContainer,
+        r = libusb_bulk_transfer(handle, deviceLibusb->usb.bulkIn, (unsigned char*)responseContainer,
             (int)finalResponseSize, &transferred, deviceLibusb->timeoutMilliseconds);
         if (r != 0) {
-            PTP_LOG_ERROR_F(&self->logger, "Failed to read final PTP response: %s", libusb_error_name(r));
+            PTP_ERROR_F("Failed to read final PTP response: %s", libusb_error_name(r));
             return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
+
+        if (transferred == 0) {
+            r = libusb_bulk_transfer(handle, deviceLibusb->usb.bulkIn, (unsigned char*)responseContainer,
+                (int)finalResponseSize, &transferred, deviceLibusb->timeoutMilliseconds);
+            if (r != 0) {
+                PTP_ERROR_F("Failed to read final PTP response: %s", libusb_error_name(r));
+                return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
+            }
+        }
+
+        if (transferred < (int)sizeof(PTPContainerHeader)) {
+            PTP_ERROR_F("Incomplete PTP response received: got: %d expected >= %d", transferred, (int)sizeof(PTPContainerHeader));
+            return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
+        }
+
+        // TODO: verify PTP_CONTAINER_ is correct here
     }
 
     *actualDataOutSize = dataBytesTransferred;
@@ -292,10 +342,10 @@ static b32 PTPDeviceLibusb_Reset(PTPDevice* self) {
             ok = 0;
         }
         // Attempt to clear stalls on endpoints
-        libusb_clear_halt((libusb_device_handle*)d->handle, d->usbBulkIn);
-        libusb_clear_halt((libusb_device_handle*)d->handle, d->usbBulkOut);
-        if (d->usbInterrupt) {
-            libusb_clear_halt((libusb_device_handle*)d->handle, d->usbInterrupt);
+        libusb_clear_halt((libusb_device_handle*)d->handle, d->usb.bulkIn);
+        libusb_clear_halt((libusb_device_handle*)d->handle, d->usb.bulkOut);
+        if (d->usb.interruptIn) {
+            libusb_clear_halt((libusb_device_handle*)d->handle, d->usb.interruptIn);
         }
         // Attempt to (re)claim interface 0
         libusb_claim_interface((libusb_device_handle*)d->handle, 0);
@@ -339,7 +389,7 @@ static void* EventThreadProc(void* lpParameter) {
         }
 
         // Perform interrupt transfer with a reasonable timeout
-        int r = libusb_interrupt_transfer(dev->handle, dev->usbInterrupt,
+        int r = libusb_interrupt_transfer(dev->handle, dev->usb.interruptIn,
             dev->eventMem.mem, dev->eventMem.capacity, &transferred, 1000);
 
         if (dev->eventThreadStop) {
@@ -400,7 +450,7 @@ static AwResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMilliseco
     }
 
     int transferred = 0;
-    int r = libusb_interrupt_transfer(dev->handle, dev->usbInterrupt,
+    int r = libusb_interrupt_transfer(dev->handle, dev->usb.interruptIn,
         dev->eventMem.mem, dev->eventMem.capacity, &transferred, timeoutMilliseconds);
 
     if (r == 0 && transferred > 0) {
@@ -414,7 +464,7 @@ static AwResult PTPDeviceLibusb_ReadEvents(PTPDevice* self, int timeoutMilliseco
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-b32 PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+AwResult PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTP_TRACE("PTPLibusbDeviceList_OpenDevice");
     LibusbDeviceInfo* info = deviceInfo->device;
     libusb_device* dev = info->device;
@@ -422,8 +472,8 @@ b32 PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* dev
 
     int r = libusb_open(dev, &handle);
     if (r != 0) {
-        PTP_LOG_ERROR_F(&self->logger, "Failed to open device: %s", libusb_error_name(r));
-        return FALSE;
+        PTP_ERROR_F("Failed to open device: %s", libusb_error_name(r));
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     if (libusb_kernel_driver_active(handle, 0) == 1) {
@@ -432,20 +482,22 @@ b32 PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* dev
 
     r = libusb_claim_interface(handle, 0);
     if (r != 0) {
-        PTP_LOG_ERROR_F(&self->logger, "Failed to claim interface: %s", libusb_error_name(r));
+        PTP_ERROR_F("Failed to claim interface: %s", libusb_error_name(r));
         libusb_close(handle);
-        return FALSE;
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
-    u8 bulkIn = 0, bulkOut = 0, interruptIn = 0;
-    CheckDeviceHasPtpEndPoints(self, dev, &bulkIn, &bulkOut, &interruptIn);
+    PTPUsbEndPoints endPoints;
+    if (!CheckDeviceHasPtpEndPoints(self, dev, &endPoints)) {
+        PTP_ERROR("Failed to find PTP interfaces");
+        libusb_close(handle);
+        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
+    }
 
     PTPDeviceLibusb* deviceLibusb = MArrayAddPtrZ(self->allocator, self->openDevices);
     deviceLibusb->device = libusb_ref_device(dev);
     deviceLibusb->handle = handle;
-    deviceLibusb->usbBulkIn = bulkIn;
-    deviceLibusb->usbBulkOut = bulkOut;
-    deviceLibusb->usbInterrupt = interruptIn;
+    deviceLibusb->usb = endPoints;
     deviceLibusb->disconnected = FALSE;
     deviceLibusb->timeoutMilliseconds = self->timeoutMilliseconds;
     deviceLibusb->allocator = self->allocator;
@@ -477,7 +529,7 @@ b32 PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* dev
 
         int r = pthread_create(&deviceLibusb->eventThread, NULL, EventThreadProc, deviceLibusb);
         if (r != 0) {
-            PTP_LOG_WARNING_F(&self->logger, "Failed to create event thread: %d", r);
+            PTP_WARNING_F("Failed to create event thread: %d", r);
             deviceLibusb->eventThreadStop = -1;
             pthread_mutex_destroy(&deviceLibusb->eventLock);
         } else {
@@ -486,7 +538,7 @@ b32 PTPLibusbDeviceList_OpenDevice(PTPLibusbDeviceList* self, PTPDeviceInfo* dev
         }
     }
 
-    return TRUE;
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
 b32 PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device) {
@@ -494,7 +546,7 @@ b32 PTPLibusbDeviceList_CloseDevice(PTPLibusbDeviceList* self, PTPDevice* device
     PTPDeviceLibusb* deviceLibusb = device->device;
 
     // Stop event thread if running
-    if (deviceLibusb->eventThreadStop) {
+    if (deviceLibusb->eventThreadStarted) {
         // Signal thread to stop
         deviceLibusb->eventThreadStop = -1;
 
@@ -553,7 +605,7 @@ static void PTPLibusbDeviceList_ReleaseList_(PTPBackend* backend) {
     PTPLibusbDeviceList_ReleaseList(self);
 }
 
-static b32 PTPLibusbDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+static AwResult PTPLibusbDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
     PTPLibusbDeviceList* self = backend->self;
     return PTPLibusbDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }

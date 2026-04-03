@@ -2,6 +2,7 @@
 
 #include "mlib/mlib.h"
 #include "ptp/ptp-const.h"
+#include "platform/usb-const.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,9 +15,7 @@ typedef struct {
 typedef struct {
     void* device; // libusb_device*
     void* handle; // libusb_device_handle*
-    u8 usbBulkIn;
-    u8 usbBulkOut;
-    u8 usbInterrupt;
+    PTPUsbEndPoints usb;
     b32 disconnected;
     // Request timeout - can be adjust before requests
     u32 timeoutMilliseconds;
