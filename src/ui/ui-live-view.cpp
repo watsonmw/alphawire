@@ -186,8 +186,10 @@ void UiPtpLiveViewShow(AppContext& c) {
         if (c.liveViewOverlayMode != LiveViewOverlayMode_NONE) {
             ImDrawList *drawList = ImGui::GetWindowDrawList();
             ImVec2 windowPos = ImGui::GetWindowPos();
-            ImU32 overlayColor = ImColor(c.liveViewOverlayColor[0], c.liveViewOverlayColor[1], c.liveViewOverlayColor[2]);
+            ImU32 overlayOutlineColor = ImColor(0, 0, 0);
+            ImU32 overlayMainColor = ImColor(c.liveViewOverlayColor[0], c.liveViewOverlayColor[1], c.liveViewOverlayColor[2]);
             float thickness = c.liveViewOverlayThickness;
+            float outlineThickness = thickness +  0.5f;
 
             ImVec2 topLeft(windowPos.x + imagePos.x, windowPos.y + imagePos.y);
             ImVec2 topRight(windowPos.x + imagePos.x + renderWidth, windowPos.y + imagePos.y);
@@ -198,12 +200,18 @@ void UiPtpLiveViewShow(AppContext& c) {
             if (c.liveViewOverlayMode == LiveViewOverlayMode_CROSSHAIR) {
                 float crosshairLen = renderHeight * 0.05f;
                 drawList->AddLine(ImVec2(center.x, center.y - crosshairLen),
-                    ImVec2(center.x, center.y + crosshairLen), overlayColor, thickness);
+                    ImVec2(center.x, center.y + crosshairLen), overlayOutlineColor, outlineThickness);
                 drawList->AddLine(ImVec2(center.x - crosshairLen, center.y),
-                    ImVec2(center.x + crosshairLen, center.y), overlayColor, thickness);
+                    ImVec2(center.x + crosshairLen, center.y), overlayOutlineColor, outlineThickness);
+                drawList->AddLine(ImVec2(center.x, center.y - crosshairLen),
+                    ImVec2(center.x, center.y + crosshairLen), overlayMainColor, thickness);
+                drawList->AddLine(ImVec2(center.x - crosshairLen, center.y),
+                    ImVec2(center.x + crosshairLen, center.y), overlayMainColor, thickness);
             } else if (c.liveViewOverlayMode == LiveViewOverlayMode_X) {
-                drawList->AddLine(topLeft, bottomRight, overlayColor, thickness);
-                drawList->AddLine(topRight, bottomLeft, overlayColor, thickness);
+                drawList->AddLine(topLeft, bottomRight, overlayOutlineColor, outlineThickness);
+                drawList->AddLine(topRight, bottomLeft, overlayOutlineColor, outlineThickness);
+                drawList->AddLine(topLeft, bottomRight, overlayMainColor, thickness);
+                drawList->AddLine(topRight, bottomLeft, overlayMainColor, thickness);
             }
         }
 

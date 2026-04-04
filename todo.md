@@ -4,7 +4,7 @@ UI
 - Settings apply
   - Str setter (match based on enums)
   - int setter (try to find matching enum)
-  - bool setter
+  - bool setter1945
 - Build list of property editors / widgets?
   - Debug Set widgets
   - Enum List Read only support (except in debug)
@@ -24,6 +24,7 @@ Backends
 - IP: Connect via IP only?
 - IP: Connect with password (TLS)
 - Events for IOKit
+- Rename from PTP to Aw
 
 Commands
 ===
