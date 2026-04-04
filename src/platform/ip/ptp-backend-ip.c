@@ -469,11 +469,14 @@ static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, 
 
     MSockSetSocketTimeout(dev.dataSock, 60000);
     MSockAddress socketAddr = {};
-    if (MSockConnectHost(dev.dataSock, MStrViewFromStr(deviceInfo->ipAddress), 15740, &socketAddr) == MSOCK_ERROR) {
+    if (MSockConnectHost(dev.dataSock, MStrViewFromStr(deviceInfo->ipAddress), 15740, &socketAddr)
+            == MSOCK_ERROR) {
+        error.code = AW_RESULT_TRANSPORT_ERROR;
         goto exitWithError;
     }
 
     // Init Command Request (Type 1)
+    // TODO: Allow this to set to something else (pass as backend param)
     u8 guid[16] = {'A', 'l', 'p', 'h', 'a', 'W', 'i', 'r', 'e', ' ', 'P', 'T', 'P', ' ', 'I', 'P'};
     const char* friendlyName = "AlphaWire";
     u32 nameLen = MCStrLen(friendlyName);
@@ -539,9 +542,12 @@ static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, 
             MMemReadU32LE(&inRead, &failureCode);
             PTP_ERROR_F("PTPIp_OpenDevice init fail: %s (0x%08x)", PTPIp_GetInitFailErrorString(failureCode),
                 failureCode);
+            error.code = AW_RESULT_PTP_FAILURE;
+            error.ptp = failureCode;
             goto exitWithError;
         } else {
             PTP_ERROR_F("PTPIp_OpenDevice unexpected init response packet type: 0x%08x", responseType);
+            error.code = AW_RESULT_MALFORMED_RESPONSE;
             goto exitWithError;
         }
     }
@@ -551,12 +557,14 @@ static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, 
     // Setup Event Socket
     dev.eventSock = MSockMakeTcpSocket();
     if (dev.eventSock == MSOCK_INVALID) {
+        error.code = AW_RESULT_TRANSPORT_ERROR;
         goto exitWithError;
     }
 
     MSockSetSocketTimeout(dev.eventSock, 5000);
     dev.eventSockTimeoutMilliseconds = 5000;
     if (MSockConnectAddress(dev.eventSock, &socketAddr) == MSOCK_INVALID) {
+        error.code = AW_RESULT_TRANSPORT_ERROR;
         goto exitWithError;
     }
 
@@ -597,6 +605,7 @@ static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, 
     }
 
     if (responseType != PTPIP_TYPE_INIT_EVENT_ACK) {
+        error.code = AW_RESULT_MALFORMED_RESPONSE;
         goto exitWithError;
     }
 
