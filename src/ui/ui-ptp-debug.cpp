@@ -1225,49 +1225,51 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Spacing();
     if (ImGui::CollapsingHeader("Metadata")) {
         ImGui::Spacing();
+        PTPProperty* dateTimeProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_DATE_TIME_SET);
 
-        if (ImGui::Button("Set Time Now")) {
-            // Get current time in nanosecs
-            SDL_Time nowNanos = 0;
-            SDL_GetCurrentTime(&nowNanos);
+        if (dateTimeProperty) {
+            if (ImGui::Button("Set Time Now")) {
+                // Get current time in nanosecs
+                SDL_Time nowNanos = 0;
+                SDL_GetCurrentTime(&nowNanos);
 
-            time_t nowSec = (time_t)(nowNanos / 1000000000LL);
-            struct tm* localDateTime = localtime(&nowSec);
+                time_t nowSec = (time_t)(nowNanos / 1000000000LL);
+                struct tm* localDateTime = localtime(&nowSec);
 
-            // Calculate timezone offset in hours and minutes
+                // Calculate timezone offset in hours and minutes
 #ifdef WIN32
-            extern long _timezone;
-            long offset = -_timezone / 60; // Convert to minutes
+                extern long _timezone;
+                long offset = -_timezone / 60; // Convert to minutes
 #else
-            extern long timezone;
-            long offset = -timezone / 60; // Convert to minutes
+                extern long timezone;
+                long offset = -timezone / 60; // Convert to minutes
 #endif
-            if (localDateTime->tm_isdst > 0) {
-                offset += 60; // Adjust for Daylight Savings
-            }
-            int offsetHours = (int)(offset / 60);
-            int offsetMinutes = (int)(offset % 60);
+                if (localDateTime->tm_isdst > 0) {
+                    offset += 60; // Adjust for Daylight Savings
+                }
+                int offsetHours = (int)(offset / 60);
+                int offsetMinutes = (int)(offset % 60);
 
-            // Calculate the decimal part of the current second
-            long deciSec = (nowNanos / 100000000LL) % 10L;
+                // Calculate the decimal part of the current second
+                long deciSec = (nowNanos / 100000000LL) % 10L;
 
-            // Format: YYYYmmddTHHMMSS.m+HHMM
-            char timeBuffer[64];
-            snprintf(timeBuffer, sizeof(timeBuffer),
-                     "%04d%02d%02dT%02d%02d%02d.%01ld%+03d%02d",
-                     localDateTime->tm_year + 1900,
-                     localDateTime->tm_mon + 1,
-                     localDateTime->tm_mday,
-                     localDateTime->tm_hour,
-                     localDateTime->tm_min,
-                     localDateTime->tm_sec,
-                     deciSec,
-                     offsetHours,
-                     (offsetMinutes < 0 ? -offsetMinutes : offsetMinutes));
+                // Format: YYYYmmddTHHMMSS.m+HHMM
+                char timeBuffer[64];
+                snprintf(timeBuffer, sizeof(timeBuffer),
+                         "%04d%02d%02dT%02d%02d%02d.%01ld%+03d%02d",
+                         localDateTime->tm_year + 1900,
+                         localDateTime->tm_mon + 1,
+                         localDateTime->tm_mday,
+                         localDateTime->tm_hour,
+                         localDateTime->tm_min,
+                         localDateTime->tm_sec,
+                         deciSec,
+                         offsetHours,
+                         (offsetMinutes < 0 ? -offsetMinutes : offsetMinutes));
 
-            MStr time = MStrMakeStaticCStr(timeBuffer);
-            PTPProperty* dateTimeProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_DATE_TIME_SET);
-            if (dateTimeProperty) {
+                MLogf("Setting time to '%s'", timeBuffer);
+
+                MStr time = MStrMakeStaticCStr(timeBuffer);
                 PTPControl_SetPropertyStrRaw(&c.ptp, dateTimeProperty, time);
             }
         }
