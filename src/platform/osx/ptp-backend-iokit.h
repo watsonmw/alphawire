@@ -26,9 +26,7 @@ typedef struct {
     // Event handling
     MMemIO eventMem; // Event buffer for reading and parsing events (reused across calls)
     // Background event thread
-    pthread_t eventThread;
-    b32 eventThreadStop : 1;
-    b32 eventThreadStarted : 1;
+    CFRunLoopSourceRef asyncEventSource;
     pthread_mutex_t eventLock;
     PTPEvent* eventList;
 } PTPDeviceIOKit;
