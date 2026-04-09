@@ -38,11 +38,11 @@ b32 WinUtils_GetLastErrorAsStr(char* buffer, size_t bufferSize)
     }
 }
 
-void WinUtils_LogLastError(PTPLog* logger, const char* mesg) {
+void WinUtils_LogLastError(AwLog* logger, const char* mesg) {
     if (WinUtils_GetLastErrorAsStr(logger->msgBuffer, sizeof(logger->msgBuffer))) {
-        PTP_LOG_ERROR_F(logger, "%s: %s (0x%08x)", mesg, logger->msgBuffer, GetLastError());
+        AW_LOG_ERROR_F(logger, "%s: %s (0x%08x)", mesg, logger->msgBuffer, GetLastError());
     } else {
-        PTP_LOG_ERROR(logger, mesg);
+        AW_LOG_ERROR(logger, mesg);
     }
 }
 

@@ -3,9 +3,9 @@
 #include <stdio.h>
 
 #include "mlib/utf8.h"
-#include "ptp/ptp-control.h"
-#include "ptp/ptp-control.h"
-#include "ptp/ptp-util.h"
+#include "aw/aw-control.h"
+#include "aw/aw-control.h"
+#include "aw/aw-util.h"
 
 typedef struct {
     u8 value;
@@ -28,8 +28,8 @@ typedef union uFixedEnums {
     EnumValueU32* u32;
 } FixedEnums;
 
-typedef b32 (*PTP_PropBuildEnumsFunc_t)(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValueEnums* outEnums);
-typedef MStr (*PTP_PropValueAsStringFunc_t)(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue value);
+typedef b32 (*PTP_PropBuildEnumsFunc_t)(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums);
+typedef MStr (*PTP_PropValueAsStringFunc_t)(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue value);
 
 typedef struct {
     u16 code;
@@ -50,7 +50,7 @@ typedef struct PTPPropertyMetadata {
     char *desc; // TODO: Add descriptions
 } PTPPropertyMetadata;
 
-static MStr GetFNumberAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFNumberAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     int whole = value / 100;
@@ -77,7 +77,7 @@ static MStr GetFNumberAsString(PTPControl* self, MAllocator* allocator, PTPPrope
     return r;
 }
 
-static MStr GetShutterSpeedAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetShutterSpeedAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     u32 value = propValue.u32;
     MStr r = {};
     if (value == 0xffffffff) {
@@ -107,7 +107,7 @@ static MStr GetShutterSpeedAsString(PTPControl* self, MAllocator* allocator, PTP
     return r;
 }
 
-static MStr GetWhiteBalanceGMAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetWhiteBalanceGMAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     int value = propValue.u8;
     if (value > 0xE4 || value < 0x9C) {
@@ -153,7 +153,7 @@ static MStr GetWhiteBalanceGMAsString(PTPControl* self, MAllocator* allocator, P
     return r;
 }
 
-static MStr GetWhiteBalanceABAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetWhiteBalanceABAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     int value = propValue.u8;
     if (value > 0xE4 || value < 0x9C) {
@@ -200,7 +200,7 @@ static MStr GetWhiteBalanceABAsString(PTPControl* self, MAllocator* allocator, P
     return r;
 }
 
-static MStr GetPendingFileInfoAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetPendingFileInfoAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
@@ -222,7 +222,7 @@ static MStr GetPendingFileInfoAsString(PTPControl* self, MAllocator* allocator, 
     return r;
 }
 
-static MStr GetPixelShootingNumberAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetPixelShootingNumberAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0) {
@@ -239,7 +239,7 @@ static MStr GetPixelShootingNumberAsString(PTPControl* self, MAllocator* allocat
     return r;
 }
 
-static MStr GetPixelShootingIntervalAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetPixelShootingIntervalAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0xFFFF) {
@@ -255,7 +255,7 @@ static MStr GetPixelShootingIntervalAsString(PTPControl* self, MAllocator* alloc
     return r;
 }
 
-static MStr GetPixelShootingProgressAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetPixelShootingProgressAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     char text[32];
@@ -267,7 +267,7 @@ static MStr GetPixelShootingProgressAsString(PTPControl* self, MAllocator* alloc
     return r;
 }
 
-static MStr GetBatteryRemainingAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetBatteryRemainingAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     i8 value = propValue.i8;
     if (value == -1) {
@@ -282,7 +282,7 @@ static MStr GetBatteryRemainingAsString(PTPControl* self, MAllocator* allocator,
     return r;
 }
 
-static MStr GetPredictedMaxFileSizeAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetPredictedMaxFileSizeAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     char text[32];
@@ -293,7 +293,7 @@ static MStr GetPredictedMaxFileSizeAsString(PTPControl* self, MAllocator* alloca
     return r;
 }
 
-static MStr GetTemperatureAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetTemperatureAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
@@ -310,7 +310,7 @@ static MStr GetTemperatureAsString(PTPControl* self, MAllocator* allocator, PTPP
     return r;
 }
 
-static MStr GetIsoAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetIsoAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 mode = value >> 24;
@@ -347,7 +347,7 @@ static MStr GetIsoAsString(PTPControl* self, MAllocator* allocator, PTPProperty*
     return r;
 }
 
-static MStr GetExposureBiasAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetExposureBiasAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     i16 value = propValue.i16;
     MStr r = {};
     int whole = value / 1000;
@@ -363,7 +363,7 @@ static MStr GetExposureBiasAsString(PTPControl* self, MAllocator* allocator, PTP
     return r;
 }
 
-static MStr GetFlashCompAsString(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFlashCompAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     i16 value = propValue.i16;
     MStr r = {};
     int whole = value / 1000;
@@ -379,7 +379,7 @@ static MStr GetFlashCompAsString(PTPControl* self, MAllocator* allocator, PTPPro
     return r;
 }
 
-static MStr GetZoomScale(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetZoomScale(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     int whole = propValue.u32 / 1000;
     int decimals = (propValue.u32 % 1000) / 100;
@@ -396,7 +396,7 @@ static MStr GetZoomScale(PTPControl* self, MAllocator* allocator, PTPProperty* p
     return r;
 }
 
-static MStr GetZoomBarInfo(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetZoomBarInfo(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 zoomPosition = value & 0xffff;
@@ -1043,14 +1043,14 @@ static EnumValueU8 sProp_GainControl[] = {
 };
 
 static EnumValueU8 sProp_DRO[] = {
-    {0x01, "DRO Off"},
+    {0x01, "Off"},
     {0x02, "DRO"},
     {0x10, "DRO+"},
-    {0x11, "DRO + Manual1"},
-    {0x12, "DRO + Manual2"},
-    {0x13, "DRO + Manual3"},
-    {0x14, "DRO + Manual4"},
-    {0x15, "DRO + Manual5"},
+    {0x11, "DRO Lvl1"},
+    {0x12, "DRO Lvl2"},
+    {0x13, "DRO Lvl3"},
+    {0x14, "DRO Lvl4"},
+    {0x15, "DRO Lvl5"},
     {0x1F, "DRO Auto"},
     {0x20, "HDR Auto"},
     {0x21, "HDR 1.0EV"},
@@ -1580,7 +1580,7 @@ static EnumValueU16 sProp_DialList[] = {
     { 0x4004, "Rear Dial R"},
 };
 
-static MStr GetFocusMagnifyScale(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFocusMagnifyScale(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     int whole = value / 10;
@@ -1598,7 +1598,7 @@ static MStr GetFocusMagnifyScale(PTPControl* self, MAllocator* allocator, PTPPro
     return r;
 }
 
-static MStr GetFocusMagnifyPos(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFocusMagnifyPos(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 x = (value >> 16) & 0xffff;
@@ -1611,7 +1611,7 @@ static MStr GetFocusMagnifyPos(PTPControl* self, MAllocator* allocator, PTPPrope
     return r;
 }
 
-static MStr GetFocusMagnify(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFocusMagnify(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u64 value = propValue.u64;
     u32 x = (u32)((value >> 16) & 0xffff);
@@ -1636,7 +1636,7 @@ static MStr GetFocusMagnify(PTPControl* self, MAllocator* allocator, PTPProperty
     return r;
 }
 
-static MStr GetFocusSpotPos(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFocusSpotPos(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
     u32 x = (value >> 16) & 0xffff;
@@ -1649,7 +1649,7 @@ static MStr GetFocusSpotPos(PTPControl* self, MAllocator* allocator, PTPProperty
     return r;
 }
 
-static MStr GetFocalDistanceMeters(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropValue propValue) {
+static MStr GetFocalDistanceMeters(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     char text[32];
     u32 value = propValue.u32;
@@ -2617,21 +2617,21 @@ static PtpEventLabels sPtpEventLabels[] = {
     {0xC240, "SDIE_DeleteContentResult"}
 };
 
-static PTPPropValueEnum sControl_UpDown[] = {
-    {.propValue.u16=0x0001, .str.str="Up", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0002, .str.str="Down", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+static AwPtpPropValueEnum sControl_UpDown[] = {
+    {.propValue.u16=0x0001, .str.str="Up", .flags=AW_ENUM_VALUE_WRITE|AW_ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0002, .str.str="Down", .flags=AW_ENUM_VALUE_WRITE|AW_ENUM_VALUE_STR_CONST},
 };
 
-static PTPPropValueEnum sControl_SelectMediaFormat[] = {
-    {.propValue.u16=0x0001, .str.str="Full Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0002, .str.str="Full Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0011, .str.str="Quick Format - Slot 1", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
-    {.propValue.u16=0x0012, .str.str="Quick Format - Slot 2", .flags=ENUM_VALUE_WRITE|ENUM_VALUE_STR_CONST},
+static AwPtpPropValueEnum sControl_SelectMediaFormat[] = {
+    {.propValue.u16=0x0001, .str.str="Full Format - Slot 1", .flags=AW_ENUM_VALUE_WRITE|AW_ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0002, .str.str="Full Format - Slot 2", .flags=AW_ENUM_VALUE_WRITE|AW_ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0011, .str.str="Quick Format - Slot 1", .flags=AW_ENUM_VALUE_WRITE|AW_ENUM_VALUE_STR_CONST},
+    {.propValue.u16=0x0012, .str.str="Quick Format - Slot 2", .flags=AW_ENUM_VALUE_WRITE|AW_ENUM_VALUE_STR_CONST},
 };
 
 #define PROP_ENUM_SET(a) .form.enums = {.values=(a), .size=MStaticArraySize(a)}
 
-static PtpControl sPtpControlsMetadata[] = {
+static AwPtpControl sAwControlsMetadata[] = {
     {DPC_SHUTTER_HALF_PRESS,           PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Half-Press Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_SHUTTER,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "Shutter Release Button", PROP_ENUM_SET(sControl_UpDown)},
     {DPC_AE_LOCK,                      PTP_DT_UINT16, SDI_CONTROL_BUTTON,   PTP_FORM_FLAG_ENUM,  "AEL Button", PROP_ENUM_SET(sControl_UpDown)},
@@ -2691,7 +2691,7 @@ static PtpControl sPtpControlsMetadata[] = {
     {DPC_REMOTE_DIAL_ADJUST,           PTP_DT_INT32,  SDI_CONTROL_VARIABLE, PTP_FORM_FLAG_RANGE,  "Remote Dial Adjust", .form.range={.min.i32=I32_MIN,.max.i32=I32_MAX,.step.i32=1}},
 };
 
-char* PTP_GetPropertyLabel(u16 propCode) {
+char* AwGetPropertyLabel(u16 propCode) {
     for (int i = 0; i < MStaticArraySize(sPtpPropertyLabels); i++) {
         if (sPtpPropertyLabels[i].code == propCode) {
             return sPtpPropertyLabels[i].label;
@@ -2701,17 +2701,17 @@ char* PTP_GetPropertyLabel(u16 propCode) {
     return NULL;
 }
 
-char* PTP_GetControlLabel(u16 controlCode) {
-    for (int i = 0; i < MStaticArraySize(sPtpControlsMetadata); i++) {
-        if (sPtpControlsMetadata[i].controlCode == controlCode) {
-            return sPtpControlsMetadata[i].label;
+char* AwGetControlLabel(u16 controlCode) {
+    for (int i = 0; i < MStaticArraySize(sAwControlsMetadata); i++) {
+        if (sAwControlsMetadata[i].controlCode == controlCode) {
+            return sAwControlsMetadata[i].label;
         }
     }
 
     return NULL;
 }
 
-char* PTP_GetEventLabel(u16 eventCode) {
+char* AwGetEventLabel(u16 eventCode) {
     for (int i = 0; i < MStaticArraySize(sPtpEventLabels); i++) {
         if (sPtpEventLabels[i].code == eventCode) {
             return sPtpEventLabels[i].label;
@@ -2739,7 +2739,7 @@ static ObjectFormatMetadata sPtpObjectFormatMetadata[] = {
     {PTP_OFC_MP4, "MP4"},
 };
 
-char* PTP_GetObjectFormatStr(u16 objectFormatCode) {
+char* AwGetObjectFormatStr(u16 objectFormatCode) {
     for (int i = 0; i < MStaticArraySize(sPtpObjectFormatMetadata); i++) {
         if (sPtpObjectFormatMetadata[i].code == objectFormatCode) {
             return sPtpObjectFormatMetadata[i].name;
@@ -2832,7 +2832,7 @@ static OperationMetadata sPtpOperationMetadata[] = {
     {PTP_OC_SDIO_GetExtDeviceProp, "SDIO_GetExtDeviceProp", "Get the DevicePropInfo."},
 };
 
-char* PTP_GetOperationLabel(u16 operationCode) {
+char* AwGetOperationLabel(u16 operationCode) {
     for (int i = 0; i < MStaticArraySize(sPtpOperationMetadata); i++) {
         if (sPtpOperationMetadata[i].code == operationCode) {
             return sPtpOperationMetadata[i].label;
@@ -2842,7 +2842,7 @@ char* PTP_GetOperationLabel(u16 operationCode) {
     return NULL;
 }
 
-char* PTP_GetDataTypeStr(PTPDataType dataType) {
+char* AwPtpGetDataTypeStr(PtpDataType dataType) {
     switch (dataType) {
         case PTP_DT_UNDEF:
             return "undef";
@@ -2892,7 +2892,7 @@ char* PTP_GetDataTypeStr(PTPDataType dataType) {
     return NULL;
 }
 
-char* PTP_GetFormFlagStr(PTPFormFlag formFlag) {
+char* AwPtpGetFormFlagStr(PtpFormFlag formFlag) {
     switch (formFlag) {
         case PTP_FORM_FLAG_NONE:
             return "";
@@ -2904,7 +2904,7 @@ char* PTP_GetFormFlagStr(PTPFormFlag formFlag) {
     return NULL;
 }
 
-char* PTP_GetPropIsEnabledStr(u8 propIsEnabled) {
+char* AwPtpGetPropIsEnabledStr(u8 propIsEnabled) {
     switch (propIsEnabled) {
         case 0x0:
             return "N/A";
@@ -2916,7 +2916,7 @@ char* PTP_GetPropIsEnabledStr(u8 propIsEnabled) {
     return NULL;
 }
 
-void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer, size_t bufferLen) {
+void AwPtpGetPropValueStr(PtpDataType dataType, AwPtpPropValue value, char* buffer, size_t bufferLen) {
     switch (dataType) {
         case PTP_DT_INT8:
             snprintf(buffer, bufferLen, "%hhd (%02hhx)",  value.i8, value.i8);
@@ -2980,7 +2980,7 @@ void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* buffer,
     }
 }
 
-b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2) {
+b32 AwPtpPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue value2) {
     switch (dataType) {
         case PTP_DT_INT8:
             return value1.i8 == value2.i8;
@@ -3030,11 +3030,11 @@ b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue valu
     return FALSE;
 }
 
-b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value) {
-    return PTP_PropValueEq((PTPDataType)property->dataType, property->value, value);
+b32 AwPtpPropEquals(AwPtpProperty* property, AwPtpPropValue value) {
+    return AwPtpPropValueEq((PtpDataType)property->dataType, property->value, value);
 }
 
-size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
+size_t Ptp_PropValueSize(PtpDataType dataType, AwPtpPropValue value) {
     switch (dataType) {
         case PTP_DT_INT8:
         case PTP_DT_UINT8:
@@ -3082,7 +3082,7 @@ size_t Ptp_PropValueSize(PTPDataType dataType, PTPPropValue value) {
     return 0;
 }
 
-static void PropValueFree(MAllocator* mem, PTPDataType dataType, PTPPropValue* value) {
+static void PropValueFree(MAllocator* mem, PtpDataType dataType, AwPtpPropValue* value) {
     if (value == NULL) {
         return;
     }
@@ -3112,22 +3112,22 @@ typedef struct {
     MStr captureDateTime;
     MStr modDateTime;
     MStr keywords;
-} PTPObjectInfo;
+} AwObjectInfo;
 
-static void PTP_FreeObjectInfo(MAllocator* allocator, PTPObjectInfo *objectInfo) {
+static void Aw_FreeObjectInfo(MAllocator* allocator, AwObjectInfo *objectInfo) {
     MStrFree(allocator, objectInfo->filename);
     MStrFree(allocator, objectInfo->captureDateTime);
     MStrFree(allocator, objectInfo->modDateTime);
     MStrFree(allocator, objectInfo->keywords);
 }
 
-void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames) {
+void AwControl_FreeLiveViewFrames(AwControl* self, AwLiveViewFrames* liveViewFrames) {
     MArrayFree(self->allocator, liveViewFrames->focus.frames);
     MArrayFree(self->allocator, liveViewFrames->face.frames);
     MArrayFree(self->allocator, liveViewFrames->tracking.frames);
 }
 
-void PTP_FreePropValueEnums(MAllocator* allocator, PTPPropValueEnums* outEnums) {
+void AwPtp_FreePropValueEnums(MAllocator* allocator, AwPtpPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(outEnums->values); ++i) {
         if (outEnums->values[i].str.capacity) {
             MStrFree(allocator, outEnums->values[i].str);
@@ -3136,8 +3136,8 @@ void PTP_FreePropValueEnums(MAllocator* allocator, PTPPropValueEnums* outEnums) 
     MArrayFree(allocator, outEnums->values);
 }
 
-void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums) {
-    PTP_FreePropValueEnums(self->allocator, outEnums);
+void AwControl_FreePropValueEnums(AwControl* self, AwPtpPropValueEnums* outEnums) {
+    AwPtp_FreePropValueEnums(self->allocator, outEnums);
 }
 
 static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* outStr) {
@@ -3197,7 +3197,7 @@ static int WritePtpString(MStr str, MMemIO* memIo) {
     return FALSE;
 }
 
-static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, PTPPropValue* value) {
+static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, AwPtpPropValue* value) {
     i32 r = 0;
     switch (dataType) {
         case PTP_DT_INT8:
@@ -3257,7 +3257,7 @@ static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType,
     return r;
 }
 
-static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
+static void PrintPropertyValue(u16 dataType, AwPtpPropValue* value) {
     switch (dataType) {
         case PTP_DT_INT8:
             MLogf(" %d (%02x)", value->i8, value->i8);
@@ -3317,10 +3317,10 @@ static void PrintPropertyValue(u16 dataType, PTPPropValue* value) {
     }
 }
 
-static void PrintProperties(PTPControl* self) {
+static void PrintProperties(AwControl* self) {
     size_t numProperties = MArraySize(self->properties);
     for (int i = 0; i < numProperties; i++) {
-        PTPProperty* p = self->properties + i;
+        AwPtpProperty* p = self->properties + i;
         MLogf("Property Code: %04x GetSet: %02x IsEnabled: %02x Type: %04x Form: %02x",
             p->propCode, p->getSet, p->isEnabled, p->dataType, p->formFlag);
 
@@ -3360,9 +3360,9 @@ static void PrintProperties(PTPControl* self) {
     }
 }
 
-void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t dataOutSize) {
+void AwControl_InitDataBuffers(AwControl* self, size_t dataInSize, size_t dataOutSize) {
     if (dataInSize > self->dataInCapacity || self->dataInMem == NULL) {
-        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_IN,
+        void* mem = self->device->transport.reallocBuffer(self->device, AW_BUFFER_IN,
                                                           self->dataInMem, self->dataInCapacity,
                                                           dataInSize);
         self->dataInCapacity = dataInSize;
@@ -3370,7 +3370,7 @@ void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t data
     }
 
     if (dataOutSize > self->dataOutCapacity || self->dataOutMem == NULL) {
-        void* mem = self->device->transport.reallocBuffer(self->device, PTP_BUFFER_OUT,
+        void* mem = self->device->transport.reallocBuffer(self->device, AW_BUFFER_OUT,
                                                           self->dataOutMem, self->dataOutCapacity,
                                                           dataOutSize);
         self->dataOutCapacity = dataOutSize;
@@ -3385,18 +3385,18 @@ void PTPControl_InitDataBuffers(PTPControl* self, size_t dataInSize, size_t data
     }
 }
 
-void PTPControl_FreeDataBuffers(PTPControl* self) {
-    self->device->transport.freeBuffer(self->device, PTP_BUFFER_IN, self->dataInMem, self->dataInCapacity);
+void AwControl_FreeDataBuffers(AwControl* self) {
+    self->device->transport.freeBuffer(self->device, AW_BUFFER_IN, self->dataInMem, self->dataInCapacity);
     self->dataInMem = NULL;
     self->dataInCapacity = 0;
-    self->device->transport.freeBuffer(self->device, PTP_BUFFER_OUT, self->dataOutMem, self->dataOutCapacity);
+    self->device->transport.freeBuffer(self->device, AW_BUFFER_OUT, self->dataOutMem, self->dataOutCapacity);
     self->dataOutMem = NULL;
     self->dataOutCapacity = 0;
 }
 
-static PTPRequestHeader BuildReq(PTPControl* self, size_t dataInSize, size_t dataOutSize, u16 opCode) {
-    PTPControl_InitDataBuffers(self, (u32)dataInSize, (u32)dataOutSize);
-    PTPRequestHeader r = {
+static AwPtpRequestHeader BuildReq(AwControl* self, size_t dataInSize, size_t dataOutSize, u16 opCode) {
+    AwControl_InitDataBuffers(self, (u32)dataInSize, (u32)dataOutSize);
+    AwPtpRequestHeader r = {
         .OpCode = opCode,
         .NextPhase = PTP_NEXT_PHASE_READ_DATA,
         .SessionId = self->sessionId,
@@ -3407,7 +3407,7 @@ static PTPRequestHeader BuildReq(PTPControl* self, size_t dataInSize, size_t dat
 
 typedef struct {
     AwResult result;
-    PTPResponseHeader* dataOut;
+    AwPtpResponseHeader* dataOut;
     MMemIO memIo;
 } PTPResponse;
 
@@ -3418,7 +3418,7 @@ typedef struct {
 #define RESULT_PTP(p) ((AwResult){.code = AW_RESULT_PTP_FAILURE, .ptp = (p)})
 #define RESULT_OK() ((AwResult){.code = AW_RESULT_OK})
 
-static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
+static PTPResponse SendReq(AwControl* self, AwPtpRequestHeader* request) {
     size_t actualDataOutSize = 0;
     AwResult r = self->device->transport.sendAndRecv(self->device,
         request, self->dataInMem, self->dataInSize,
@@ -3432,7 +3432,7 @@ static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
 
     response.dataOut = &self->ptpResponse;
     response.result.ptp = response.dataOut->ResponseCode;
-    if (actualDataOutSize > sizeof(PTPResponseHeader)) {
+    if (actualDataOutSize > sizeof(AwPtpResponseHeader)) {
         MMemInitRead(&response.memIo, self->dataOutMem, actualDataOutSize);
     } else {
         response.memIo.mem = NULL;
@@ -3443,8 +3443,8 @@ static PTPResponse SendReq(PTPControl* self, PTPRequestHeader* request) {
     return response;
 }
 
-static PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInSize, size_t dataOutSize, int numParams, ...) {
-    PTPRequestHeader req = BuildReq(self, dataInSize, dataOutSize, opCode);
+static PTPResponse DoRequest(AwControl* self, u16 opCode, size_t dataInSize, size_t dataOutSize, int numParams, ...) {
+    AwPtpRequestHeader req = BuildReq(self, dataInSize, dataOutSize, opCode);
 
     va_list vargs;
     va_start(vargs, numParams);
@@ -3457,26 +3457,26 @@ static PTPResponse DoRequest(PTPControl* self, u16 opCode, size_t dataInSize, si
     return SendReq(self, &req);
 }
 
-static AwResult OpenSession(PTPControl* self, u32 sessionId) {
+static AwResult OpenSession(AwControl* self, u32 sessionId) {
     PTPResponse r = DoRequest(self, PTP_OC_OpenSession, 0, 8, 1, sessionId);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-static AwResult CloseSession(PTPControl* self) {
+static AwResult CloseSession(AwControl* self) {
     PTPResponse r = DoRequest(self, PTP_OC_CloseSession, 0, 8, 0);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-static AwResult SDIO_Connect(PTPControl* self, u32 phase, u32 connectionId) {
+static AwResult SDIO_Connect(AwControl* self, u32 phase, u32 connectionId) {
     PTPResponse r = DoRequest(self, PTP_OC_SDIO_Connect, 0, 8,
                               3, phase, connectionId, connectionId);
     RETURN_IF_FAIL(r);
     return r.result;
 }
 
-static AwResult PTP_GetDeviceInfo(PTPControl* self) {
+static AwResult PTP_GetDeviceInfo(AwControl* self) {
     PTPResponse r = DoRequest(self, PTP_OC_GetDeviceInfo, 0, 0x1000, 0);
     RETURN_IF_FAIL(r);
 
@@ -3545,7 +3545,7 @@ static AwResult PTP_GetDeviceInfo(PTPControl* self) {
     return r.result;
 }
 
-static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPResponse r, u64 numProperties) {
+static void SDIO_ProcessDeviceProperties200(AwControl *self, b32 initial, PTPResponse r, u64 numProperties) {
     if (initial) {
         MArrayInit(self->allocator, self->properties, 0);
         MArrayInit(self->allocator, self->controls, 0);
@@ -3555,20 +3555,20 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
         u16 propCode = 0;
         MMemReadU16LE(&r.memIo, &propCode);
 
-        if (PTPControl_SupportsControl(self, propCode)) {
+        if (AwControl_SupportsControl(self, propCode)) {
             // Handle control
-            PtpControl *control = NULL;
+            AwPtpControl *control = NULL;
             if (!initial) {
-                control = PTPControl_GetControlByCode(self, propCode);
+                control = AwControl_GetControlByCode(self, propCode);
             }
             if (!control) {
                 control = MArrayAddPtr(self->allocator, self->controls);
-                memset(control, 0, sizeof(PtpControl));
+                memset(control, 0, sizeof(AwPtpControl));
                 control->controlCode = propCode;
 
-                size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+                size_t numControlsMeta = MStaticArraySize(sAwControlsMetadata);
                 for (int j = 0; j < numControlsMeta; j++) {
-                    PtpControl* controlDesc = sPtpControlsMetadata + j;
+                    AwPtpControl* controlDesc = sAwControlsMetadata + j;
                     if (controlDesc->controlCode == propCode) {
                         control->label = controlDesc->label;
                         break;
@@ -3582,7 +3582,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
             u8 isEnabled = 0;
             MMemReadU8(&r.memIo, &isEnabled);
 
-            PTPPropValue dummy;
+            AwPtpPropValue dummy;
             ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
             ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &dummy);
 
@@ -3592,9 +3592,9 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
                 u16 numEnumSet = 0;
                 MMemReadU16LE(&r.memIo, &numEnumSet);
                 MArrayInit(self->allocator, control->form.enums.values, numEnumSet);
-                memset(control->form.enums.values, 0, numEnumSet * sizeof(PtpControl));
+                memset(control->form.enums.values, 0, numEnumSet * sizeof(AwPtpControl));
                 for (int j = 0; j < numEnumSet; j++) {
-                    PTPPropValueEnum *value = MArrayAddPtr(self->allocator, control->form.enums.values);
+                    AwPtpPropValueEnum *value = MArrayAddPtr(self->allocator, control->form.enums.values);
                     ReadPropertyValue(self->allocator, &r.memIo, control->dataType, &value->propValue);
                 }
                 control->form.enums.size = numEnumSet;
@@ -3606,13 +3606,13 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
             }
         } else {
             // Handle property
-            PTPProperty *property = NULL;
+            AwPtpProperty *property = NULL;
             if (!initial) {
-                property = PTPControl_GetPropertyByCode(self, propCode);
+                property = AwControl_GetPropertyByCode(self, propCode);
             }
             if (!property) {
                 property = MArrayAddPtr(self->allocator, self->properties);
-                memset(property, 0, sizeof(PTPProperty));
+                memset(property, 0, sizeof(AwPtpProperty));
                 property->propCode = propCode;
             }
 
@@ -3630,7 +3630,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
                 MMemReadU16LE(&r.memIo, &numEnumSet);
                 MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
                 for (int j = 0; j < numEnumSet; j++) {
-                    PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
+                    AwPtpPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
                     ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
                 }
             } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
@@ -3640,7 +3640,7 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
             }
 
             // On older pre-2020 cameras, some properties can only be adjusted up or down, mark them as such with
-            // 'isNotch', client code can change these properties with PTPControl_SetPropertyNotch()
+            // 'isNotch', client code can change these properties with AwControl_SetPropertyNotch()
             switch (propCode) {
                 case DPC_F_NUMBER:
                 case DPC_EXPOSURE_COMPENSATION:
@@ -3657,19 +3657,19 @@ static void SDIO_ProcessDeviceProperties200(PTPControl *self, b32 initial, PTPRe
     }
 }
 
-static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 initial, PTPResponse r, u64 numProperties) {
+static void SDIO_ProcessDeviceProperties300(AwControl *self, b32 initial, PTPResponse r, u64 numProperties) {
     if (initial) {
         MArrayInit(self->allocator, self->properties, numProperties);
-        memset(self->properties, 0, numProperties * sizeof(PTPProperty));
+        memset(self->properties, 0, numProperties * sizeof(AwPtpProperty));
     }
 
     for (int i = 0; i < numProperties; i++) {
         u16 propCode = 0;
         MMemReadU16LE(&r.memIo, &propCode);
 
-        PTPProperty *property = NULL;
+        AwPtpProperty *property = NULL;
         if (!initial) {
-            property = PTPControl_GetPropertyByCode(self, propCode);
+            property = AwControl_GetPropertyByCode(self, propCode);
         }
         if (!property) {
             property = MArrayAddPtrZ(self->allocator, self->properties);
@@ -3690,14 +3690,14 @@ static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 initial, PTPRe
             MMemReadU16LE(&r.memIo, &numEnumSet);
             MArrayInit(self->allocator, property->form.enums.set, numEnumSet);
             for (int j = 0; j < numEnumSet; j++) {
-                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
+                AwPtpPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.set);
                 ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
             }
             u16 numEnumGetSet = 0;
             MMemReadU16LE(&r.memIo, &numEnumGetSet);
             MArrayInit(self->allocator, property->form.enums.getSet, numEnumGetSet);
             for (int j = 0; j < numEnumGetSet; j++) {
-                PTPPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.getSet);
+                AwPtpPropValue* value = MArrayAddPtr(self->allocator, property->form.enums.getSet);
                 ReadPropertyValue(self->allocator, &r.memIo, property->dataType, value);
             }
         } else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
@@ -3708,7 +3708,7 @@ static void SDIO_ProcessDeviceProperties300(PTPControl *self, b32 initial, PTPRe
     }
 }
 
-static void SetMetadataForProperties(PTPControl* self) {
+static void SetMetadataForProperties(AwControl* self) {
     MArrayEachPtr(self->properties, i) {
         if (i.p->meta) {
             continue;
@@ -3729,8 +3729,8 @@ enum GetAllExtDevicePropInfoUpdateMode {
     UPDATE_ALL
 };
 
-static AwResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 initial, b32 incremental, b32 addExtended) {
-    PTPRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
+static AwResult SDIO_GetAllExtDevicePropInfo(AwControl* self, b32 initial, b32 incremental, b32 addExtended) {
+    AwPtpRequestHeader req = BuildReq(self, 0, 64 * 1024, PTP_OC_SDIO_GetAllExtDevicePropInfo);
     if (self->protocolVersion >= SDI_EXTENSION_VERSION_300) {
         req.Params[0] = incremental ? 0x1 : 0x0;
         req.Params[1] = addExtended ? 0x1 : 0x0;
@@ -3756,10 +3756,10 @@ static AwResult SDIO_GetAllExtDevicePropInfo(PTPControl* self, b32 initial, b32 
     return r.result;
 }
 
-static AwResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
+static AwResult SDIO_SetExtDevicePropValue(AwControl* self, u16 propCode, u16 dataType, AwPtpPropValue value) {
     size_t size = Ptp_PropValueSize(dataType, value);
 
-    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
+    AwPtpRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
     req.Params[0] = propCode;
     req.NumParams = 1;
@@ -3801,10 +3801,10 @@ static AwResult SDIO_SetExtDevicePropValue(PTPControl* self, u16 propCode, u16 d
     return r.result;
 }
 
-static AwResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType, PTPPropValue value) {
+static AwResult SDIO_ControlDevice(AwControl* self, u16 propCode, u16 dataType, AwPtpPropValue value) {
     size_t size = Ptp_PropValueSize(dataType, value);
 
-    PTPRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
+    AwPtpRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
     req.Params[0] = propCode;
     req.NumParams = 1;
@@ -3840,7 +3840,7 @@ static AwResult SDIO_ControlDevice(PTPControl* self, u16 propCode, u16 dataType,
     return r.result;
 }
 
-static AwResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList displayList) {
+static AwResult SDIO_GetDisplayStringList(AwControl* self, AwStringDisplayList displayList) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetDisplayStringList,
                               0,
@@ -3872,7 +3872,7 @@ static AwResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList
             MMemReadU16(&r.memIo, &displayStringNum);
             MLogf("Display String List: %04x Data: %04x Num: %d", listType, dataType, displayStringNum);
             for (int k = 0; k < displayStringNum; k++) {
-                PTPPropValue value;
+                AwPtpPropValue value;
                 ReadPropertyValue(self->allocator, &r.memIo, dataType, &value);
                 char* str = ReadPtpString16BitLen(self->allocator, &r.memIo);
                 MLogf(" -- %s", str);
@@ -3883,7 +3883,7 @@ static AwResult SDIO_GetDisplayStringList(PTPControl* self, PtpStringDisplayList
     return r.result;
 }
 
-static AwResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUnits) {
+static AwResult SDIO_GetLensInformation(AwControl* self, AwFocusUnits focusUnits) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetLensInformation,
                               0,
@@ -3924,7 +3924,7 @@ static AwResult SDIO_GetLensInformation(PTPControl* self, PtpFocusUnits focusUni
     return r.result;
 }
 
-static AwResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32 extended) {
+static AwResult SDIO_GetExtDeviceInfo(AwControl* self, u32 protocolVersion, b32 extended) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetExtDeviceInfo,
                               0,
@@ -3959,7 +3959,7 @@ static AwResult SDIO_GetExtDeviceInfo(PTPControl* self, u32 protocolVersion, b32
     return r.result;
 }
 
-static AwResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectInfo* objectInfo) {
+static AwResult AwGetObjectInfo(AwControl* self, u32 objectHandle, AwObjectInfo* objectInfo) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_GetObjectInfo,
                               0,
@@ -3993,7 +3993,7 @@ static AwResult PTP_GetObjectInfo(PTPControl* self, u32 objectHandle, PTPObjectI
     return r.result;
 }
 
-static AwResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO* fileOut, LiveViewFrames* liveViewFrames) {
+static AwResult PTP_GetLiveViewImage(AwControl* self, size_t objectSize, MMemIO* fileOut, AwLiveViewFrames* liveViewFrames) {
     fileOut->size = 0;
 
     PTPResponse r = DoRequest(self,
@@ -4036,7 +4036,7 @@ static AwResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO
                 MMemReadSkipBytes(&r.memIo, reservedArrayNum * 24);
             }
 
-            FocusFrames* focusFrames = &liveViewFrames->focus;
+            AwFocusFrames* focusFrames = &liveViewFrames->focus;
             MMemReadU32LE(&r.memIo, &focusFrames->xDenominator);
             MMemReadU32LE(&r.memIo, &focusFrames->yDenominator);
 
@@ -4050,7 +4050,7 @@ static AwResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO
                 MArrayClear(focusFrames->frames);
 
                 for (int i = 0; i < frameNum; ++i) {
-                    FocusFrame* focusFrame = MArrayAddPtr(self->allocator, focusFrames->frames);
+                    AwFocusFrame* focusFrame = MArrayAddPtr(self->allocator, focusFrames->frames);
                     MMemReadU16LE(&r.memIo, &focusFrame->frameType);
                     MMemReadU16LE(&r.memIo, &focusFrame->focusFrameState);
                     MMemReadU8(&r.memIo, &focusFrame->priority);
@@ -4077,8 +4077,8 @@ static AwResult PTP_GetLiveViewImage(PTPControl* self, size_t objectSize, MMemIO
     return r.result;
 }
 
-AwResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
-    PTP_TRACE("PTP_GetObject");
+static AwResult Aw_GetObject(AwControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
+    AW_TRACE("Aw_GetObject");
     fileOut->size = 0;
     fileOut->allocator = self->allocator;
 
@@ -4096,33 +4096,33 @@ AwResult PTP_GetObject(PTPControl* self, u32 objectHandle, size_t objectSize, MM
     return r.result;
 }
 
-int PTPControl_GetPendingFiles(PTPControl* self) {
-    PTPProperty* property = PTPControl_GetPropertyByCode(self, DPC_PENDING_FILES);
+int AwControl_GetPendingFiles(AwControl* self) {
+    AwPtpProperty* property = AwControl_GetPropertyByCode(self, DPC_PENDING_FILES);
     if (property != NULL && property->dataType == PTP_DT_UINT16) {
         u16 value = property->value.u16;
         if (value & 0x8000) {
             value = value & 0x7fff;
         }
-        PTP_TRACE_F("PTPControl_GetPendingFiles -> %d", value);
+        AW_TRACE_F("AwControl_GetPendingFiles -> %d", value);
         return value;
     }
     return 0;
 }
 
-AwResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut) {
-    PTP_TRACE("PTPControl_GetLiveViewImage");
-    PTPObjectInfo objectInfo = {};
-    AwResult r = PTP_GetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
+AwResult AwControl_GetLiveViewImage(AwControl* self, MMemIO* fileOut, AwLiveViewFrames* liveViewFramesOut) {
+    AW_TRACE("AwControl_GetLiveViewImage");
+    AwObjectInfo objectInfo = {};
+    AwResult r = AwGetObjectInfo(self, SD_OH_LIVE_VIEW_IMAGE, &objectInfo);
     if (!IS_OK(r)) {
         return r;
     }
     // Free strings - we dont use them
-    PTP_FreeObjectInfo(self->allocator, &objectInfo);
+    Aw_FreeObjectInfo(self->allocator, &objectInfo);
     return PTP_GetLiveViewImage(self, objectInfo.objectCompressedSize, fileOut, liveViewFramesOut);
 }
 
-AwResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut) {
-    PTP_TRACE("PTP_GetOSDImage");
+AwResult AwControl_GetOSDImage(AwControl* self, MMemIO* fileOut) {
+    AW_TRACE("AwControl_GetOSDImage");
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetOSDImage,
                               0,
@@ -4153,45 +4153,45 @@ AwResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* fileOut) {
     return r.result;
 }
 
-AwResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* fileOut, PTPCapturedImageInfo* ciiOut) {
-    PTP_TRACE("PTPControl_GetCapturedImage");
-    PTPObjectInfo objectInfo = {};
-    AwResult r = PTP_GetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
+AwResult AwControl_GetCapturedImage(AwControl* self, MMemIO* fileOut, AwPtpCapturedImageInfo* ciiOut) {
+    AW_TRACE("AwControl_GetCapturedImage");
+    AwObjectInfo objectInfo = {};
+    AwResult r = AwGetObjectInfo(self, SD_OH_CAPTURED_IMAGE, &objectInfo);
     if (!IS_OK(r)) {
         return r;
     }
     if (objectInfo.objectCompressedSize == 0 || MStrIsEmpty(objectInfo.filename)) {
-        PTP_DEBUG_F("No image to download (size: %d filename: '%.*s')", objectInfo.objectCompressedSize,
+        AW_DEBUG_F("No image to download (size: %d filename: '%.*s')", objectInfo.objectCompressedSize,
             objectInfo.filename.size, objectInfo.filename.str);
         ciiOut->size = 0;
         MStrZero(&ciiOut->filename);
         return r;
     }
-    PTP_DEBUG_F("Downloading image... (%.*s format: %s size: %d)", objectInfo.filename.size, objectInfo.filename.str,
-        PTP_GetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
+    AW_DEBUG_F("Downloading image... (%.*s format: %s size: %d)", objectInfo.filename.size, objectInfo.filename.str,
+        AwGetObjectFormatStr(objectInfo.objectFormat), objectInfo.objectCompressedSize);
     ciiOut->filename = objectInfo.filename;
     ciiOut->objectFormat = objectInfo.objectFormat;
     ciiOut->size = objectInfo.objectCompressedSize;
     MStrZero(&objectInfo.filename); // ownership has passed to ciiOut
-    PTP_FreeObjectInfo(self->allocator, &objectInfo); // Free any other strings
-    r = PTP_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
-    PTP_DEBUG_F("Downloaded image size: %d", fileOut->size);
+    Aw_FreeObjectInfo(self->allocator, &objectInfo); // Free any other strings
+    r = Aw_GetObject(self, SD_OH_CAPTURED_IMAGE, objectInfo.objectCompressedSize, fileOut);
+    AW_DEBUG_F("Downloaded image size: %d", fileOut->size);
     return r;
 }
 
-AwResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* fileOut) {
-    PTP_TRACE("PTPControl_GetCameraSettingsFile");
-    PTPObjectInfo objectInfo = {};
-    AwResult r = PTP_GetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
+AwResult AwControl_GetCameraSettingsFile(AwControl* self, MMemIO* fileOut) {
+    AW_TRACE("AwControl_GetCameraSettingsFile");
+    AwObjectInfo objectInfo = {};
+    AwResult r = AwGetObjectInfo(self, SD_OH_CAMERA_SETTINGS, &objectInfo);
     if (!IS_OK(r)) {
         return r;
     }
-    PTP_FreeObjectInfo(self->allocator, &objectInfo);
-    return PTP_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
+    Aw_FreeObjectInfo(self->allocator, &objectInfo);
+    return Aw_GetObject(self, SD_OH_CAMERA_SETTINGS, objectInfo.objectCompressedSize, fileOut);
 }
 
-AwResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** eventsOut) {
-    PTP_TRACE("PTPControl_ReadEvents");
+AwResult AwControl_ReadEvents(AwControl* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** eventsOut) {
+    AW_TRACE("AwControl_ReadEvents");
 
     if (!self->device->transport.readEvents) {
         return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
@@ -4204,11 +4204,11 @@ AwResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAlloc
     return self->device->transport.readEvents(self->device, timeoutMilliseconds, alloc, eventsOut);
 }
 
-AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
-    PTP_TRACE("PTPControl_GetMagnifier");
-    PTPProperty* propMagPos = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_POS);
+AwResult AwControl_GetMagnifier(AwControl* self, AwMagnifier* outMagnifier) {
+    AW_TRACE("AwControl_GetMagnifier");
+    AwPtpProperty* propMagPos = AwControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_POS);
     if (propMagPos) {
-        PTPProperty* propMagScale = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_SCALE);
+        AwPtpProperty* propMagScale = AwControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY_SCALE);
 
         u32 posValue = propMagPos->value.u32;
         i32 x = (i32)((posValue >> 16) & 0xffff);
@@ -4231,7 +4231,7 @@ AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
 
         return RESULT_OK();
     } else {
-        PTPProperty* propMag = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
+        AwPtpProperty* propMag = AwControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
         if (propMag) {
             u64 cyrValue = propMag->value.u64;
             i32 curRatio = (i32)((cyrValue >> 32) & 0x7fffffff);
@@ -4244,7 +4244,7 @@ AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
             outMagnifier->ratio.ratioByTen = curRatio;
             outMagnifier->canSet = TRUE;
 
-            PTPPropValue* enums = propMag->form.enums.getSet;
+            AwPtpPropValue* enums = propMag->form.enums.getSet;
             if (!enums) {
                 enums = propMag->form.enums.set;
             }
@@ -4252,7 +4252,7 @@ AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
             outMagnifier->numRatios = MArraySize(enums);
             outMagnifier->ratioIndex = 0;
             for (size_t i = 0; i < MArraySize(enums); ++i) {
-                PTPPropValue* v = enums + i;
+                AwPtpPropValue* v = enums + i;
                 u64 value = v->u64;
                 i32 ratio = (i32)((value >> 32) & 0x7fffffff);
                 AwMagnifierRatio* r = outMagnifier->ratios + i;
@@ -4276,13 +4276,13 @@ AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier) {
     return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
 }
 
-AwResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier) {
-    PTP_TRACE("PTPControl_SetMagnifier");
-    PTPProperty* propMag = PTPControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
+AwResult AwControl_SetMagnifier(AwControl* self, AwMagnifierSet magnifier) {
+    AW_TRACE("AwControl_SetMagnifier");
+    AwPtpProperty* propMag = AwControl_GetPropertyByCode(self, DPC_FOCUS_MAGNIFY);
     if (propMag) {
         u64 newValue = ((u64)magnifier.ratio.ratioByTen << 32) |
             (((magnifier.x & 0xffff) << 16) | (magnifier.y & 0xffff));
-        return PTPControl_SetPropertyValue(self, propMag, (PTPPropValue){.u64 = newValue});
+        return AwControl_SetPropertyValue(self, propMag, (AwPtpPropValue){.u64 = newValue});
     }
     return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
 }
@@ -4338,8 +4338,8 @@ AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos) {
     return (AwPosInt2){x, y};
 }
 
-AwResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
-    PTPRequestHeader req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
+static AwResult AwSendObject(AwControl* self, u32 objectHandle, MMemIO* fileIn) {
+    AwPtpRequestHeader req = BuildReq(self, fileIn->size, 0x1000, PTP_OC_SendObject);
     req.Params[0] = objectHandle;
     req.NumParams = 1;
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
@@ -4352,12 +4352,12 @@ AwResult PTP_SendObject(PTPControl* self, u32 objectHandle, MMemIO* fileIn) {
     return r.result;
 }
 
-AwResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* fileIn) {
-    PTP_TRACE("PTPControl_PutCameraSettingsFile");
-    return PTP_SendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
+AwResult AwControl_PutCameraSettingsFile(AwControl* self, MMemIO* fileIn) {
+    AW_TRACE("AwControl_PutCameraSettingsFile");
+    return AwSendObject(self, SD_OH_CAMERA_SETTINGS, fileIn);
 }
 
-AwResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator) {
+AwResult AwControl_Init(AwControl* self, AwDevice* device, MAllocator* allocator) {
     if (!self || !device) {
         return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
@@ -4369,49 +4369,49 @@ AwResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* alloca
     return RESULT_OK();
 }
 
-static void SDIO_InitControlsMetadata200(PTPControl *self, size_t numControls) {
+static void SDIO_InitControlsMetadata200(AwControl *self, size_t numControls) {
     for (int i = 0; i < numControls; i++) {
         u16 controlCode = self->supportedControls[i];
-        PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
+        AwPtpControl* control = AwControl_GetControlByCode(self, controlCode);
         if (!control) {
             control = MArrayAddPtr(self->allocator, self->controls);
 
             b32 found = FALSE;
-            size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+            size_t numControlsMeta = MStaticArraySize(sAwControlsMetadata);
             for (int j = 0; j < numControlsMeta; j++) {
-                PtpControl *meta = sPtpControlsMetadata + j;
+                AwPtpControl *meta = sAwControlsMetadata + j;
                 if (meta->controlCode == controlCode) {
-                    memcpy(control, meta, sizeof(PtpControl));
+                    memcpy(control, meta, sizeof(AwPtpControl));
                     found = TRUE;
                     break;
                 }
             }
             if (!found) {
-                memset(control, 0, sizeof(PtpControl));
+                memset(control, 0, sizeof(AwPtpControl));
                 control->controlCode = controlCode;
             }
         }
     }
 }
 
-static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
+static void SDIO_InitControlsMetadata300(AwControl *self, size_t numControls) {
     MArrayInit(self->allocator, self->controls, numControls);
     for (int i = 0; i < numControls; i++) {
         u16 controlCode = self->supportedControls[i];
 
-        PtpControl* control = MArrayAddPtr(self->allocator, self->controls);
+        AwPtpControl* control = MArrayAddPtr(self->allocator, self->controls);
         b32 found = FALSE;
-        size_t numControlsMeta = MStaticArraySize(sPtpControlsMetadata);
+        size_t numControlsMeta = MStaticArraySize(sAwControlsMetadata);
         for (int j = 0; j < numControlsMeta; j++) {
-            PtpControl* meta = sPtpControlsMetadata + j;
+            AwPtpControl* meta = sAwControlsMetadata + j;
             if (meta->controlCode == controlCode) {
-                memcpy(control, meta, sizeof(PtpControl));
+                memcpy(control, meta, sizeof(AwPtpControl));
                 found = TRUE;
                 break;
             }
         }
         if (!found) {
-            memset(control, 0, sizeof(PtpControl));
+            memset(control, 0, sizeof(AwPtpControl));
             control->dataType = PTP_DT_UINT16;
             control->controlType = SDI_CONTROL_BUTTON;
             control->formFlag = PTP_FORM_FLAG_ENUM;
@@ -4422,8 +4422,8 @@ static void SDIO_InitControlsMetadata300(PTPControl *self, size_t numControls) {
     }
 }
 
-AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
-    PTP_TRACE_F("PTPControl_Connect 0x04%x", version);
+AwResult AwControl_Connect(AwControl* self, AwSonyProtocolVersion version) {
+    AW_TRACE_F("AwControl_Connect 0x04%x", version);
     AwResult r;
 
     ////////////////////////////////////////////
@@ -4443,9 +4443,9 @@ AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
             // only help avoid a timeout on initial connection.
             if (self->device->transport.reset) {
                 if (r.code == AW_RESULT_TIMEOUT) {
-                    PTP_WARNING("Timeout while calling OpenSession() - will reset transport and retry...");
+                    AW_WARNING("Timeout while calling OpenSession() - will reset transport and retry...");
                 } else {
-                    PTP_WARNING("Session already open while calling OpenSession() - will reset transport and retry...");
+                    AW_WARNING("Session already open while calling OpenSession() - will reset transport and retry...");
                 }
                 self->device->transport.reset(self->device);
             }
@@ -4465,14 +4465,14 @@ AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     // 1. Authentication Packet 1
     r = SDIO_Connect(self, 1, connectionId);
     if (!IS_OK(r)) {
-        PTP_WARNING_F("Auth phase 1 failed (0x%08x)...", r);
+        AW_WARNING_F("Auth phase 1 failed (0x%08x)...", r);
         return r;
     }
 
     // 2. Authentication Packet 2
     r = SDIO_Connect(self, 2, connectionId);
     if (!IS_OK(r)) {
-        PTP_WARNING_F("Auth phase 2 failed (0x%08x)...", r);
+        AW_WARNING_F("Auth phase 2 failed (0x%08x)...", r);
         return r;
     }
 
@@ -4486,14 +4486,14 @@ AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
         }
     }
     if (!gotExtDeviceInfo) {
-        PTP_WARNING_F("GetExtDeviceInfo failed after %d retries...", retries);
+        AW_WARNING_F("GetExtDeviceInfo failed after %d retries...", retries);
         return RESULT_CODE(AW_RESULT_DEVICE_INFO_FAILURE);
     }
 
     // 4. Authentication Phase 3
     r = SDIO_Connect(self, 3, connectionId);
     if (!IS_OK(r)) {
-        PTP_WARNING_F("Auth phase 3 failed (0x%08x)...", r);
+        AW_WARNING_F("Auth phase 3 failed (0x%08x)...", r);
         return r;
     }
 
@@ -4504,14 +4504,14 @@ AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     // Get general device info
     r = PTP_GetDeviceInfo(self);
     if (!IS_OK(r)) {
-        PTP_WARNING_F("GetDeviceInfo failed: 0x%08x 0x%08x", r.code, r.ptp);
+        AW_WARNING_F("GetDeviceInfo failed: 0x%08x 0x%08x", r.code, r.ptp);
         return r;
     }
 
     // Get property metadata & values
     r = SDIO_GetAllExtDevicePropInfo(self, TRUE, FALSE, TRUE);
     if (!IS_OK(r)) {
-        PTP_WARNING_F("GetAllExtDevicePropInfo failed: 0x%08x 0x%08x", r.code, r.ptp);
+        AW_WARNING_F("GetAllExtDevicePropInfo failed: 0x%08x 0x%08x", r.code, r.ptp);
         return r;
     }
 
@@ -4521,7 +4521,7 @@ AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
 
     // Build controls list
     size_t numControls = MArraySize(self->supportedControls);
-    PTP_INFO_F("Connected to device (protocol: %d)", self->protocolVersion);
+    AW_INFO_F("Connected to device (protocol: %d)", self->protocolVersion);
     if (self->protocolVersion == SDI_EXTENSION_VERSION_200) {
         SDIO_InitControlsMetadata200(self, numControls);
     } else {
@@ -4533,8 +4533,8 @@ AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version) {
     return RESULT_OK();
 }
 
-AwResult PTPControl_Cleanup(PTPControl* self) {
-    PTP_TRACE("PTPControl_Cleanup");
+AwResult AwControl_Cleanup(AwControl* self) {
+    AW_TRACE("AwControl_Cleanup");
 
     ////////////////////////////////////////////
     // Close session (if not done by transport layer implicitly)
@@ -4546,7 +4546,7 @@ AwResult PTPControl_Cleanup(PTPControl* self) {
         self->transactionId = 0;
     }
 
-    PTPControl_FreeDataBuffers(self);
+    AwControl_FreeDataBuffers(self);
 
     self->protocolVersion = 0;
     self->standardVersion = 0;
@@ -4558,7 +4558,7 @@ AwResult PTPControl_Cleanup(PTPControl* self) {
     MArrayFree(self->allocator, self->captureFormats);
     MArrayFree(self->allocator, self->imageFormats);
     for (int i = 0; i < MArraySize(self->properties); ++i) {
-        PTPProperty* property = self->properties + i;
+        AwPtpProperty* property = self->properties + i;
         PropValueFree(self->allocator, property->dataType, &property->value);
         PropValueFree(self->allocator, property->dataType, &property->defaultValue);
         if (property->formFlag == PTP_FORM_FLAG_ENUM) {
@@ -4573,7 +4573,7 @@ AwResult PTPControl_Cleanup(PTPControl* self) {
     MArrayFree(self->allocator, self->properties);
 
     for (int i = 0; i < MArraySize(self->controls); ++i) {
-        PtpControl* control = self->controls + i;
+        AwPtpControl* control = self->controls + i;
         if (control->formFlag == PTP_FORM_FLAG_ENUM) {
             if (control->form.enums.owned) {
                 MArrayFree(self->allocator, control->form.enums.values);
@@ -4591,7 +4591,7 @@ AwResult PTPControl_Cleanup(PTPControl* self) {
     return RESULT_OK();
 }
 
-b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode) {
+b32 AwControl_SupportsEvent(AwControl* self, u16 eventCode) {
     for (int i = 0; i < MArraySize(self->supportedEvents); ++i) {
         if (self->supportedEvents[i] == eventCode) {
             return TRUE;
@@ -4600,7 +4600,7 @@ b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode) {
     return FALSE;
 }
 
-b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode) {
+b32 AwControl_SupportsControl(AwControl* self, u16 controlCode) {
     for (int i = 0; i < MArraySize(self->supportedControls); ++i) {
         if (self->supportedControls[i] == controlCode) {
             return TRUE;
@@ -4609,7 +4609,7 @@ b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode) {
     return FALSE;
 }
 
-b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode) {
+b32 AwControl_SupportsProperty(AwControl* self, u16 propCode) {
     for (int i = 0; i < MArraySize(self->supportedProperties); ++i) {
         if (self->supportedProperties[i] == propCode) {
             return TRUE;
@@ -4618,7 +4618,7 @@ b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode) {
     return FALSE;
 }
 
-b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property) {
+b32 AwControl_PropertyEnabled(AwControl* self, AwPtpProperty* property) {
     if (!property) {
         return FALSE;
     }
@@ -4628,8 +4628,8 @@ b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property) {
     return FALSE;
 }
 
-b32 PTPControl_PropertyEnabledByCode(PTPControl* self, u16 propCode) {
-    PTPProperty* property = PTPControl_GetPropertyByCode(self, propCode);
+b32 AwControl_PropertyEnabledByCode(AwControl* self, u16 propCode) {
+    AwPtpProperty* property = AwControl_GetPropertyByCode(self, propCode);
     if (!property) {
         return FALSE;
     }
@@ -4639,7 +4639,7 @@ b32 PTPControl_PropertyEnabledByCode(PTPControl* self, u16 propCode) {
     return FALSE;
 }
 
-PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode) {
+AwPtpProperty* AwControl_GetPropertyByCode(AwControl* self, u16 propertyCode) {
     for (int i = 0; i < MArraySize(self->properties); ++i) {
         if (self->properties[i].propCode == propertyCode) {
             return self->properties + i;
@@ -4648,7 +4648,7 @@ PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode) {
     return NULL;
 }
 
-PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* id) {
+AwPtpProperty* AwControl_GetPropertyById(AwControl* self, const char* id) {
     MArrayEachPtr(self->properties, it) {
         if (!it.p->meta) {
             continue;
@@ -4661,16 +4661,16 @@ PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* id) {
     return NULL;
 }
 
-size_t PTPControl_NumProperties(PTPControl* self) {
+size_t AwControl_NumProperties(AwControl* self) {
     return MArraySize(self->properties);
 }
 
-PTPProperty* PTPControl_GetPropertyByIndex(PTPControl* self, u16 index) {
+AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index) {
     return self->properties + index;
 }
 
-AwResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh) {
-    PTP_TRACE("PTPControl_UpdateProperties");
+AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh) {
+    AW_TRACE("AwControl_UpdateProperties");
     return SDIO_GetAllExtDevicePropInfo(self, FALSE, !fullRefresh, TRUE);
 }
 
@@ -4684,13 +4684,13 @@ static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8
     return NULL;
 }
 
-static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProperty* property,
-        EnumValueU8* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
+static b32 BuildEnumsFromListU8(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+        EnumValueU8* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u8 lookupValue = property->form.enums.getSet[i].u8;
         char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue.u8 = lookupValue;
         propEnum->str = MStrMakeStaticCStr(str);
     }
@@ -4698,12 +4698,12 @@ static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProp
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
+            AwPtpPropValueEnum* prop = outEnums->values + j;
+            prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ;
         }
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
             u8 lookupValue = property->form.enums.set[i].u8;
-            PTPPropValueEnum* prop = NULL;
+            AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u8 enumValue = outEnums->values[j].propValue.u8;
                 if (lookupValue == enumValue) {
@@ -4712,11 +4712,11 @@ static b32 BuildEnumsFromListU8(PTPControl* self, MAllocator* allocator, PTPProp
                 }
             }
             if (prop) {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue.u8 = lookupValue;
                 propEnum->str = MStrMakeStaticCStr(str);
             }
@@ -4736,13 +4736,13 @@ static char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, 
     return NULL;
 }
 
-static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPProperty* property,
-        EnumValueU16* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
+static b32 BuildEnumsFromListU16(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+        EnumValueU16* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u16 lookupValue = property->form.enums.getSet[i].u16;
         char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue.u16 = lookupValue;
         propEnum->str = MStrMakeStaticCStr(str);
     }
@@ -4750,12 +4750,12 @@ static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPPro
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
+            AwPtpPropValueEnum* prop = outEnums->values + j;
+            prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ;
         }
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
             u16 lookupValue = property->form.enums.set[i].u16;
-            PTPPropValueEnum* prop = NULL;
+            AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u16 enumValue = outEnums->values[j].propValue.u16;
                 if (lookupValue == enumValue) {
@@ -4764,11 +4764,11 @@ static b32 BuildEnumsFromListU16(PTPControl* self, MAllocator* allocator, PTPPro
                 }
             }
             if (prop) {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue.u16 = lookupValue;
                 propEnum->str = MStrMakeStaticCStr(str);
             }
@@ -4788,13 +4788,13 @@ static char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, 
     return NULL;
 }
 
-static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPProperty* property,
-                                 EnumValueU32* enumValues, size_t numEnumValues, PTPPropValueEnums* outEnums) {
+static b32 BuildEnumsFromListU32(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                 EnumValueU32* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
         u32 lookupValue = property->form.enums.getSet[i].u32;
         char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue.u32 = lookupValue;
         propEnum->str = MStrMakeStaticCStr(str);
     }
@@ -4802,12 +4802,12 @@ static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPPro
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ;
+            AwPtpPropValueEnum* prop = outEnums->values + j;
+            prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ;
         }
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
             u32 lookupValue = property->form.enums.set[i].u32;
-            PTPPropValueEnum* prop = NULL;
+            AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u32 enumValue = outEnums->values[j].propValue.u32;
                 if (lookupValue == enumValue) {
@@ -4816,11 +4816,11 @@ static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPPro
                 }
             }
             if (prop) {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
                 char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
-                PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-                propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue.u32 = lookupValue;
                 propEnum->str = MStrMakeStaticCStr(str);
             }
@@ -4830,33 +4830,33 @@ static b32 BuildEnumsFromListU32(PTPControl* self, MAllocator* allocator, PTPPro
     return TRUE;
 }
 
-b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* property, PTPPropertyMetadata* meta,
-        PTPPropValueEnums* outEnums) {
+b32 BuildEnumsFromGetFunc(AwControl* self, MAllocator* allocator, AwPtpProperty* property, PTPPropertyMetadata* meta,
+        AwPtpPropValueEnums* outEnums) {
     for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        PTPPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
-        PTPPropValue propValue = property->form.enums.getSet[i];
+        AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        AwPtpPropValue propValue = property->form.enums.getSet[i];
         propEnum->propValue = propValue;
         propEnum->str = meta->valueAsStringFunc(self, allocator, property, propValue);
         if (propEnum->str.capacity) {
-            propEnum->flags = ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+            propEnum->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         } else {
-            propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+            propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         }
     }
 
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
         for (int j = 0; j < getSetItems; j++) {
-            PTPPropValueEnum* prop = outEnums->values + j;
-            prop->flags &= ~ENUM_VALUE_WRITE;
+            AwPtpPropValueEnum* prop = outEnums->values + j;
+            prop->flags &= ~AW_ENUM_VALUE_WRITE;
         }
 
         for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            PTPPropValue lookupValue = property->form.enums.set[i];
-            PTPPropValueEnum* prop = NULL;
+            AwPtpPropValue lookupValue = property->form.enums.set[i];
+            AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
-                PTPPropValue enumValue = outEnums->values[j].propValue;
-                if (PTP_PropValueEq(property->dataType, lookupValue, enumValue)) {
+                AwPtpPropValue enumValue = outEnums->values[j].propValue;
+                if (AwPtpPropValueEq(property->dataType, lookupValue, enumValue)) {
                     prop = outEnums->values + j;
                     break;
                 }
@@ -4869,9 +4869,9 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* 
             }
 
             if (prop->str.capacity) {
-                prop->flags = ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                prop->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
-                prop->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+                prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             }
         }
     }
@@ -4879,7 +4879,7 @@ b32 BuildEnumsFromGetFunc(PTPControl* self, MAllocator* allocator, PTPProperty* 
     return TRUE;
 }
 
-b32 PTPControl_GetEnumsForProperty(PTPControl* self, PTPProperty* property, MAllocator* allocator, PTPPropValueEnums* outEnums) {
+b32 AwControl_GetEnumsForProperty(AwControl* self, AwPtpProperty* property, MAllocator* allocator, AwPtpPropValueEnums* outEnums) {
     if (!property || property->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
@@ -4905,7 +4905,7 @@ b32 PTPControl_GetEnumsForProperty(PTPControl* self, PTPProperty* property, MAll
     return FALSE;
 }
 
-b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* strOut) {
+b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MAllocator* allocator, MStr* strOut) {
     if (property == NULL) {
         return FALSE;
     }
@@ -5007,7 +5007,7 @@ static void UpdateStr(MAllocator* allocator, MStr* strIn, MStr* strOut) {
     strOut->size = strIn->size;
 }
 
-AwResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value) {
+AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, AwPtpPropValue value) {
     if (!property) {
         return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
@@ -5022,40 +5022,40 @@ AwResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PT
     return r;
 }
 
-AwResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value) {
+AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value) {
     // TODO: generic and per prop string parsing
     return RESULT_OK();
 }
 
-AwResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch) {
+AwResult AwControl_SetPropertyNotch(AwControl* self, AwPtpProperty* property, i8 notch) {
     if (!property) {
         return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
-    PTP_TRACE_F("PTPControl_SetPropertyNotch(%x, %d)", property->propCode, notch);
+    AW_TRACE_F("AwControl_SetPropertyNotch(%x, %d)", property->propCode, notch);
     if (!property->isNotch) {
-        PTP_ERROR_F("Property %d is not a notch property", property->propCode);
+        AW_ERROR_F("Property %d is not a notch property", property->propCode);
         return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
     }
-    return SDIO_ControlDevice(self, property->propCode, PTP_DT_INT8, (PTPPropValue){.i8=notch});
+    return SDIO_ControlDevice(self, property->propCode, PTP_DT_INT8, (AwPtpPropValue){.i8=notch});
 }
 
-b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property) {
+b32 AwControl_IsPropertyWritable(AwControl* self, AwPtpProperty* property) {
     if (!property) {
         return FALSE;
     }
-    PTP_TRACE_F("PTPControl_IsPropertyWritable(%x)", property->propCode);
+    AW_TRACE_F("AwControl_IsPropertyWritable(%x)", property->propCode);
     return property->getSet == 1 && property->isEnabled == 1;
 }
 
-b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* property) {
+b32 AwControl_IsPropertyNotch(AwControl* self, AwPtpProperty* property) {
     if (!property) {
         return FALSE;
     }
-    PTP_TRACE_F("PTPControl_IsPropertyNotch(%x)", property->propCode);
+    AW_TRACE_F("AwControl_IsPropertyNotch(%x)", property->propCode);
     return property->isNotch && property->isEnabled == 1;
 }
 
-PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut) {
+AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* strOut) {
     if (!property->meta) {
         return FALSE;
     }
@@ -5066,18 +5066,18 @@ PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property,
     return TRUE;
 }
 
-size_t PTPControl_NumControls(PTPControl* self) {
+size_t AwControl_NumControls(AwControl* self) {
     return MArraySize(self->controls);
 }
 
-PtpControl* PTPControl_GetControlByIndex(PTPControl* self, u16 index) {
+AwPtpControl* AwControl_GetControlByIndex(AwControl* self, u16 index) {
     if (index >= MArraySize(self->controls)) {
         return NULL;
     }
     return self->controls + index;
 }
 
-PtpControl* PTPControl_GetControlByCode(PTPControl* self, u16 controlCode) {
+AwPtpControl* AwControl_GetControlByCode(AwControl* self, u16 controlCode) {
     for (int i = 0; i < MArraySize(self->controls); ++i) {
         if (self->controls[i].controlCode == controlCode) {
             return self->controls + i;
@@ -5086,8 +5086,8 @@ PtpControl* PTPControl_GetControlByCode(PTPControl* self, u16 controlCode) {
     return NULL;
 }
 
-AwResult PTPControl_SetControlValue(PTPControl* self, u16 controlCode, PTPPropValue value) {
-    PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
+AwResult AwControl_SetControlValue(AwControl* self, u16 controlCode, AwPtpPropValue value) {
+    AwPtpControl* control = AwControl_GetControlByCode(self, controlCode);
     if (control) {
         return SDIO_ControlDevice(self, controlCode, control->dataType, value);
     } else {
@@ -5095,24 +5095,24 @@ AwResult PTPControl_SetControlValue(PTPControl* self, u16 controlCode, PTPPropVa
     }
 }
 
-AwResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed) {
-    PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
+AwResult AwControl_SetControlToggle(AwControl* self, u16 controlCode, b32 pressed) {
+    AwPtpControl* control = AwControl_GetControlByCode(self, controlCode);
     if (control) {
-        return SDIO_ControlDevice(self, controlCode, control->dataType, (PTPPropValue){.u16=pressed?2:1});
+        return SDIO_ControlDevice(self, controlCode, control->dataType, (AwPtpPropValue){.u16=pressed?2:1});
     } else {
         return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
     }
 }
 
-b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums) {
-    PtpControl* control = PTPControl_GetControlByCode(self, controlCode);
+b32 AwControl_GetEnumsForControl(AwControl* self, u16 controlCode, AwPtpPropValueEnums* outEnums) {
+    AwPtpControl* control = AwControl_GetControlByCode(self, controlCode);
     if (control->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
 
     for (int i = 0; i < MArraySize(control->form.enums.values); i++) {
-        PTPPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
-        propEnum->flags = ENUM_VALUE_STR_CONST | ENUM_VALUE_READ | ENUM_VALUE_WRITE;
+        AwPtpPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
+        propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue = control->form.enums.values->propValue;
         MStrZero(&propEnum->str);
     }
@@ -5120,11 +5120,11 @@ b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValu
     return FALSE;
 }
 
-PTP_EXPORT b32 PTPControl_RemoteButtonEnable(PTPControl* self) {
-    return PTPControl_SupportsControl(self, DPC_REMOTE_BUTTON);
+AW_EXPORT b32 AwControl_RemoteButtonEnable(AwControl* self) {
+    return AwControl_SupportsControl(self, DPC_REMOTE_BUTTON);
 }
 
-AwResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed) {
+AwResult AwControl_RemoteButtonPress(AwControl* self, u16 button, b32 pressed) {
     u32 value = (((u32)button) << 16) | (pressed ? 2 : 1);
-    return SDIO_ControlDevice(self, DPC_REMOTE_BUTTON, PTP_DT_UINT32, (PTPPropValue){.u32=value});
+    return SDIO_ControlDevice(self, DPC_REMOTE_BUTTON, PTP_DT_UINT32, (AwPtpPropValue){.u32=value});
 }

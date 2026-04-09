@@ -16,9 +16,9 @@ def _convert_m_str(m_str) -> str:
 def _USB_BcdVersionAsString(usbVersion) -> str:
     return f"{(usbVersion >> 8) & 0xFF}.{usbVersion & 0xFF:02d}"
 
-# Hide PTPProperty and PTPControl pointers - should only give handles to the python side
+# Hide PTPProperty and AwControl pointers - should only give handles to the python side
 
-class PTPDevice:
+class AwDevice:
     def __init__(self, awire_lib, device):
         self.awire_lib = awire_lib
         self.device = device
@@ -28,43 +28,43 @@ class PTPDevice:
 
     def open_control(self):
         if self.control is None:
-            self.control = PTPControl(self.awire_lib, self.device, self.allocator)
+            self.control = AwControl(self.awire_lib, self.device, self.allocator)
         return self.control
 
 
-class PTPControl:
+class AwControl:
     def __init__(self, awire_lib, device, allocator):
         self.awire_lib = awire_lib
-        self.control = ffi.new("PTPControl[1]")
+        self.control = ffi.new("AwControl[1]")
         self.device = device
-        self.awire_lib.PTPControl_Init(self.control, device, allocator)
+        self.awire_lib.AwControl_Init(self.control, device, allocator)
         self.allocator = allocator
         self.live_view_image = None  # Need way to free this
 
     def connect(self, sonyProtocolVersion=300):
-        self.awire_lib.PTPControl_Connect(self.control, sonyProtocolVersion)
+        self.awire_lib.AwControl_Connect(self.control, sonyProtocolVersion)
 
     def cleanup(self):
         if self.control is not None:
-            self.awire_lib.PTPControl_Cleanup(self.control)
+            self.awire_lib.AwControl_Cleanup(self.control)
             self.control = None
 
     def get_num_properties(self) -> int:
-        return self.awire_lib.PTPControl_NumProperties(self.control)
+        return self.awire_lib.AwControl_NumProperties(self.control)
 
     def get_property_at_index(self, index: int):
-        return self.awire_lib.PTPControl_GetPropertyAtIndex(self.control, index)
+        return self.awire_lib.AwControl_GetPropertyAtIndex(self.control, index)
 
     def get_property_by_code(self, code: int):
-        return self.awire_lib.PTPControl_GetPropertyByCode(self.control, code)
+        return self.awire_lib.AwControl_GetPropertyByCode(self.control, code)
 
     def get_property_by_name(self, name: str):
         c_name = ffi.new("char[]", name.encode('utf-8'))
-        return self.awire_lib.PTPControl_GetPropertyByName(self.control, c_name)
+        return self.awire_lib.AwControl_GetPropertyByName(self.control, c_name)
 
     def get_property_value_as_str(self, property) -> typing.Optional[str]:
         mstr = ffi.new("MStr[1]")
-        r = self.awire_lib.PTPControl_GetPropertyValueAsStr(self.control, property, self.allocator, mstr)
+        r = self.awire_lib.AwControl_GetPropertyValueAsStr(self.control, property, self.allocator, mstr)
         if r:
             s = _convert_m_str(mstr[0])
             self.awire_lib.PTP_StrFree(self.allocator, ffi.addressof(mstr[0]))
@@ -80,10 +80,10 @@ class PTPControl:
             return _convert_c_str(cstr)
 
     def get_num_controls(self) -> int:
-        return self.awire_lib.PTPControl_NumControls(self.control)
+        return self.awire_lib.AwControl_NumControls(self.control)
 
     def get_control_at_index(self, index: int):
-        return self.awire_lib.PTPControl_GetControlAtIndex(self.control, index)
+        return self.awire_lib.AwControl_GetControlAtIndex(self.control, index)
 
     def get_live_view_image(self) -> typing.Optional[memoryview]:
         if self.live_view_image is None:
@@ -91,12 +91,12 @@ class PTPControl:
             self.live_view_image = mem_io[0]
             self.live_view_image.allocator = self.allocator
         p_mem_io = ffi.addressof(self.live_view_image)
-        live_view_frames = ffi.new("LiveViewFrames[1]")
+        live_view_frames = ffi.new("AwLiveViewFrames[1]")
         p_live_view_frames = ffi.addressof(live_view_frames[0])
 
-        self.awire_lib.PTPControl_GetLiveViewImage(self.control, p_mem_io, p_live_view_frames)
+        self.awire_lib.AwControl_GetLiveViewImage(self.control, p_mem_io, p_live_view_frames)
         if self.live_view_image.size:
-            self.awire_lib.PTPControl_FreeLiveViewFrames(self.control, live_view_frames)
+            self.awire_lib.AwControl_FreeLiveViewFrames(self.control, live_view_frames)
             buffer_obj = ffi.buffer(self.live_view_image.mem, self.live_view_image.size)
             return memoryview(buffer_obj)
 
@@ -109,7 +109,7 @@ class PTPControl:
             self.live_view_image = None
 
 
-class PTPDeviceInfo:
+class AwDeviceInfo:
     def __init__(self, dev: ffi.CData):
         self.manufacturer = _convert_m_str(dev.manufacturer)
         self.product = _convert_m_str(dev.product)
@@ -120,10 +120,10 @@ class PTPDeviceInfo:
         self._ffi_device = dev
 
 
-class PTPDeviceList:
+class AwDeviceList:
     def __init__(self, awire_lib):
         self.awire_lib = awire_lib
-        self.devlist = ffi.new("PTPDeviceList[1]")
+        self.devlist = ffi.new("AwDeviceList[1]")
         self.allocator = ffi.new("MAllocator[1]")
         self.awire_lib.PTP_InitDefaultAllocator(self.allocator)
         self.isOpen = False
@@ -132,7 +132,7 @@ class PTPDeviceList:
     def open(self) -> bool:
         if self.isOpen:
             self.close()
-        ok = self.awire_lib.PTPDeviceList_Open(self.devlist, self.allocator)
+        ok = self.awire_lib.AwDeviceList_Open(self.devlist, self.allocator)
         if ok:
             self.isOpen = True
         return ok
@@ -140,7 +140,7 @@ class PTPDeviceList:
     def close(self) -> bool:
         if not self.isOpen:
             return False
-        ok = self.awire_lib.PTPDeviceList_Close(self.devlist)
+        ok = self.awire_lib.AwDeviceList_Close(self.devlist)
         if ok:
             self.isOpen = False
         return ok
@@ -148,34 +148,34 @@ class PTPDeviceList:
     def refresh(self) -> bool:
         if not self.isOpen:
             return False
-        ok = self.awire_lib.PTPDeviceList_RefreshList(self.devlist)
+        ok = self.awire_lib.AwDeviceList_RefreshList(self.devlist)
         if ok:
             self.current_index = 0
         return ok
 
-    def open_device(self, device_info: PTPDeviceInfo) -> typing.Optional[PTPDevice]:
+    def open_device(self, device_info: AwDeviceInfo) -> typing.Optional[AwDevice]:
         if not self.isOpen:
             return None
-        device_out = ffi.new("PTPDevice**")
+        device_out = ffi.new("AwDevice**")
         di = ffi.addressof(device_info._ffi_device)
-        ok = self.awire_lib.PTPDeviceList_OpenDevice(self.devlist, di, device_out)
+        ok = self.awire_lib.AwDeviceList_OpenDevice(self.devlist, di, device_out)
         if ok:
-            return PTPDevice(self.awire_lib, device_out[0])
+            return AwDevice(self.awire_lib, device_out[0])
         else:
             return None
 
     def __len__(self):
         if not self.isOpen:
             return 0
-        return self.awire_lib.PTPDeviceList_NumDevices(self.devlist)
+        return self.awire_lib.AwDeviceList_NumDevices(self.devlist)
 
-    def __getitem__(self, index: int) -> typing.Optional[PTPDeviceInfo]:
+    def __getitem__(self, index: int) -> typing.Optional[AwDeviceInfo]:
         if not self.isOpen:
             return None
         if index >= len(self):
             raise IndexError("Device index out of range")
         dev = self.devlist[0].devices[index]
-        return PTPDeviceInfo(dev)
+        return AwDeviceInfo(dev)
 
     def __iter__(self):
         self.current_index = 0
@@ -194,7 +194,7 @@ def _run_tests(awire_lib):
     # TODO: Capture image
     # TODO: Modify some shot parameters
     # TODO: Allow device to be specified
-    deviceList = PTPDeviceList(awire_lib)
+    deviceList = AwDeviceList(awire_lib)
     ok = deviceList.open()
     if ok:
         deviceList.refresh()

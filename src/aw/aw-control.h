@@ -2,9 +2,9 @@
 
 #include "mlib/mlib.h"
 
-#include "ptp/ptp-backend.h"
-#include "ptp/ptp-const.h"
-#include "ptp/ptp-log.h"
+#include "aw/aw-backend.h"
+#include "aw/aw-const.h"
+#include "aw/aw-log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +24,7 @@ extern "C" {
  * - Managing data buffers for incoming and outgoing PTP operations.
  */
 typedef struct {
-    PTPDevice* device;
+    AwDevice* device;
 
     u16 protocolVersion;
     MStr manufacturer;
@@ -45,8 +45,8 @@ typedef struct {
     u16* captureFormats;
     u16* imageFormats;
 
-    PTPProperty* properties;
-    PtpControl* controls;
+    AwPtpProperty* properties;
+    AwPtpControl* controls;
 
     u32 sessionId;
     u32 transactionId;
@@ -57,51 +57,51 @@ typedef struct {
     u8* dataOutMem;
     u32 dataOutSize;
     u32 dataOutCapacity;
-    PTPRequestHeader ptpRequest;
-    PTPResponseHeader ptpResponse;
+    AwPtpRequestHeader ptpRequest;
+    AwPtpResponseHeader ptpResponse;
 
-    PTPEvent* eventQueue;  // Array of queued events
+    AwPtpEvent* eventQueue;  // Array of queued events
 
     MAllocator* allocator;
-    PTPLog logger;
-} PTPControl;
+    AwLog logger;
+} AwControl;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Setup & Cleanup
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Initialize PTPControl struct with the specified device.
- * Follow up with a PTPControl_Connect() to start communicating over the device's transport.
+ * Initialize AwControl struct with the specified device.
+ * Follow up with a AwControl_Connect() to start communicating over the device's transport.
  *
  * List available devices and connect to the first one:
  *
  * @code{.c}
- *    #include "ptp/ptp-control.h"
- *    #include "ptp/ptp-device-list.h"
+ *    #include "aw/aw-control.h"
+ *    #include "aw/aw-device-list.h"
  *    ...
- *    PTPDeviceList ptpDeviceList{};
+ *    AwDeviceList deviceList{};
  *    // Open device list
- *    PTPDeviceList_Open(&ptpDeviceList, &allocator);
+ *    AwDeviceList_Open(&deviceList, &allocator);
  *    // Poll for devices
- *    PTPDeviceList_RefreshList(&ptpDeviceList);
+ *    AwDeviceList_RefreshList(&deviceList);
  *    // If one or more devices
- *    if (MArraySize(ptpDeviceList.devices) {
- *        PTPDeviceInfo* deviceInfo = ptpDeviceList.devices;
- *        PTPDevice* device = NULL;
+ *    if (MArraySize(deviceList.devices) {
+ *        AwDeviceInfo* deviceInfo = deviceList.devices;
+ *        AwDevice* device = NULL;
  *        // Establish transport for first device
- *        PTPDeviceList_OpenDevice(&ptpDeviceList, deviceInfo, &device);
- *        PTPControl ptp{};
+ *        AwDeviceList_OpenDevice(&deviceList, deviceInfo, &device);
+ *        AwControl aw{};
  *        // Init control structure
- *        PTPControl_Init(&ptp, device, &allocator);
+ *        AwControl_Init(&aw, device, &allocator);
  *        // Connect to device with given mode
- *        PTPControl_Connect(&ptp, SDI_EXTENSION_VERSION_300);
+ *        AwControl_Connect(&aw, SDI_EXTENSION_VERSION_300);
  *    }
  * @endcode
  *
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator);
+AW_EXPORT AwResult AwControl_Init(AwControl* self, AwDevice* device, MAllocator* allocator);
 
 /**
  * Establishes a connection with a Sony device over PTP (Picture Transfer Protocol), on the previously setup transport.
@@ -112,19 +112,19 @@ PTP_EXPORT AwResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAlloca
  * @param version The Sony protocol version to connect with.  Year 2020+ cameras support SDI_EXTENSION_VERSION_300,
  *                which has more properties and controls, along with other API improvements over the
  *                SDI_EXTENSION_VERSION_200 protocol.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version);
+AW_EXPORT AwResult AwControl_Connect(AwControl* self, AwSonyProtocolVersion version);
 
 /**
- * Cleanup the PTPControl structure.
+ * Cleanup the AwControl structure.
  * Depending on the underlying transport this may also close the PTP session, if it does not then
  * releasing the transport will close the PTP session.
- * After PTPControl_Cleanup() is called, the device transport should be closed.
+ * After AwControl_Cleanup() is called, the device transport should be closed.
  *
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_Cleanup(PTPControl* self);
+AW_EXPORT AwResult AwControl_Cleanup(AwControl* self);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Check support for various events, controls, and properties
@@ -135,21 +135,21 @@ PTP_EXPORT AwResult PTPControl_Cleanup(PTPControl* self);
  * @param eventCode The PTP event code to check.
  * @return TRUE if the event is supported, FALSE otherwise.
  */
-PTP_EXPORT b32 PTPControl_SupportsEvent(PTPControl* self, u16 eventCode);
+AW_EXPORT b32 AwControl_SupportsEvent(AwControl* self, u16 eventCode);
 
 /**
  * Check if the device supports a specific control operation.
  * @param controlCode The control code to check.
  * @return TRUE if the control is supported, FALSE otherwise.
  */
-PTP_EXPORT b32 PTPControl_SupportsControl(PTPControl* self, u16 controlCode);
+AW_EXPORT b32 AwControl_SupportsControl(AwControl* self, u16 controlCode);
 
 /**
  * Check if the device supports a specific property.
  * @param propCode The property code to check.
  * @return TRUE if the property is supported, FALSE otherwise.
  */
-PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode);
+AW_EXPORT b32 AwControl_SupportsProperty(AwControl* self, u16 propCode);
 
 /**
  * Check if a feature state property indicates that a feature is enabled/disabled.
@@ -157,7 +157,7 @@ PTP_EXPORT b32 PTPControl_SupportsProperty(PTPControl* self, u16 propCode);
  *                 DPC_MANUAL_FOCUS_ADJUST_ENABLED
  * @return TRUE if the feature is available and currently enabled.
  */
-PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* property);
+AW_EXPORT b32 AwControl_PropertyEnabled(AwControl* self, AwPtpProperty* property);
 
 /**
  * Check if a feature state property indicates that a feature is enabled/disabled.
@@ -165,7 +165,7 @@ PTP_EXPORT b32 PTPControl_PropertyEnabled(PTPControl* self, PTPProperty* propert
  *                 DPC_MANUAL_FOCUS_ADJUST_ENABLED
  * @return TRUE if the feature is available and currently enabled.
  */
-PTP_EXPORT b32 PTPControl_PropertyEnabledByCode(PTPControl* self, u16 propCode);
+AW_EXPORT b32 AwControl_PropertyEnabledByCode(AwControl* self, u16 propCode);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Generic property getter and setters
@@ -175,60 +175,60 @@ PTP_EXPORT b32 PTPControl_PropertyEnabledByCode(PTPControl* self, u16 propCode);
  * Number of properties found.
  * @return number of properties found
  */
-PTP_EXPORT size_t PTPControl_NumProperties(PTPControl* self);
+AW_EXPORT size_t AwControl_NumProperties(AwControl* self);
 
 /**
  * Get Property at index (no particular order)
- * Use with PTPControl_NumProperties() to list all properties.
+ * Use with AwControl_NumProperties() to list all properties.
  * @param index
  * @return property at index
  */
-PTP_EXPORT PTPProperty* PTPControl_GetPropertyByIndex(PTPControl* self, u16 index);
+AW_EXPORT AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index);
 
 /**
  * Pull latest property values from device
  * @param fullRefresh When set to TRUE: Refresh all properties, FALSE: Refresh only changed properties
- *                    NOTE: Most property changes are correctly tracked by the camera, but PTPControl_GetPendingFiles()
+ *                    NOTE: Most property changes are correctly tracked by the camera, but AwControl_GetPendingFiles()
  *                    may not update when 'fullRefresh' is set to FALSE.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_UpdateProperties(PTPControl* self, b32 fullRefresh);
+AW_EXPORT AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh);
 
 /**
  * Get property by property code
  * @param propertyCode
  * @return PTPProperty if found, null if not available
  */
-PTP_EXPORT PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode);
+AW_EXPORT AwPtpProperty* AwControl_GetPropertyByCode(AwControl* self, u16 propertyCode);
 
 /**
  * Get property by id
  * @param id
  * @return PTPProperty if found, null if not available
  */
-PTP_EXPORT PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* id);
+AW_EXPORT AwPtpProperty* AwControl_GetPropertyById(AwControl* self, const char* id);
 
 /**
  * Build a list of enums for property if enums are available.
  * Converts values to strings for display.
- * You must free memory allocated by this function by calling PTPControl_FreePropValueEnums / PTP_FreePropValueEnums.
+ * You must free memory allocated by this function by calling AwControl_FreePropValueEnums / PTP_FreePropValueEnums.
  * @param property
- * @param allocator allocator to use for outEnums, when set to null to uses the default PTPControl allocator
+ * @param allocator allocator to use for outEnums, when set to null to uses the default AwControl allocator
  * @param outEnums
- * @page allocator Optional allocator to use (when NULL use PTPControl allocator).
+ * @page allocator Optional allocator to use (when NULL use AwControl allocator).
  * @return TRUE if enums are available, false if no enums available for this property
  */
-PTP_EXPORT b32 PTPControl_GetEnumsForProperty(PTPControl* self, PTPProperty* property, MAllocator* allocator, PTPPropValueEnums* outEnums);
+AW_EXPORT b32 AwControl_GetEnumsForProperty(AwControl* self, AwPtpProperty* property, MAllocator* allocator, AwPtpPropValueEnums* outEnums);
 
 /**
- * Free output enum returned by PTPControl_GetEnumsForProperty()
+ * Free output enum returned by AwControl_GetEnumsForProperty()
  */
-PTP_EXPORT void PTPControl_FreePropValueEnums(PTPControl* self, PTPPropValueEnums* outEnums);
+AW_EXPORT void AwControl_FreePropValueEnums(AwControl* self, AwPtpPropValueEnums* outEnums);
 
 /**
- * Free output enum returned by PTPControl_GetEnumsForProperty()
+ * Free output enum returned by AwControl_GetEnumsForProperty()
  */
-PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outEnums);
+AW_EXPORT void AwPtp_FreePropValueEnums(MAllocator* self, AwPtpPropValueEnums* outEnums);
 
 /**
  * Get the property value as a human-readable string.
@@ -237,21 +237,21 @@ PTP_EXPORT void PTP_FreePropValueEnums(MAllocator* self, PTPPropValueEnums* outE
  * @param outStr Output string containing the property value.
  * @return TRUE on success, FALSE on failure.
  */
-PTP_EXPORT b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* allocator, MStr* outStr);
+AW_EXPORT b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MAllocator* allocator, MStr* outStr);
 
 /**
  * Check if a property can be written/modified.
  * @param property The property to check.
  * @return TRUE if the property is writable, FALSE otherwise.
  */
-PTP_EXPORT b32 PTPControl_IsPropertyWritable(PTPControl* self, PTPProperty* property);
+AW_EXPORT b32 AwControl_IsPropertyWritable(AwControl* self, AwPtpProperty* property);
 
 /**
  * Check if a property uses notch-style adjustment (for older Sony 2.0 interface).
  * @param property The property to check.
  * @return TRUE if the property uses notch adjustment, FALSE otherwise.
  */
-PTP_EXPORT b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* property);
+AW_EXPORT b32 AwControl_IsPropertyNotch(AwControl* self, AwPtpProperty* property);
 
 /**
  * Get the string identifier for a property.
@@ -259,7 +259,7 @@ PTP_EXPORT b32 PTPControl_IsPropertyNotch(PTPControl* self, PTPProperty* propert
  * @param strOut Output string containing the property ID.
  * @return TRUE on success, FALSE on failure.
  */
-PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property, MStr* strOut);
+AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* strOut);
 
 /**
  * Set a property value on the device.
@@ -267,7 +267,7 @@ PTP_EXPORT b32 PTPControl_GetPropertyId(PTPControl* self, PTPProperty* property,
  * @param value The new value to set.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* property, PTPPropValue value);
+AW_EXPORT AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, AwPtpPropValue value);
 
 /**
  * Set a property value using a string representation.
@@ -275,7 +275,7 @@ PTP_EXPORT AwResult PTPControl_SetPropertyValue(PTPControl* self, PTPProperty* p
  * @param value The string value to set.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* property, MStr value);
+AW_EXPORT AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value);
 
 /**
  * Adjust 'notch' properties that are used for some shot settings when using older Sony 2.0 PTP interface.
@@ -285,26 +285,26 @@ PTP_EXPORT AwResult PTPControl_SetPropertyStr(PTPControl* self, PTPProperty* pro
  *              -2: notch two setting down twice
  * @return
  */
-PTP_EXPORT AwResult PTPControl_SetPropertyNotch(PTPControl* self, PTPProperty* property, i8 notch);
+AW_EXPORT AwResult AwControl_SetPropertyNotch(AwControl* self, AwPtpProperty* property, i8 notch);
 
-MINLINE AwResult PTPControl_SetPropertyU8(PTPControl* self, PTPProperty* property, u8 value) {
-    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u8 = value});
+MINLINE AwResult AwControl_SetPropertyU8(AwControl* self, AwPtpProperty* property, u8 value) {
+    return AwControl_SetPropertyValue(self, property, M_STRUCT(AwPtpPropValue){.u8 = value});
 }
 
-MINLINE AwResult PTPControl_SetPropertyU16(PTPControl* self, PTPProperty* property, u16 value) {
-    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u16 = value});
+MINLINE AwResult AwControl_SetPropertyU16(AwControl* self, AwPtpProperty* property, u16 value) {
+    return AwControl_SetPropertyValue(self, property, M_STRUCT(AwPtpPropValue){.u16 = value});
 }
 
-MINLINE AwResult PTPControl_SetPropertyU32(PTPControl* self, PTPProperty* property, u32 value) {
-    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u32 = value});
+MINLINE AwResult AwControl_SetPropertyU32(AwControl* self, AwPtpProperty* property, u32 value) {
+    return AwControl_SetPropertyValue(self, property, M_STRUCT(AwPtpPropValue){.u32 = value});
 }
 
-MINLINE AwResult PTPControl_SetPropertyU64(PTPControl* self, PTPProperty* property, u64 value) {
-    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.u64 = value});
+MINLINE AwResult AwControl_SetPropertyU64(AwControl* self, AwPtpProperty* property, u64 value) {
+    return AwControl_SetPropertyValue(self, property, M_STRUCT(AwPtpPropValue){.u64 = value});
 }
 
-MINLINE AwResult PTPControl_SetPropertyStrRaw(PTPControl* self, PTPProperty* property, MStr value) {
-    return PTPControl_SetPropertyValue(self, property, M_STRUCT(PTPPropValue){.str = value});
+MINLINE AwResult AwControl_SetPropertyStrRaw(AwControl* self, AwPtpProperty* property, MStr value) {
+    return AwControl_SetPropertyValue(self, property, M_STRUCT(AwPtpPropValue){.str = value});
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,25 +313,25 @@ MINLINE AwResult PTPControl_SetPropertyStrRaw(PTPControl* self, PTPProperty* pro
 
 /**
  * Number of controls found.
- * @param self Pointer to the PTPControl instance to be checked.
+ * @param self Pointer to the AwControl instance to be checked.
  * @return number of controls found
  */
-PTP_EXPORT size_t PTPControl_NumControls(PTPControl* self);
+AW_EXPORT size_t AwControl_NumControls(AwControl* self);
 
 /**
  * Get Control at index (no particular order)
- * Use with PTPControl_NumControls() to list all controls.
+ * Use with AwControl_NumControls() to list all controls.
  * @param index
  * @return property at index
  */
-PTP_EXPORT PtpControl* PTPControl_GetControlByIndex(PTPControl* self, u16 index);
+AW_EXPORT AwPtpControl* AwControl_GetControlByIndex(AwControl* self, u16 index);
 
 /**
  * Get a control by its control code.
  * @param controlCode The control code to look up.
  * @return Pointer to the control if found, NULL otherwise.
  */
-PTP_EXPORT PtpControl* PTPControl_GetControlByCode(PTPControl* self, u16 controlCode);
+AW_EXPORT AwPtpControl* AwControl_GetControlByCode(AwControl* self, u16 controlCode);
 
 /**
  * Set a control value on the device.
@@ -339,7 +339,7 @@ PTP_EXPORT PtpControl* PTPControl_GetControlByCode(PTPControl* self, u16 control
  * @param value The new value to set.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_SetControlValue(PTPControl* self, u16 controlCode, PTPPropValue value);
+AW_EXPORT AwResult AwControl_SetControlValue(AwControl* self, u16 controlCode, AwPtpPropValue value);
 
 /**
  * Toggle a control on or off.
@@ -347,7 +347,7 @@ PTP_EXPORT AwResult PTPControl_SetControlValue(PTPControl* self, u16 controlCode
  * @param pressed TRUE to press/enable, FALSE to release/disable.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCode, b32 pressed);
+AW_EXPORT AwResult AwControl_SetControlToggle(AwControl* self, u16 controlCode, b32 pressed);
 
 /**
  * Get available enum values for a control.
@@ -355,7 +355,7 @@ PTP_EXPORT AwResult PTPControl_SetControlToggle(PTPControl* self, u16 controlCod
  * @param outEnums Output structure containing the available enum values.
  * @return TRUE if enums are available, FALSE otherwise.
  */
-PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, PTPPropValueEnums* outEnums);
+AW_EXPORT b32 AwControl_GetEnumsForControl(AwControl* self, u16 controlCode, AwPtpPropValueEnums* outEnums);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -365,11 +365,11 @@ PTP_EXPORT b32 PTPControl_GetEnumsForControl(PTPControl* self, u16 controlCode, 
 /**
  * Get the number of image files queued for download on camera.
  *
- * Call PTPControl_UpdateProperties(TRUE) before calling this function to ensure local properties are uptodate.
+ * Call AwControl_UpdateProperties(TRUE) before calling this function to ensure local properties are uptodate.
  * 'TRUE' is needed as a partial/incremental refresh of properties may not include the updated count for pending files
  * for some cameras.
  */
-PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
+AW_EXPORT int AwControl_GetPendingFiles(AwControl* self);
 
 /**
  * Downloads an image from the cameras buffer.
@@ -381,7 +381,7 @@ PTP_EXPORT int PTPControl_GetPendingFiles(PTPControl* self);
  * @param outCii Info about the downloaded image
  * @return
  */
-PTP_EXPORT AwResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* outFile, PTPCapturedImageInfo* outCii);
+AW_EXPORT AwResult AwControl_GetCapturedImage(AwControl* self, MMemIO* outFile, AwPtpCapturedImageInfo* outCii);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -397,20 +397,20 @@ PTP_EXPORT AwResult PTPControl_GetCapturedImage(PTPControl* self, MMemIO* outFil
  * @param outLiveViewFrames NULL or output pointer to the focus frames (if available for your camera model and mode)
  * @return
  */
-PTP_EXPORT AwResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* outFile, LiveViewFrames* outLiveViewFrames);
+AW_EXPORT AwResult AwControl_GetLiveViewImage(AwControl* self, MMemIO* outFile, AwLiveViewFrames* outLiveViewFrames);
 
 /**
- * Free live view frames returned by PTPControl_GetLiveViewImage()
+ * Free live view frames returned by AwControl_GetLiveViewImage()
  * @param liveViewFrames the live view frames to free
  */
-PTP_EXPORT void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
+AW_EXPORT void AwControl_FreeLiveViewFrames(AwControl* self, AwLiveViewFrames* liveViewFrames);
 
 /**
  * Get the on-screen display as PNG (if available).  2025+ cameras.
  * @param outFile The PNG image
  * @return
  */
-PTP_EXPORT AwResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* outFile);
+AW_EXPORT AwResult AwControl_GetOSDImage(AwControl* self, MMemIO* outFile);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -422,14 +422,14 @@ PTP_EXPORT AwResult PTPControl_GetOSDImage(PTPControl* self, MMemIO* outFile);
  * @param outFile MemIO to write the settings file to.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_GetCameraSettingsFile(PTPControl* self, MMemIO* outFile);
+AW_EXPORT AwResult AwControl_GetCameraSettingsFile(AwControl* self, MMemIO* outFile);
 
 /**
  * Upload camera settings file to the device.
  * @param file MemIO containing the settings file data.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* file);
+AW_EXPORT AwResult AwControl_PutCameraSettingsFile(AwControl* self, MMemIO* file);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -443,7 +443,7 @@ PTP_EXPORT AwResult PTPControl_PutCameraSettingsFile(PTPControl* self, MMemIO* f
  * @param outEvents Output pointer to array of events (caller must free).
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_ReadEvents(PTPControl* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents);
+AW_EXPORT AwResult AwControl_ReadEvents(AwControl* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -497,14 +497,14 @@ typedef struct AwPosInt2 {
  * @param outMagnifier Output structure to receive magnifier state.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_GetMagnifier(PTPControl* self, AwMagnifier* outMagnifier);
+AW_EXPORT AwResult AwControl_GetMagnifier(AwControl* self, AwMagnifier* outMagnifier);
 
 /**
  * Set magnifier position and zoom level.
  * @param magnifier Magnifier parameters to set.
  * @return Returns PTP_OK on success, or an appropriate error code on failure.
  */
-PTP_EXPORT AwResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet magnifier);
+AW_EXPORT AwResult AwControl_SetMagnifier(AwControl* self, AwMagnifierSet magnifier);
 
 /**
  * Calculate new viewport position when moving magnifier by a relative amount.
@@ -512,31 +512,31 @@ PTP_EXPORT AwResult PTPControl_SetMagnifier(PTPControl* self, AwMagnifierSet mag
  * @param pos Relative movement position (normalized coordinates).
  * @return New integer viewport position.
  */
-PTP_EXPORT AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos);
+AW_EXPORT AwPosInt2 AwMagnifierMoveViewport(AwMagnifier* magnifier, AwPosFloat2 pos);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Remote button press
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-PTP_EXPORT b32 PTPControl_RemoteButtonEnable(PTPControl* self);
-PTP_EXPORT AwResult PTPControl_RemoteButtonPress(PTPControl* self, u16 button, b32 pressed);
+AW_EXPORT b32 AwControl_RemoteButtonEnable(AwControl* self);
+AW_EXPORT AwResult AwControl_RemoteButtonPress(AwControl* self, u16 button, b32 pressed);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // String conversion, value helpers
 //////////////////////////////////////////////////////////////////////////////////////////////
-PTP_EXPORT char* PTP_GetOperationLabel(u16 operationCode);
-PTP_EXPORT char* PTP_GetControlLabel(u16 controlCode);
-PTP_EXPORT char* PTP_GetEventLabel(u16 eventCode);
-PTP_EXPORT char* PTP_GetPropertyLabel(u16 propCode);
-PTP_EXPORT char* PTP_GetObjectFormatStr(u16 objectFormatCode);
+AW_EXPORT char* AwGetOperationLabel(u16 operationCode);
+AW_EXPORT char* AwGetControlLabel(u16 controlCode);
+AW_EXPORT char* AwGetEventLabel(u16 eventCode);
+AW_EXPORT char* AwGetPropertyLabel(u16 propCode);
+AW_EXPORT char* AwGetObjectFormatStr(u16 objectFormatCode);
 
-PTP_EXPORT char* PTP_GetDataTypeStr(PTPDataType dataType);
-PTP_EXPORT char* PTP_GetFormFlagStr(PTPFormFlag formFlag);
-PTP_EXPORT char* PTP_GetPropIsEnabledStr(u8 propIsEnabled);
+AW_EXPORT char* AwPtpGetDataTypeStr(PtpDataType dataType);
+AW_EXPORT char* AwPtpGetFormFlagStr(PtpFormFlag formFlag);
+AW_EXPORT char* AwPtpGetPropIsEnabledStr(u8 propIsEnabled);
 
-PTP_EXPORT void PTP_GetPropValueStr(PTPDataType dataType, PTPPropValue value, char* outBuffer, size_t bufferLen);
-PTP_EXPORT b32 PTP_PropValueEq(PTPDataType dataType, PTPPropValue value1, PTPPropValue value2);
-PTP_EXPORT b32 PTPProperty_Equals(PTPProperty* property, PTPPropValue value);
+AW_EXPORT void AwPtpGetPropValueStr(PtpDataType dataType, AwPtpPropValue value, char* outBuffer, size_t bufferLen);
+AW_EXPORT b32 AwPtpPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue value2);
+AW_EXPORT b32 AwPtpPropEquals(AwPtpProperty* property, AwPtpPropValue value);
 
 #ifdef __cplusplus
 } // extern "C"

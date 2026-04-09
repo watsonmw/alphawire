@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mlib/mlib.h"
-#include "ptp/ptp-const.h"
+#include "aw/aw-const.h"
 
 #include <IOKit/usb/IOUSBLib.h>
 
@@ -21,19 +21,19 @@ typedef struct {
     u8 usbInterrupt;
     b32 disconnected;
     u32 timeoutMilliseconds;
-    PTPLog logger;
+    AwLog logger;
     MAllocator* allocator;
     // Event handling
     MMemIO eventMem; // Event buffer for reading and parsing events (reused across calls)
     // Background event thread
     CFRunLoopSourceRef asyncEventSource;
     pthread_mutex_t eventLock;
-    PTPEvent* eventList;
-} PTPDeviceIOKit;
+    AwPtpEvent* eventList;
+} AwDeviceIOKit;
 
 typedef struct {
     IOKitDeviceInfo* devices;
-    PTPDeviceIOKit* openDevices;
+    AwDeviceIOKit* openDevices;
     int timeoutMilliseconds;
     // Device attach notification
     IONotificationPortRef notifyPort;
@@ -42,19 +42,19 @@ typedef struct {
     CFRunLoopSourceRef runLoopSource;
     b32 deviceListUpToDate;
     MAllocator* allocator;
-    PTPLog logger;
-    struct PTPBackend* backend; // Reference to parent backend
-} PTPIokitDeviceList;
+    AwLog logger;
+    struct AwBackend* backend; // Reference to parent backend
+} AwIokitDeviceList;
 
-PTP_EXPORT AwResult PTPIokitDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds);
-PTP_EXPORT AwResult PTPIokitDeviceList_Open(PTPIokitDeviceList* self);
-PTP_EXPORT AwResult PTPIokitDeviceList_Close(PTPIokitDeviceList* self);
-PTP_EXPORT AwResult PTPIokitDeviceList_RefreshList(PTPIokitDeviceList* self, PTPDeviceInfo** devices);
-PTP_EXPORT AwResult PTPIokitDeviceList_ReleaseList(PTPIokitDeviceList* self);
-PTP_EXPORT AwResult PTPIokitDeviceList_OpenDevice(PTPIokitDeviceList* self, PTPDeviceInfo* deviceId, PTPDevice** deviceOut);
-PTP_EXPORT AwResult PTPIokitDeviceList_CloseDevice(PTPIokitDeviceList* self, PTPDevice* device);
+AW_EXPORT AwResult AwIokitDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMilliseconds);
+AW_EXPORT AwResult AwIokitDeviceList_Open(AwIokitDeviceList* self);
+AW_EXPORT AwResult AwIokitDeviceList_Close(AwIokitDeviceList* self);
+AW_EXPORT AwResult AwIokitDeviceList_RefreshList(AwIokitDeviceList* self, AwDeviceInfo** devices);
+AW_EXPORT AwResult AwIokitDeviceList_ReleaseList(AwIokitDeviceList* self);
+AW_EXPORT AwResult AwIokitDeviceList_OpenDevice(AwIokitDeviceList* self, AwDeviceInfo* deviceId, AwDevice** deviceOut);
+AW_EXPORT AwResult AwIokitDeviceList_CloseDevice(AwIokitDeviceList* self, AwDevice* device);
 
-PTP_EXPORT AwResult PTPIokitDevice_ReadEvent(PTPDevice* device, PTPEvent* outEvent, int timeoutMilliseconds);
+AW_EXPORT AwResult AwIokitDevice_ReadEvent(AwDevice* device, AwPtpEvent* outEvent, int timeoutMilliseconds);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -8,7 +8,7 @@
 #include "stb/stb_image.h"
 
 #include "ui/ui-context.h"
-#include "ptp/ptp-const.h"
+#include "aw/aw-const.h"
 
 #include "mlib/mlib.h"
 
@@ -99,11 +99,11 @@ void UiPtpLiveViewShow(AppContext& c) {
     bool refresh = (currentTime - c.liveViewLastTime >= 0.1f);
     if (refresh) {
         c.liveViewLastTime = currentTime;
-        if (PTPControl_GetLiveViewImage(&c.ptp, &c.liveViewImage, &c.liveViewFrames).code == AW_RESULT_OK) {
+        if (AwControl_GetLiveViewImage(&c.aw, &c.liveViewImage, &c.liveViewFrames).code == AW_RESULT_OK) {
             LoadTextureFromMemory(&c.liveViewImage, &c.liveViewImageGLId, &c.liveViewImageWidth, &c.liveViewImageHeight);
         }
         if (c.osdEnabled) {
-            if (PTPControl_GetOSDImage(&c.ptp, &c.osdImage).code == AW_RESULT_OK) {
+            if (AwControl_GetOSDImage(&c.aw, &c.osdImage).code == AW_RESULT_OK) {
                 LoadTextureFromMemory(&c.osdImage, &c.osdImageGLId, &c.osdImageWidth, &c.osdImageHeight);
                 c.osdCaptured = true;
             } else {
@@ -231,23 +231,23 @@ void UiPtpLiveViewShow(AppContext& c) {
                         case LiveViewClickAction_MOVE_FOCUS: {
                             // If no touch focus mode is set - set one
                             // Still need to be set to a flexible spot mode
-                            PTPProperty* liveViewTouchOp =
-                                PTPControl_GetPropertyByCode(&c.ptp, DPC_TOUCH_FOCUS_OPERATION);
+                            AwPtpProperty* liveViewTouchOp =
+                                AwControl_GetPropertyByCode(&c.aw, DPC_TOUCH_FOCUS_OPERATION);
                             if (liveViewTouchOp->value.u8 == 0) {
-                                PTPControl_SetPropertyValue(&c.ptp, liveViewTouchOp, PTPPropValue{.u8 = 1});
+                                AwControl_SetPropertyValue(&c.aw, liveViewTouchOp, AwPtpPropValue{.u8 = 1});
                             }
                             AwMagnifier magnifier = {};
-                            PTPControl_GetMagnifier(&c.ptp, &magnifier);
+                            AwControl_GetMagnifier(&c.aw, &magnifier);
 
                             AwPosInt2 newPos = AwMagnifierMoveViewport(&magnifier,
                                 AwPosFloat2{.x = relX / renderWidth, .y = relY / renderHeight});
                             u32 value = (u32)(newPos.x << 16) | newPos.y;
-                            PTPControl_SetControlValue(&c.ptp, DPC_REMOTE_TOUCH_XY, PTPPropValue{.u32=value});
+                            AwControl_SetControlValue(&c.aw, DPC_REMOTE_TOUCH_XY, AwPtpPropValue{.u32=value});
                             break;
                         }
                         case LiveViewClickAction_MAGNIFY: {
                             AwMagnifier magnifier = {};
-                            PTPControl_GetMagnifier(&c.ptp, &magnifier);
+                            AwControl_GetMagnifier(&c.aw, &magnifier);
 
                             // Move to next magnification level
                             i32 index = magnifier.ratioIndex;
@@ -263,7 +263,7 @@ void UiPtpLiveViewShow(AppContext& c) {
                             AwPosInt2 newPos = AwMagnifierMoveViewport(&magnifier,
                                 AwPosFloat2{.x = relX / renderWidth, .y = relY / renderHeight});
 
-                            PTPControl_SetMagnifier(&c.ptp,
+                            AwControl_SetMagnifier(&c.aw,
                                 AwMagnifierSet{.x = newPos.x, .y = newPos.y, .ratio = *ratio});
                             break;
                         }

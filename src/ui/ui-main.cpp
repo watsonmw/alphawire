@@ -47,9 +47,9 @@ int main(int argc, char** argv) {
     c.autoReleasePool = &autoReleasePool.alloc;
     UiInitLogging(c);
 
-    // c.ptpDeviceList.backendConfig.disallowSpawnEventThread = TRUE;
-    PTPDeviceList_Open(&c.ptpDeviceList, &allocator);
-    PTPDeviceList_RefreshList(&c.ptpDeviceList);
+    // c.awDeviceList.backendConfig.disallowSpawnEventThread = TRUE;
+    AwDeviceList_Open(&c.deviceList, &allocator);
+    AwDeviceList_RefreshList(&c.deviceList);
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)

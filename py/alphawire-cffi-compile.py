@@ -46,10 +46,10 @@ typedef struct {
     MAllocator* allocator;
 } MMemIO;
 
-typedef int PTPBackendType;
+typedef int AwBackendType;
 
 typedef struct {
-    PTPBackendType backendType;
+    AwBackendType backendType;
     MStr manufacturer;
     MStr product;
     MStr serial;
@@ -57,45 +57,45 @@ typedef struct {
     u16 usbPID;
     u16 usbVersion;
     void* device;
-} PTPDeviceInfo;
+} AwDeviceInfo;
 
-typedef struct PTPBackend PTPBackend;
+typedef struct AwBackend AwBackend;
 
-typedef struct PTPDevice {
+typedef struct AwDevice {
     ...;
-    PTPBackendType backendType;
+    AwBackendType backendType;
     b32 disconnected;
     void* device; // concrete backend device - contains backend specific device data
-    PTPDeviceInfo* deviceInfo;
-} PTPDevice;
+    AwDeviceInfo* deviceInfo;
+} AwDevice;
 
 typedef struct {
-    PTPDeviceInfo* devices;
-    PTPBackend* backends;
-    PTPDevice* openDevices;
+    AwDeviceInfo* devices;
+    AwBackend* backends;
+    AwDevice* openDevices;
     u32 timeoutMilliseconds;
     MAllocator* allocator;
     ...;
-} PTPDeviceList;
+} AwDeviceList;
 
 void PTP_InitDefaultAllocator(MAllocator* allocator);
 
-b32 PTPDeviceList_Open(PTPDeviceList* self, MAllocator* allocator);
-b32 PTPDeviceList_Close(PTPDeviceList* self);
-b32 PTPDeviceList_RefreshList(PTPDeviceList* self);
-b32 PTPDeviceList_NeedsRefresh(PTPDeviceList* self);
-size_t PTPDeviceList_NumDevices(PTPDeviceList* self);
-b32 PTPDeviceList_OpenDevice(PTPDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut);
+b32 AwDeviceList_Open(AwDeviceList* self, MAllocator* allocator);
+b32 AwDeviceList_Close(AwDeviceList* self);
+b32 AwDeviceList_RefreshList(AwDeviceList* self);
+b32 AwDeviceList_NeedsRefresh(AwDeviceList* self);
+size_t AwDeviceList_NumDevices(AwDeviceList* self);
+b32 AwDeviceList_OpenDevice(AwDeviceList* self, AwDeviceInfo* deviceInfo, AwDevice** deviceOut);
 
-PTPBackend* PTPDeviceList_GetBackend(PTPDeviceList* self, PTPBackendType backend);
+AwBackend* AwDeviceList_GetBackend(AwDeviceList* self, AwBackendType backend);
 
 typedef enum {
     SDI_EXTENSION_VERSION_200 = 200,
     SDI_EXTENSION_VERSION_300 = 300,
-} SonyProtocolVersion;
+} AwSonyProtocolVersion;
 
 typedef struct {
-    PTPDevice* device;
+    AwDevice* device;
     u16 protocolVersion;
     MStr manufacturer;
     MStr model;
@@ -112,7 +112,7 @@ typedef struct {
     u16* captureFormats;
     u16* imageFormats;
     ...;
-} PTPControl;
+} AwControl;
 
 typedef enum {
     PTP_OK = 0x2001,
@@ -153,7 +153,7 @@ typedef enum {
     PTP_SD_FEATURE_VERSION_INVALID = 0xA104,
     PTP_SD_TEMP_STORAGE_FULL = 0xA105,
     PTP_SD_CAMERA_STATUS_ERR = 0xA106
-} PTPResult;
+} PtpResult;
 
 typedef union {
     u8 u8;
@@ -167,53 +167,53 @@ typedef union {
     char u128[16];
     char i128[16];
     MStr str;
-} PTPPropValue;
+} AwPtpPropValue;
 
 typedef struct {
-    PTPPropValue min;
-    PTPPropValue max;
-    PTPPropValue step;
-} PTPRange;
+    AwPtpPropValue min;
+    AwPtpPropValue max;
+    AwPtpPropValue step;
+} AwPtpRange;
 
 typedef struct {
-    PTPPropValue* set;
-    PTPPropValue* getSet;
-} PTPPropertyEnum;
+    AwPtpPropValue* set;
+    AwPtpPropValue* getSet;
+} AwPtpPropertyEnum;
 
 typedef struct {
     u16 propCode;
     u16 dataType;
-    PTPPropValue defaultValue;
-    PTPPropValue value;
+    AwPtpPropValue defaultValue;
+    AwPtpPropValue value;
     u8 getSet;
     u8 isEnabled;
     u8 formFlag;
 
     union {
-        PTPRange range;
-        PTPPropertyEnum enums;
+        AwPtpRange range;
+        AwPtpPropertyEnum enums;
     } form;
     
     u8 isNotch; // Property can only be changed by 'notching' - needed for some properties
 
     ...;
-} PTPProperty;
+} AwPtpProperty;
 
 typedef struct {
-    PTPPropValue propValue;
+    AwPtpPropValue propValue;
     MStr str;
     u16 flags;
-} PTPPropValueEnum;
+} AwPtpPropValueEnum;
 
 typedef struct {
-    PTPPropValueEnum* values;
-} PTPPropValueEnums;
+    AwPtpPropValueEnum* values;
+} AwPtpPropValueEnums;
 
 typedef struct {
-    PTPPropValueEnum* values;
+    AwPtpPropValueEnum* values;
     size_t size;
     b32 owned;
-} PTPPropValueEnumArray;
+} AwPtpPropValueEnumArray;
 
 typedef struct {
     u16 controlCode;
@@ -223,10 +223,10 @@ typedef struct {
     char* label;
 
     union {
-        PTPRange range;
-        PTPPropValueEnumArray enums;
+        AwPtpRange range;
+        AwPtpPropValueEnumArray enums;
     } form;
-} PtpControl;
+} AwControl;
 
 typedef struct {
     u16 frameType; // SD_FocusFrameType
@@ -234,13 +234,13 @@ typedef struct {
     u8 priority;
     u32 height;
     u32 width;
-} FocusFrame;
+} AwFocusFrame;
 
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    FocusFrame* frames;
-} FocusFrames;
+    AwFocusFrame* frames;
+} AwFocusFrames;
 
 typedef struct {
     u16 faceFrameType; // SD_FaceFrameType
@@ -251,13 +251,13 @@ typedef struct {
     u32 yNumerator;
     u32 height;
     u32 width;
-} FocusFrameFace;
+} AwFocusFrameFace;
 
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    FocusFrameFace* frames;
-} FaceFrames;
+    AwFocusFrameFace* frames;
+} AwFaceFrames;
 
 typedef struct {
     u16 trackingFrameType; // SD_TrackingFrameType
@@ -267,35 +267,35 @@ typedef struct {
     u32 yNumerator;
     u32 height;
     u32 width;
-} FocusFrameTracking;
+} AwFocusFrameTracking;
 
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
     FocusFrameTracking* frames;
-} TrackingFrames;
+} AwTrackingFrames;
 
 typedef struct {
     u16 version;
     FocusFrames focus;
     FaceFrames face;
     TrackingFrames tracking;
-} LiveViewFrames;
+} AwLiveViewFrames;
 
-PTPResult PTPControl_Init(PTPControl* self, PTPDevice* device, MAllocator* allocator);
-PTPResult PTPControl_Connect(PTPControl* self, SonyProtocolVersion version);
-PTPResult PTPControl_Cleanup(PTPControl* self);
-PTPResult PTPControl_UpdateProperties(PTPControl* self);
-size_t PTPControl_NumProperties(PTPControl* self);
-PTPProperty* PTPControl_GetPropertyAtIndex(PTPControl* self, u16 index);
-PTPProperty* PTPControl_GetPropertyByCode(PTPControl* self, u16 propertyCode);
-PTPProperty* PTPControl_GetPropertyById(PTPControl* self, const char* propertyId);
-b32 PTPControl_GetPropertyValueAsStr(PTPControl* self, PTPProperty* property, MAllocator* alloc, MStr* strOut);
-PTPResult PTPControl_GetLiveViewImage(PTPControl* self, MMemIO* fileOut, LiveViewFrames* liveViewFramesOut);
-void PTPControl_FreeLiveViewFrames(PTPControl* self, LiveViewFrames* liveViewFrames);
+AwResult AwControl_Init(AwControl* self, AwDevice* device, MAllocator* allocator);
+AwResult AwControl_Connect(AwControl* self, AwSonyProtocolVersion version);
+AwResult AwControl_Cleanup(AwControl* self);
+AwResult AwControl_UpdateProperties(AwControl* self);
+size_t AwControl_NumProperties(AwControl* self);
+AwPtpProperty* AwControl_GetPropertyAtIndex(AwControl* self, u16 index);
+AwPtpProperty* AwControl_GetPropertyByCode(AwControl* self, u16 propertyCode);
+AwPtpProperty* AwControl_GetPropertyById(AwControl* self, const char* propertyId);
+b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MAllocator* alloc, MStr* strOut);
+AwResult AwControl_GetLiveViewImage(AwControl* self, MMemIO* fileOut, AwLiveViewFrames* liveViewFramesOut);
+void AwControl_FreeLiveViewFrames(AwControl* self, AwLiveViewFrames* liveViewFrames);
 
-size_t PTPControl_NumControls(PTPControl* self);
-PtpControl* PTPControl_GetControlAtIndex(PTPControl* self, u16 index);
+size_t AwControl_NumControls(AwControl* self);
+AwControl* AwControl_GetControlAtIndex(AwControl* self, u16 index);
 
 char* PTP_GetOperationLabel(u16 operationCode);
 char* PTP_GetControlLabel(u16 controlCode);
@@ -315,12 +315,12 @@ lib_source_code = """
 #define M_MEM_DEBUG
 #define ALPHAWIRE_BUILDING_SHARED_LIB
 
-#include "platform/usb-const.h"
-#include "ptp/ptp-const.h"
-#include "ptp/ptp-control.h"
-#include "ptp/ptp-device-list.h"
-#include "ptp/ptp-log.h"
-#include "ptp/ptp-util.h"
+#include "aw/aw-const.h"
+#include "aw/aw-control.h"
+#include "aw/aw-device-list.h"
+#include "aw/aw-log.h"
+#include "aw/aw-util.h"
+#include "aw/platform/usb-const.h"
 """
 
 if __name__ == "__main__":

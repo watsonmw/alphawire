@@ -8,12 +8,12 @@ extern "C" {
 
 #ifdef _WIN32
 #ifdef ALPHAWIRE_BUILDING_SHARED_LIB
-#define PTP_EXPORT __declspec(dllexport)
+#define AW_EXPORT __declspec(dllexport)
 #else
-#define PTP_EXPORT __declspec(dllimport)
+#define AW_EXPORT __declspec(dllimport)
 #endif
 #else
-#define PTP_EXPORT __attribute__((visibility("default")))
+#define AW_EXPORT __attribute__((visibility("default")))
 #endif
 
 typedef enum {
@@ -39,13 +39,13 @@ typedef enum {
     PTP_DT_AINT128 = 0x4009,
     PTP_DT_AUINT128 = 0x400A,
     PTP_DT_STR = 0xFFFF,
-} PTPDataType;
+} PtpDataType;
 
 typedef enum {
     PTP_FORM_FLAG_NONE = 0x00,
     PTP_FORM_FLAG_RANGE = 0x01,
     PTP_FORM_FLAG_ENUM = 0x02,
-} PTPFormFlag;
+} PtpFormFlag;
 
 typedef union {
     u8 u8;
@@ -59,40 +59,40 @@ typedef union {
     char u128[16];
     char i128[16];
     MStr str;
-} PTPPropValue;
+} AwPtpPropValue;
 
 typedef struct {
-    PTPPropValue min;
-    PTPPropValue max;
-    PTPPropValue step;
-} PTPRange;
+    AwPtpPropValue min;
+    AwPtpPropValue max;
+    AwPtpPropValue step;
+} AwPtpRange;
 
 typedef struct {
-    PTPPropValue* set;
-    PTPPropValue* getSet;
-} PTPPropertyEnum;
+    AwPtpPropValue* set;
+    AwPtpPropValue* getSet;
+} AwPtpPropertyEnum;
 
-enum PTPEnumValueFlags {
-    ENUM_VALUE_READ = 0x1,
-    ENUM_VALUE_WRITE = 0x2,
-    ENUM_VALUE_STR_CONST = 0x4
+enum AwPtpEnumValueFlags {
+    AW_ENUM_VALUE_READ = 0x1,
+    AW_ENUM_VALUE_WRITE = 0x2,
+    AW_ENUM_VALUE_STR_CONST = 0x4
 };
 
 typedef struct {
-    PTPPropValue propValue;
+    AwPtpPropValue propValue;
     MStr str; // String representation of the value (can be used in a drop-down/options select for example)
     u16 flags;
-} PTPPropValueEnum;
+} AwPtpPropValueEnum;
 
 typedef struct {
-    PTPPropValueEnum* values;
-} PTPPropValueEnums;
+    AwPtpPropValueEnum* values;
+} AwPtpPropValueEnums;
 
 typedef struct {
-    PTPPropValueEnum* values;
+    AwPtpPropValueEnum* values;
     size_t size;
     b32 owned;
-} PTPPropValueEnumArray;
+} AwPtpPropValueEnumArray;
 
 // Current status of a single PTP property
 typedef struct {
@@ -100,8 +100,8 @@ typedef struct {
 
     u16 propCode;
     u16 dataType;
-    PTPPropValue defaultValue;
-    PTPPropValue value;
+    AwPtpPropValue defaultValue;
+    AwPtpPropValue value;
 
     // 0 - Can only get this value, 1 - Can set this value (at least sometimes, see isEnabled for current status)
     u8 getSet;
@@ -113,8 +113,8 @@ typedef struct {
     u8 formFlag;
 
     union {
-        PTPRange range;
-        PTPPropertyEnum enums;
+        AwPtpRange range;
+        AwPtpPropertyEnum enums;
     } form;
 
     // isNotch properties can only be changed by 'notching' i.e. up / down rotating through settings
@@ -122,13 +122,13 @@ typedef struct {
     u8 isNotch;
 
     struct PTPPropertyMetadata* meta;
-} PTPProperty;
+} AwPtpProperty;
 
 typedef enum {
     SDI_CONTROL_BUTTON = 0x81,
     SDI_CONTROL_NOTCH = 0x82,
     SDI_CONTROL_VARIABLE = 0x84,
-} SDI_ControlType;
+} AwSDIControlType;
 
 typedef struct {
     u16 controlCode;
@@ -138,12 +138,12 @@ typedef struct {
     char* label;
 
     union {
-        PTPRange range;
-        PTPPropValueEnumArray enums;
+        AwPtpRange range;
+        AwPtpPropValueEnumArray enums;
     } form;
-} PtpControl;
+} AwPtpControl;
 
-enum PTPOperationCode {
+enum PtpOperationCode {
     PTP_OC_GetDeviceInfo = 0x1001,
     PTP_OC_OpenSession = 0x1002,
     PTP_OC_CloseSession = 0x1003,
@@ -396,7 +396,7 @@ typedef enum {
     DPC_SHUTTER_ECS_NUMBER_STEP = 0xF000,
     DPC_MOVIE_RECORD_TOGGLE = 0xF001,
     DPC_FOCUS_POSITION_CANCEL = 0xF002,
-} DevicePropertiesCode;
+} AwDevicePropertyCode;
 
 typedef enum {
     PTP_DL_ALL = 0x00000000,
@@ -423,17 +423,17 @@ typedef enum {
     PTP_DL_SUBJECT_RECOGNITION_AF = 0x15,
     PTP_DL_BASE_LOOK_META_RECORD_SUPPORT = 0x16,
     PTP_DL_SELECT_REC_FOLDER_NAME = 0x17,
-} PtpStringDisplayList;
+} AwStringDisplayList;
 
 typedef enum {
     PTP_FOCUS_UNIT_FEET = 1,
     PTP_FOCUS_UNIT_METERS = 2,
-} PtpFocusUnits;
+} AwFocusUnits;
 
 typedef enum {
     SDI_EXTENSION_VERSION_200 = 200,
     SDI_EXTENSION_VERSION_300 = 300,
-} SonyProtocolVersion;
+} AwSonyProtocolVersion;
 
 typedef enum {
     PTP_OK = 0x2001,
@@ -474,7 +474,7 @@ typedef enum {
     PTP_SD_FEATURE_VERSION_INVALID = 0xA104,
     PTP_SD_TEMP_STORAGE_FULL = 0xA105,
     PTP_SD_CAMERA_STATUS_ERR = 0xA106,
-} PTPResult;
+} PtpResult;
 
 typedef enum {
     AW_RESULT_OK,
@@ -491,7 +491,7 @@ typedef enum {
 
 typedef struct AwResult {
     AwResultCode code;
-    PTPResult ptp;
+    PtpResult ptp;
 } AwResult;
 
 typedef enum {
@@ -505,7 +505,7 @@ typedef enum {
     PTP_OFC_MPO = 0xB301,
     PTP_OFC_WMA = 0xB901,
     PTP_OFC_MP4 = 0xB982,
-} PTPObjectFormatCode;
+} AwObjectFormatCode;
 
 #define AW_OSD_WIDTH 640
 #define AW_OSD_HEIGHT 480
@@ -527,14 +527,14 @@ typedef enum
 {
     SD_Disabled = 0x00,
     SD_Enabled = 0x01,
-} SD_EnabledDisabled;
+} AwEnabledDisabled;
 
 typedef enum {
     SD_OH_CAPTURED_IMAGE = 0xffffc001,
     SD_OH_LIVE_VIEW_IMAGE = 0xffffc002,
     SD_OH_CAMERA_SETTINGS = 0xffffc004,
     SD_OH_FTP_SETTINGS = 0xffffc005
-} SD_ObjectHandle;
+} AwObjectHandle;
 
 typedef enum
 {
@@ -554,7 +554,7 @@ typedef enum
     SD_NonDualAFAssist = 0x000E,
     SD_FrameSomewhere = 0x000F,
     SD_Cross = 0x0010,
-} SD_FocusFrameType;
+} AwFocusFrameType;
 
 typedef enum
 {
@@ -565,7 +565,7 @@ typedef enum
     SD_RangeLimit = 0x0005,
     SD_RegistrationAF = 0x0006,
     SD_Island = 0x0007,
-} SD_FocusFrameState;
+} AwFocusFrameState;
 
 typedef enum
 {
@@ -576,81 +576,81 @@ typedef enum
     SD_SelectedFace = 0x0005,
     SD_AF_TargetSelectionFace = 0x0006,
     SD_SmileDetectionSelectFace = 0x0007,
-} SD_FaceFrameType;
+} AwFaceFrameType;
 
 typedef enum
 {
     SD_Unselected = 0x01,
     SD_Selected = 0x02,
-} SD_SelectionState;
+} AwSelectionState;
 
 typedef enum
 {
     SD_NonTargetAF = 0x0001,
     SD_TargetAF = 0x0002,
-} SD_TrackingFrameType;
+} AwTrackingFrameType;
 
 typedef struct {
-    u16 frameType; // SD_FocusFrameType
-    u16 focusFrameState; // SD_FocusFrameState
+    u16 frameType; // AwFocusFrameType
+    u16 focusFrameState; // AwFocusFrameState
     u8 priority;
     u32 x;
     u32 y;
     u32 height;
     u32 width;
-} FocusFrame;
+} AwFocusFrame;
 
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    FocusFrame* frames;
-} FocusFrames;
+    AwFocusFrame* frames;
+} AwFocusFrames;
 
 typedef struct {
-    u16 faceFrameType; // SD_FaceFrameType
-    u16 faceFocusFrameState; // SD_FaceFrameState
-    u16 selectionState; // SD_SelectionState
+    u16 faceFrameType; // AwFaceFrameType
+    u16 faceFocusFrameState; // AwFaceFrameState
+    u16 selectionState; // AwSelectionState
     u8 priority;
     u32 xNumerator;
     u32 yNumerator;
     u32 height;
     u32 width;
-} FocusFrameFace;
+} AwFocusFrameFace;
 
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    FocusFrameFace* frames;
-} FaceFrames;
+    AwFocusFrameFace* frames;
+} AwFaceFrames;
 
 typedef struct {
-    u16 trackingFrameType; // SD_TrackingFrameType
-    u16 trackingFrameState; // SD_TrackingFrameState
+    u16 trackingFrameType; // AwTrackingFrameType
+    u16 trackingFrameState; // AwTrackingFrameState
     u8 priority;
     u32 xNumerator;
     u32 yNumerator;
     u32 height;
     u32 width;
-} FocusFrameTracking;
+} AwFocusFrameTracking;
 
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    FocusFrameTracking* frames;
-} TrackingFrames;
+    AwFocusFrameTracking* frames;
+} AwTrackingFrames;
 
 typedef struct {
     u16 version;
-    FocusFrames focus;
-    FaceFrames face;
-    TrackingFrames tracking;
-} LiveViewFrames;
+    AwFocusFrames focus;
+    AwFaceFrames face;
+    AwTrackingFrames tracking;
+} AwLiveViewFrames;
 
 typedef struct {
     MStr filename;
-    PTPObjectFormatCode objectFormat;
+    AwObjectFormatCode objectFormat;
     size_t size;
-} PTPCapturedImageInfo;
+} AwPtpCapturedImageInfo;
 
 typedef enum {
     PTP_StoreAdded = 0x4004,
@@ -676,10 +676,10 @@ typedef enum {
     PTP_OperationResults = 0xC222,
     PTP_AFStatus = 0xC223,
     PTP_MovieRecOperationResults = 0xC224,
-} PTPEventCode;
+} AwPtpEventCode;
 
 typedef struct {
-    PTPEventCode code;
+    AwPtpEventCode code;
     u32 size;
     union {
         struct {
@@ -691,7 +691,7 @@ typedef struct {
             u32 objectHandle;
         };
     };
-} PTPEvent;
+} AwPtpEvent;
 
 #define PTP_MAX_PARAMS 5
 
@@ -702,7 +702,7 @@ typedef struct {
     u32 Params[PTP_MAX_PARAMS];
     u32 NumParams;
     u32 NextPhase;
-} PTPRequestHeader;
+} AwPtpRequestHeader;
 
 typedef struct {
     u16 ResponseCode;
@@ -710,18 +710,18 @@ typedef struct {
     u32 TransactionId;
     u32 NumParams;
     u32 Params[PTP_MAX_PARAMS];
-} PTPResponseHeader;
+} AwPtpResponseHeader;
 
 typedef enum {
     PTP_NEXT_PHASE_READ_DATA = 3,
     PTP_NEXT_PHASE_WRITE_DATA = 4,
     PTP_NEXT_PHASE_NO_DATA = 5
-} PTPNextPhase;
+} AwPtpNextPhase;
 
 typedef enum {
-    PTP_BUFFER_IN,
-    PTP_BUFFER_OUT,
-} PTPBufferType;
+    AW_BUFFER_IN,
+    AW_BUFFER_OUT,
+} AwBufferType;
 
 #ifdef __cplusplus
 } // extern "C"

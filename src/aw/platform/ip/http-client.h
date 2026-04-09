@@ -18,7 +18,6 @@ typedef struct HttpHeader {
     MStrView value;
 } HttpHeader;
 
-
 typedef enum HttpVersion {
     HttpVersion_1_0,
     HttpVersion_1_1,

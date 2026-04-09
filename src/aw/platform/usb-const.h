@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 #include "mlib/mlib.h"
-#include "ptp/ptp-const.h"
+#include "aw/aw-const.h"
 
 #define USB_SONY_VID 0x054C
 #define USB_EN_US 0x0409
@@ -28,20 +28,20 @@ typedef MSTRUCTPACKED(struct {
     u32 transactionId;
 }) PTPContainerHeader;
 
-typedef struct PTPUsbEndPoints {
+typedef struct AwUsbEndPoints {
     u8 bulkIn;
     u16 bulkInMaxPacketSize;
     u8 bulkOut;
     u16 bulkOutPacketSize;
     u8 interruptIn;
     u8 interruptInterval;
-} PTPUsbEndPoints;
+} AwUsbEndPoints;
 
 /**
  * Convert USB version to a string, the USB version is stored as BCD (binary code decimal).
  * @return number of bytes written, see snprintf()
  */
-PTP_EXPORT int USB_BcdVersionAsString(u16 bcdVersion, char* dstStr, size_t dstStrLen);
+AW_EXPORT int USB_BcdVersionAsString(u16 bcdVersion, char* dstStr, size_t dstStrLen);
 
 #ifdef __cplusplus
 }

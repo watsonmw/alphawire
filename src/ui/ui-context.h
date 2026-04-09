@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ptp/ptp-control.h"
-#include "ptp/ptp-device-list.h"
+#include "aw/aw-control.h"
+#include "aw/aw-device-list.h"
 #include "../mlib/utf8.h"
 
 #include <vector>
@@ -10,8 +10,8 @@
 #include <string>
 #include <deque>
 
-#ifdef PTP_ENABLE_WIA
-#include "platform/windows/ptp-backend-wia.h"
+#ifdef AW_ENABLE_WIA
+#include "aw/platform/windows/aw-backend-wia.h"
 #endif
 
 #include "imgui.h"
@@ -21,7 +21,7 @@ void TextureRelease(ImTextureID* outTexture);
 struct UiPtpProperty {
     char propCode[32];
     char* propLabel;
-    PTPProperty *prop;
+    AwPtpProperty *prop;
 
     UiPtpProperty() {
         memset(propCode, 0, 32);
@@ -103,14 +103,14 @@ struct PropTable {
         return false;
     }
 
-    void rebuild(PTPControl& ptp) {
+    void rebuild(AwControl& ptp) {
         items.clear();
         for (size_t i = 0; i < MArraySize(ptp.properties); i++) {
-            PTPProperty *property = ptp.properties + i;
+            AwPtpProperty *property = ptp.properties + i;
 
             UiPtpProperty uiPtpProperty{};
             snprintf(uiPtpProperty.propCode,  sizeof(uiPtpProperty.propCode), "0x%04x", property->propCode);
-            uiPtpProperty.propLabel = PTP_GetPropertyLabel(property->propCode);
+            uiPtpProperty.propLabel = AwGetPropertyLabel(property->propCode);
             if (uiPtpProperty.propLabel == NULL) {
                 uiPtpProperty.propLabel = uiPtpProperty.propCode;
             }
@@ -145,20 +145,20 @@ struct PropTable {
 };
 
 struct LogEntry {
-    PTPLogLevel level;
+    AwLogLevel level;
     std::string message;
 
-    LogEntry(PTPLogLevel lvl, const char* msg) : level(lvl), message(msg) {}
+    LogEntry(AwLogLevel lvl, const char* msg) : level(lvl), message(msg) {}
 };
 
 struct LogWindow {
     std::deque<LogEntry> entries;
     bool autoScroll = true;
-    int selectedLogLevel = PTP_LOG_LEVEL_TRACE;  // Show all logs by default
+    int selectedLogLevel = AW_LOG_LEVEL_TRACE;  // Show all logs by default
     bool showWindow = false;
     static const size_t MAX_LOG_ENTRIES = 5000;
 
-    void AddLog(PTPLogLevel level, const char* message) {
+    void AddLog(AwLogLevel level, const char* message) {
         entries.emplace_back(level, message);
         if (entries.size() > MAX_LOG_ENTRIES) {
             entries.pop_front();
@@ -186,9 +186,9 @@ struct AppContext {
     MAllocator* deviceListAllocator = NULL;
     MAllocator* autoReleasePool = NULL;
     MAllocator deviceAllocator{};
-    PTPDeviceList ptpDeviceList{};
-    PTPDevice* device = NULL;
-    PTPControl ptp{};
+    AwDeviceList deviceList{};
+    AwDevice* device = NULL;
+    AwControl aw{};
     int selectedDeviceIndex = -1;
     int selectedProtoVersion = 1;
 
@@ -207,9 +207,9 @@ struct AppContext {
     bool propRefresh = true;
 
     // Property & Controls Debug
-    PTPProperty* selectedProperty = nullptr;
-    PtpControl* selectedControl = nullptr;
-    PTPPropValue selectedControlValue;
+    AwPtpProperty* selectedProperty = nullptr;
+    AwPtpControl* selectedControl = nullptr;
+    AwPtpPropValue selectedControlValue;
     PropTable propTable{};
 
     // Debug set props
@@ -223,7 +223,7 @@ struct AppContext {
     bool liveViewOpen = false;
     double liveViewLastTime = 0.;
     MMemIO liveViewImage{};
-    LiveViewFrames liveViewFrames{};
+    AwLiveViewFrames liveViewFrames{};
     ImTextureID liveViewImageGLId = 0;
     i32 liveViewImageWidth = 0;
     i32 liveViewImageHeight = 0;
@@ -265,23 +265,23 @@ struct AppContext {
 
     void RefreshDevices() {
         selectedDeviceIndex = -1;
-        PTPDeviceList_RefreshList(&ptpDeviceList);
+        AwDeviceList_RefreshList(&deviceList);
     }
 
     void Connect() {
-        if (selectedDeviceIndex != -1 && MArraySize(ptpDeviceList.devices) > selectedDeviceIndex) {
-            PTPDeviceInfo* deviceInfo = ptpDeviceList.devices + selectedDeviceIndex;
+        if (selectedDeviceIndex != -1 && MArraySize(deviceList.devices) > selectedDeviceIndex) {
+            AwDeviceInfo* deviceInfo = deviceList.devices + selectedDeviceIndex;
             DisconnectDevice();
-            AwResult r = PTPDeviceList_OpenDevice(&ptpDeviceList, deviceInfo, &device);
+            AwResult r = AwDeviceList_OpenDevice(&deviceList, deviceInfo, &device);
             if (r.code == AW_RESULT_OK) {
                 MAllocatorMakeClibHeap(&deviceAllocator);
-                deviceAllocator.name = (char*)"PTPDevice";
+                deviceAllocator.name = (char*)"AwDevice";
 #ifdef M_MEM_DEBUG
                 MMemDebugInit(&deviceAllocator);
 #endif
-                r = PTPControl_Init(&ptp, device, &deviceAllocator);
+                r = AwControl_Init(&aw, device, &deviceAllocator);
                 if (r.code == AW_RESULT_OK) {
-                    r = PTPControl_Connect(&ptp, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
+                    r = AwControl_Connect(&aw, selectedProtoVersion ? SDI_EXTENSION_VERSION_300 : SDI_EXTENSION_VERSION_200);
                     if (r.code == AW_RESULT_OK) {
                         connected = true;
                     }
@@ -290,11 +290,11 @@ struct AppContext {
         }
         propTable.reset();
         if (connected) {
-            cameraSettingsSaveEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_SAVE_ENABLED);
-            cameraSettingsReadEnabled = PTPControl_PropertyEnabledByCode(&ptp, DPC_CAMERA_SETTING_READ_ENABLED);
-            remoteButtonsEnabled = PTPControl_RemoteButtonEnable(&ptp);
+            cameraSettingsSaveEnabled = AwControl_PropertyEnabledByCode(&aw, DPC_CAMERA_SETTING_SAVE_ENABLED);
+            cameraSettingsReadEnabled = AwControl_PropertyEnabledByCode(&aw, DPC_CAMERA_SETTING_READ_ENABLED);
+            remoteButtonsEnabled = AwControl_RemoteButtonEnable(&aw);
 
-            PTPProperty* photographerProperty = PTPControl_GetPropertyByCode(&ptp, DPC_PHOTOGRAPHER);
+            AwPtpProperty* photographerProperty = AwControl_GetPropertyByCode(&aw, DPC_PHOTOGRAPHER);
             if (photographerProperty) {
                 size_t size = photographerProperty->value.str.size;
                 if (size >= sizeof(photographerEdit)) {
@@ -304,7 +304,7 @@ struct AppContext {
                 photographerEdit[size] = 0;
             }
 
-            PTPProperty* copyrightProperty = PTPControl_GetPropertyByCode(&ptp, DPC_COPYRIGHT);
+            AwPtpProperty* copyrightProperty = AwControl_GetPropertyByCode(&aw, DPC_COPYRIGHT);
             if (copyrightProperty) {
                 size_t size = copyrightProperty->value.str.size;
                 if (size >= sizeof(copyrightEdit)) {
@@ -342,9 +342,9 @@ struct AppContext {
         if (device != NULL) {
             MMemFree(&this->liveViewImage);
             MMemFree(&this->osdImage);
-            PTPControl_FreeLiveViewFrames(&ptp, &liveViewFrames);
-            PTPControl_Cleanup(&ptp);
-            PTPDeviceList_CloseDevice(&ptpDeviceList, device);
+            AwControl_FreeLiveViewFrames(&aw, &liveViewFrames);
+            AwControl_Cleanup(&aw);
+            AwDeviceList_CloseDevice(&deviceList, device);
 #ifdef M_MEM_DEBUG
             MMemDebugDeinit(&deviceAllocator);
 #endif
@@ -354,7 +354,7 @@ struct AppContext {
 
     void CleanupAll() {
         DisconnectDevice();
-        PTPDeviceList_Close(&ptpDeviceList);
+        AwDeviceList_Close(&deviceList);
     }
 
     void GraphicsCleanup()

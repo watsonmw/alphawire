@@ -15,20 +15,20 @@
 #endif
 
 #include "mlib/mlib.h"
-#include "ptp/ptp-control.h"
+#include "aw/aw-control.h"
 
-#include "platform/usb-const.h"
-#include "platform/windows/ptp-backend-libusbk.h"
-#include "platform/windows/win-utils.h"
+#include "aw/platform/usb-const.h"
+#include "aw/platform/windows/aw-backend-libusbk.h"
+#include "aw/platform/windows/win-utils.h"
 
-AwResult PTPUsbkDeviceList_Open(PTPUsbkBackend* self) {
-    PTP_TRACE("PTPUsbkDeviceList_Open");
+AwResult AwUsbkDeviceList_Open(AwUsbkBackend* self) {
+    AW_TRACE("AwUsbkDeviceList_Open");
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-AwResult PTPUsbkDeviceList_Close(PTPUsbkBackend* self) {
-    PTP_TRACE("PTPUsbkDeviceList_Close");
-    PTPUsbkDeviceList_ReleaseList(self);
+AwResult AwUsbkDeviceList_Close(AwUsbkBackend* self) {
+    AW_TRACE("AwUsbkDeviceList_Close");
+    AwUsbkDeviceList_ReleaseList(self);
     if (self->openDevices) {
         MArrayFree(self->allocator, self->openDevices);
     }
@@ -36,11 +36,11 @@ AwResult PTPUsbkDeviceList_Close(PTPUsbkBackend* self) {
 }
 
 // Check configuration descriptors for PTP support
-static b32 CheckDeviceHasPtpEndPoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandle, u32 timeoutMilliseconds) {
+static b32 CheckDeviceHasPtpEndPoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, u32 timeoutMilliseconds) {
     OVERLAPPED overlapped = {0};
     overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (!overlapped.hEvent) {
-        PTP_ERROR("Failed to create event for overlapped I/O");
+        AW_ERROR("Failed to create event for overlapped I/O");
         return FALSE;
     }
 
@@ -62,7 +62,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandl
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
             !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
             CloseHandle(overlapped.hEvent);
-            PTP_ERROR("Overlapped I/O failed for configuration descriptor");
+            AW_ERROR("Overlapped I/O failed for configuration descriptor");
             return FALSE;
         }
     }
@@ -73,7 +73,7 @@ static b32 CheckDeviceHasPtpEndPoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandl
     configBuffer = (UCHAR *) MMalloc(self->allocator, descriptorLength);
     if (!configBuffer) {
         CloseHandle(overlapped.hEvent);
-        PTP_ERROR("Memory allocation failed");
+        AW_ERROR("Memory allocation failed");
         return FALSE;
     }
 
@@ -166,7 +166,7 @@ static AwResult IssueOverlappedEventRead(PTPUsbkDeviceUsbk* dev, MAllocator* all
     }
 }
 
-static b32 ReadEventFromBuffer(PTPUsbkDeviceUsbk* dev, UINT transferred, PTPEvent* outEvent) {
+static b32 ReadEventFromBuffer(PTPUsbkDeviceUsbk* dev, UINT transferred, AwPtpEvent* outEvent) {
     MMemIO payloadRead;
     MMemInitRead(&payloadRead, dev->eventMem.mem, transferred);
 
@@ -233,10 +233,10 @@ static DWORD WINAPI EventThreadProc(LPVOID lpParameter) {
         }
 
         if (transferred > 0) {
-            PTPEvent tempEvent = {};
+            AwPtpEvent tempEvent = {};
             if (ReadEventFromBuffer(dev, transferred, &tempEvent)) {
                 AcquireSRWLockExclusive(&dev->eventLock);
-                PTPEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
+                AwPtpEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
                 *event = tempEvent;
                 ReleaseSRWLockExclusive(&dev->eventLock);
             }
@@ -249,7 +249,7 @@ static DWORD WINAPI EventThreadProc(LPVOID lpParameter) {
     return 0;
 }
 
-static AwResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents) {
+static AwResult AwDeviceUsbk_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents) {
     PTPUsbkDeviceUsbk* dev = self->device;
 
     if (outEvents == NULL) {
@@ -263,7 +263,7 @@ static AwResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMillisecond
         // Copy all events to output
         if (dev->eventList && MArraySize(dev->eventList) > 0) {
             for (int i = 0; i < MArraySize(dev->eventList); i++) {
-                PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+                AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
                 *event = dev->eventList[i];
             }
             // Clear the stored events
@@ -286,9 +286,9 @@ static AwResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMillisecond
     }
 
     if (immediateResult) {
-        PTPEvent outEvent = {};
+        AwPtpEvent outEvent = {};
         if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
-            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
             *event = outEvent;
         }
     } else {
@@ -312,9 +312,9 @@ static AwResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMillisecond
     }
 
     if (immediateResult) {
-        PTPEvent outEvent = {};
+        AwPtpEvent outEvent = {};
         if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
-            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
             *event = outEvent;
         }
     }
@@ -322,18 +322,18 @@ static AwResult PTPDeviceUsbk_ReadEvents(PTPDevice* self, int timeoutMillisecond
     return (AwResult){.code=AW_RESULT_OK,.ptp=PTP_OK};
 }
 
-b32 PTPUsbkDeviceList_NeedsRefresh(PTPUsbkBackend* self) {
-    PTP_TRACE("PTPUsbkDeviceList_NeedsRefresh");
+b32 AwUsbkDeviceList_NeedsRefresh(AwUsbkBackend* self) {
+    AW_TRACE("AwUsbkDeviceList_NeedsRefresh");
     return FALSE;
 }
 
-AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** devices) {
-    PTP_TRACE("PTPUsbkDeviceList_RefreshList");
+AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfo** devices) {
+    AW_TRACE("AwUsbkDeviceList_RefreshList");
 
     // Print libusbk version number
     if (!self->libkVersion.Major || !self->libkVersion.Minor || !self->libkVersion.Micro || !self->libkVersion.Nano) {
         LibK_GetVersion(&self->libkVersion);
-        PTP_INFO_F("LibK version: %d.%d.%d.%d", self->libkVersion.Major, self->libkVersion.Minor,
+        AW_INFO_F("LibK version: %d.%d.%d.%d", self->libkVersion.Major, self->libkVersion.Minor,
             self->libkVersion.Micro, self->libkVersion.Nano);
     }
 
@@ -343,7 +343,7 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
 
     // Initialize the device list
     if (!LstK_Init(&deviceList, 0)) {
-        PTP_ERROR("Failed to initialize device list.");
+        AW_ERROR("Failed to initialize device list.");
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
@@ -353,7 +353,7 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
     while (LstK_MoveNext(deviceList, &deviceInfo)) {
         // Skip if not Sony
         if (deviceInfo->Common.Vid != USB_SONY_VID) {
-            PTP_ERROR("Skipping non Sony device");
+            AW_ERROR("Skipping non Sony device");
             continue;
         }
 
@@ -365,7 +365,7 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
                 // Get the device descriptor
                 if (!UsbK_GetDescriptor(usbHandle, USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
                         (PUCHAR)&deviceDescriptor,sizeof(USB_DEVICE_DESCRIPTOR), NULL)) {
-                    PTP_ERROR("Error getting device descriptor");
+                    AW_ERROR("Error getting device descriptor");
                     UsbK_Free(usbHandle);
                     LstK_Free(deviceList);
                     return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
@@ -388,10 +388,10 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
                         WCHAR* wideString = (WCHAR*)(&stringDescriptor[2]);
 
                         UsbkDeviceInfo *usbkDevice = MArrayAddPtr(self->allocator, self->deviceList);
-                        PTPDeviceInfo* device = MArrayAddPtrZ(self->allocator, *devices);
+                        AwDeviceInfo* device = MArrayAddPtrZ(self->allocator, *devices);
                         usbkDevice->deviceId = deviceInfo;
                         device->manufacturer = MStrMakeCopyCStr(self->allocator, deviceInfo->Mfg);
-                        device->backendType = PTP_BACKEND_LIBUSBK;
+                        device->backendType = AW_BACKEND_LIBUSBK;
                         device->device = usbkDevice;
                         device->product = WinUtils_BSTRWithSizeToUTF8(self->allocator, wideString, length/2);
                         device->usbVID = deviceInfo->Common.Vid;
@@ -399,10 +399,10 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
                         device->serial = MStrMakeCopyCStr(self->allocator, deviceInfo->SerialNumber);
                         device->usbVersion = deviceDescriptor.bcdUSB;
 
-                        PTP_INFO_F("Found device: %.*s (%.*s)", device->product.size, device->product.str,
+                        AW_INFO_F("Found device: %.*s (%.*s)", device->product.size, device->product.str,
                             device->manufacturer.size, device->manufacturer.str);
                     } else {
-                        PTP_ERROR("Error getting product string descriptor");
+                        AW_ERROR("Error getting product string descriptor");
                     }
                 }
             }
@@ -410,7 +410,7 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
             // Close the USB device
             UsbK_Free(usbHandle);
         } else {
-            PTP_ERROR("Failed to open device.");
+            AW_ERROR("Failed to open device.");
         }
     }
 
@@ -422,8 +422,8 @@ AwResult PTPUsbkDeviceList_RefreshList(PTPUsbkBackend* self, PTPDeviceInfo** dev
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-AwResult PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self) {
-    PTP_TRACE("PTPUsbkDeviceList_ReleaseList");
+AwResult AwUsbkDeviceList_ReleaseList(AwUsbkBackend* self) {
+    AW_TRACE("AwUsbkDeviceList_ReleaseList");
 
     // Free the device list
     if (self->deviceListHandle) {
@@ -441,7 +441,7 @@ AwResult PTPUsbkDeviceList_ReleaseList(PTPUsbkBackend* self) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static void* PTPDeviceUsbk_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize,
+static void* AwDeviceUsbk_ReallocBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize,
                                          size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
@@ -453,7 +453,7 @@ static void* PTPDeviceUsbk_ReallocBuffer(PTPDevice* self, PTPBufferType type, vo
     return ((u8*)dataMem) + headerSize;
 }
 
-static void PTPDeviceUsbk_FreeBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
+static void AwDeviceUsbk_FreeBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -462,8 +462,8 @@ static void PTPDeviceUsbk_FreeBuffer(PTPDevice* self, PTPBufferType type, void* 
     }
 }
 
-static AwResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                          PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                          AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                           size_t* actualDataOutSize) {
     PTPUsbkDeviceUsbk* deviceUsbk = self->device;
     KUSB_HANDLE usbHandle = deviceUsbk->usbHandle;
@@ -505,7 +505,7 @@ static AwResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* req
     if (waitResult != WAIT_OBJECT_0) {
         UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
         CloseHandle(overlapped.hEvent);
-        PTP_ERROR("Timeout or error while sending PTP request");
+        AW_ERROR("Timeout or error while sending PTP request");
         return (AwResult){.code=AW_RESULT_TIMEOUT};
     }
 
@@ -531,7 +531,7 @@ static AwResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* req
         if (waitResult != WAIT_OBJECT_0) {
             UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
             CloseHandle(overlapped.hEvent);
-            PTP_ERROR("Timeout or error while sending PTP data");
+            AW_ERROR("Timeout or error while sending PTP data");
             return (AwResult){.code=AW_RESULT_TIMEOUT};
         }
     }
@@ -550,7 +550,7 @@ static AwResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* req
 
     waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
     if (waitResult != WAIT_OBJECT_0) {
-        PTP_ERROR("Timeout or error while reading PTP response");
+        AW_ERROR("Timeout or error while reading PTP response");
         UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
         CloseHandle(overlapped.hEvent);
         return (AwResult){.code=AW_RESULT_TIMEOUT};
@@ -582,7 +582,7 @@ static AwResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* req
             if (waitResult != WAIT_OBJECT_0) {
                 UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
                 CloseHandle(overlapped.hEvent);
-                PTP_ERROR("Timeout or error while reading PTP response data");
+                AW_ERROR("Timeout or error while reading PTP response data");
                 return (AwResult){.code=AW_RESULT_TIMEOUT};
             }
 
@@ -646,7 +646,7 @@ static AwResult PTPDeviceUsbk_SendAndRecv(PTPDevice* self, PTPRequestHeader* req
     }
 }
 
-static b32 PTPDeviceUsbk_Reset(PTPDevice* device) {
+static b32 AwDeviceUsbk_Reset(AwDevice* device) {
     PTPUsbkDeviceUsbk* deviceUsbk = device->device;
     if (!deviceUsbk || !deviceUsbk->usbHandle) {
         return FALSE;
@@ -654,7 +654,7 @@ static b32 PTPDeviceUsbk_Reset(PTPDevice* device) {
     return UsbK_ResetDevice(deviceUsbk->usbHandle) ? TRUE : FALSE;
 }
 
-static b32 FindBulkInOutEndpoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
+static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
                                   UCHAR* interruptOut, UCHAR* interruptIntervalOut, u32 timeoutMilliseconds) {
     USB_CONFIGURATION_DESCRIPTOR configDesc = {};
     OVERLAPPED overlapped = {0};
@@ -761,8 +761,8 @@ static b32 FindBulkInOutEndpoints(PTPUsbkBackend* self, KUSB_HANDLE usbHandle, U
     return found;
 }
 
-AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTP_TRACE("PTPUsbkDeviceList_OpenDevice");
+AwResult AwUsbkDeviceList_OpenDevice(AwUsbkBackend* self, AwDeviceInfo* deviceInfo, AwDevice** deviceOut) {
+    AW_TRACE("AwUsbkDeviceList_OpenDevice");
     UsbkDeviceInfo* device = deviceInfo->device;
     KLST_DEVINFO_HANDLE deviceInfoHandle = (KLST_DEVINFO_HANDLE)device->deviceId;
     KUSB_HANDLE usbHandle = NULL;
@@ -772,7 +772,7 @@ AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* devic
         UCHAR bulkIn = 0, bulkOut = 0, interruptOut = 0;
         UCHAR interruptInterval = 0;
         if (!FindBulkInOutEndpoints(self, usbHandle, &bulkIn, &bulkOut, &interruptOut, &interruptInterval, self->timeoutMilliseconds)) {
-            PTP_WARNING("Failed to connected to device: Unable to get endpoints");
+            AW_WARNING("Failed to connected to device: Unable to get endpoints");
             UsbK_Free(usbHandle);
             return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
@@ -793,15 +793,15 @@ AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* devic
         usbkDevice->eventThreadStopEvent = NULL;
         usbkDevice->eventList = NULL;
 
-        (*deviceOut)->transport.reallocBuffer = PTPDeviceUsbk_ReallocBuffer;
-        (*deviceOut)->transport.freeBuffer = PTPDeviceUsbk_FreeBuffer;
-        (*deviceOut)->transport.sendAndRecv = PTPDeviceUsbk_SendAndRecv;
-        (*deviceOut)->transport.reset = PTPDeviceUsbk_Reset;
-        (*deviceOut)->transport.readEvents = PTPDeviceUsbk_ReadEvents;
+        (*deviceOut)->transport.reallocBuffer = AwDeviceUsbk_ReallocBuffer;
+        (*deviceOut)->transport.freeBuffer = AwDeviceUsbk_FreeBuffer;
+        (*deviceOut)->transport.sendAndRecv = AwDeviceUsbk_SendAndRecv;
+        (*deviceOut)->transport.reset = AwDeviceUsbk_Reset;
+        (*deviceOut)->transport.readEvents = AwDeviceUsbk_ReadEvents;
         (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
         (*deviceOut)->logger = self->logger;
         (*deviceOut)->device = usbkDevice;
-        (*deviceOut)->backendType = PTP_BACKEND_LIBUSBK;
+        (*deviceOut)->backendType = AW_BACKEND_LIBUSBK;
         (*deviceOut)->disconnected = FALSE;
 
         // Start event thread if allowed
@@ -819,7 +819,7 @@ AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* devic
                     CloseHandle(usbkDevice->eventThreadStopEvent);
                     usbkDevice->eventThreadStopEvent = NULL;
                 } else {
-                    PTP_DEBUG("Started event thread");
+                    AW_DEBUG("Started event thread");
                 }
             } else {
                 WinUtils_LogLastError(&self->logger, "Failed to create event stop event");
@@ -830,13 +830,13 @@ AwResult PTPUsbkDeviceList_OpenDevice(PTPUsbkBackend* self, PTPDeviceInfo* devic
 
         return (AwResult){.code=AW_RESULT_OK};
     } else {
-        PTP_WARNING("Failed to connected to device: UsbK_Init failed");
+        AW_WARNING("Failed to connected to device: UsbK_Init failed");
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 }
 
-AwResult PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) {
-    PTP_TRACE("PTPUsbkDeviceList_CloseDevice");
+AwResult AwUsbkDeviceList_CloseDevice(AwUsbkBackend* self, AwDevice* device) {
+    AW_TRACE("AwUsbkDeviceList_CloseDevice");
     PTPUsbkDeviceUsbk* deviceUsbk = device->device;
 
     // Stop event thread if running
@@ -847,7 +847,7 @@ AwResult PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) 
         // Wait for thread to exit (with timeout)
         DWORD waitResult = WaitForSingleObject(deviceUsbk->eventThread, 10000);
         if (waitResult == WAIT_TIMEOUT) {
-            PTP_ERROR("Event thread did not exit in time, terminating");
+            AW_ERROR("Event thread did not exit in time, terminating");
             TerminateThread(deviceUsbk->eventThread, 1);
         }
 
@@ -883,56 +883,56 @@ AwResult PTPUsbkDeviceList_CloseDevice(PTPUsbkBackend* self, PTPDevice* device) 
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static AwResult PTPUsbkDeviceList_Close_(PTPBackend* backend) {
-    PTPUsbkBackend* self = backend->self;
-    AwResult r = PTPUsbkDeviceList_Close(self);
-    MFree(self->allocator, self, sizeof(PTPUsbkBackend));
+static AwResult AwUsbkDeviceList_Close_(AwBackend* backend) {
+    AwUsbkBackend* self = backend->self;
+    AwResult r = AwUsbkDeviceList_Close(self);
+    MFree(self->allocator, self, sizeof(AwUsbkBackend));
     return r;
 }
 
-static AwResult PTPUsbkDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
-    PTPUsbkBackend* self = backend->self;
-    return PTPUsbkDeviceList_RefreshList(self, deviceList);
+static AwResult AwUsbkDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+    AwUsbkBackend* self = backend->self;
+    return AwUsbkDeviceList_RefreshList(self, deviceList);
 }
 
-static b32 PTPUsbkDeviceList_NeedsRefresh_(PTPBackend* backend) {
-    PTPUsbkBackend* self = backend->self;
-    return PTPUsbkDeviceList_NeedsRefresh(self);
+static b32 AwUsbkDeviceList_NeedsRefresh_(AwBackend* backend) {
+    AwUsbkBackend* self = backend->self;
+    return AwUsbkDeviceList_NeedsRefresh(self);
 }
 
-static AwResult PTPUsbkDeviceList_ReleaseList_(PTPBackend* backend) {
-    PTPUsbkBackend* self = backend->self;
-    return PTPUsbkDeviceList_ReleaseList(self);
+static AwResult AwUsbkDeviceList_ReleaseList_(AwBackend* backend) {
+    AwUsbkBackend* self = backend->self;
+    return AwUsbkDeviceList_ReleaseList(self);
 }
 
-static AwResult PTPUsbkDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTPUsbkBackend* self = backend->self;
-    return PTPUsbkDeviceList_OpenDevice(self, deviceInfo, deviceOut);
+static AwResult AwUsbkDeviceList_OpenDevice_(AwBackend* backend, AwDeviceInfo* deviceInfo, AwDevice** deviceOut) {
+    AwUsbkBackend* self = backend->self;
+    return AwUsbkDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static AwResult PTPUsbkDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
-    PTPUsbkBackend* self = backend->self;
-    return PTPUsbkDeviceList_CloseDevice(self, device);
+static AwResult AwUsbkDeviceList_CloseDevice_(AwBackend* backend, AwDevice* device) {
+    AwUsbkBackend* self = backend->self;
+    return AwUsbkDeviceList_CloseDevice(self, device);
 }
 
-AwResult PTPUsbkDeviceList_OpenBackend(PTPBackend* backend, u32 timeoutMilliseconds) {
-    PTP_LOG_TRACE(&backend->logger, "PTPUsbkDeviceList_OpenBackend");
+AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMilliseconds) {
+    AW_LOG_TRACE(&backend->logger, "AwUsbkDeviceList_OpenBackend");
 
     if (timeoutMilliseconds == 0) {
         timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;
     }
 
-    PTPUsbkBackend* deviceList = MMallocZ(backend->allocator, sizeof(PTPUsbkBackend));
+    AwUsbkBackend* deviceList = MMallocZ(backend->allocator, sizeof(AwUsbkBackend));
     backend->self = deviceList;
-    backend->close = PTPUsbkDeviceList_Close_;
-    backend->refreshList = PTPUsbkDeviceList_RefreshList_;
-    backend->needsRefresh = PTPUsbkDeviceList_NeedsRefresh_;
-    backend->releaseList = PTPUsbkDeviceList_ReleaseList_;
-    backend->openDevice = PTPUsbkDeviceList_OpenDevice_;
-    backend->closeDevice = PTPUsbkDeviceList_CloseDevice_;
+    backend->close = AwUsbkDeviceList_Close_;
+    backend->refreshList = AwUsbkDeviceList_RefreshList_;
+    backend->needsRefresh = AwUsbkDeviceList_NeedsRefresh_;
+    backend->releaseList = AwUsbkDeviceList_ReleaseList_;
+    backend->openDevice = AwUsbkDeviceList_OpenDevice_;
+    backend->closeDevice = AwUsbkDeviceList_CloseDevice_;
     deviceList->timeoutMilliseconds = timeoutMilliseconds;
     deviceList->allocator = backend->allocator;
     deviceList->logger = backend->logger;
     deviceList->backend = backend;
-    return PTPUsbkDeviceList_Open(deviceList);
+    return AwUsbkDeviceList_Open(deviceList);
 }

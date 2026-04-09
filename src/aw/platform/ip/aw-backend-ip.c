@@ -1,4 +1,4 @@
-#include "platform/ip/ptp-backend-ip.h"
+#include "aw/platform/ip/aw-backend-ip.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,9 +6,10 @@
 
 #include "mlib/msock.h"
 #include "mlib/mxml.h"
-#include "platform/ip/http-client.h"
-#include "platform/usb-const.h"
-#include "ptp/ptp-device-list.h"
+
+#include "aw/platform/ip/http-client.h"
+#include "aw/platform/usb-const.h"
+#include "aw/aw-device-list.h"
 
 #ifndef _WIN32
     #include <arpa/inet.h>
@@ -43,7 +44,7 @@ typedef enum PTPIpInitFailError {
 // SSDP Multicast IP address is 239.255.255.250
 #define SSDP_MULTICAST_ADDR 0xEFFFFFFA
 
-static const char * PTPIp_GetInitFailErrorString(u32 failureCode) {
+static const char * AwIp_GetInitFailErrorString(u32 failureCode) {
     switch (failureCode) {
         case PTPIP_FAIL_REJECTED_INITIATOR:
             return "Connection rejected for client (often due to GUID/name mismatch).";
@@ -70,27 +71,27 @@ typedef struct {
 } PTPIpDevice;
 
 typedef struct {
-    PTPDeviceInfo* deviceList;
+    AwDeviceInfo* deviceList;
     PTPIpDevice* openDevices;
     MSock discoverySock;
     u64 discoveryStartTime;
     b32 isDiscoveryInProgress;
     u32 timeoutMilliseconds;
     MAllocator* allocator;
-    PTPLog logger;
-} PTPIpBackend;
+    AwLog logger;
+} AwPtpIpBackend;
 
-static AwResult PTPIp_ReleaseList(PTPIpBackend* backend) {
+static AwResult AwIp_ReleaseList(AwPtpIpBackend* backend) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static b32 PTPIp_NeedsRefresh(PTPIpBackend* backend) {
+static b32 AwIp_NeedsRefresh(AwPtpIpBackend* backend) {
     return FALSE;
 }
 
-static AwResult PTPIp_Close(PTPIpBackend* backend) {
-    PTP_TRACE("PTPIp_Close");
-    PTPIp_ReleaseList(backend);
+static AwResult AwIp_Close(AwPtpIpBackend* backend) {
+    AW_TRACE("AwIp_Close");
+    AwIp_ReleaseList(backend);
     if (backend->openDevices) {
         MArrayFree(backend->allocator, backend->openDevices);
     }
@@ -98,7 +99,7 @@ static AwResult PTPIp_Close(PTPIpBackend* backend) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static void* PTPDeviceIp_ReallocBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+static void* AwDeviceIp_ReallocBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -109,7 +110,7 @@ static void* PTPDeviceIp_ReallocBuffer(PTPDevice* self, PTPBufferType type, void
     return ((u8*)dataMem) + headerSize;
 }
 
-static void PTPDeviceIp_FreeBuffer(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
+static void AwDeviceIp_FreeBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -166,8 +167,8 @@ static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
 // <len      > <data more> <tid      > <data       |           > <len      > <data end > <tid      > | <len      > <cmd   res> <res> <tid      >
 //
 
-static AwResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                        PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+static AwResult AwDeviceIp_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                        AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                         size_t* actualDataOutSize) {
     PTPIpDevice* dev = (PTPIpDevice*)self->device;
     MAllocator* allocator = self->transport.allocator;
@@ -288,7 +289,7 @@ static AwResult PTPDeviceIp_SendAndRecv(PTPDevice* self, PTPRequestHeader* reque
                 MMemReadU64LE(&inRead, &transferLen);
 
                 if (transferLen > (u64)dataOutSize) {
-                    PTP_WARNING_F("Response data size: %llu but buffer out only: %llu", transferLen, (u64)dataOutSize);
+                    AW_WARNING_F("Response data size: %llu but buffer out only: %llu", transferLen, (u64)dataOutSize);
                 }
             } else {
                 error.code = AW_RESULT_MALFORMED_RESPONSE;
@@ -350,8 +351,8 @@ exitWithError:
     return error;
 }
 
-// TODO fix PTPResult it's really two things AW error + PTP error code
-static AwResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds, MAllocator* alloc, PTPEvent** outEvents) {
+// TODO fix PtpResult it's really two things AW error + PTP error code
+static AwResult AwDeviceIp_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents) {
     if (!outEvents) {
         return (AwResult){.code=AW_RESULT_UNSUPPORTED};
     }
@@ -408,7 +409,7 @@ static AwResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds,
                     break;
                 }
                 if (packetType == PTPIP_TYPE_EVENT) {
-                    PTPEvent* outEvent = MArrayAddPtrZ(alloc, *outEvents);
+                    AwPtpEvent* outEvent = MArrayAddPtrZ(alloc, *outEvents);
 
                     MMemIO payloadRead;
                     MMemInitRead(&payloadRead, inRead.mem + inRead.size, packetLen - 8);
@@ -443,22 +444,18 @@ static AwResult PTPDeviceIp_ReadEvents(PTPDevice* self, int timeoutMilliseconds,
 
     if (r == MSOCK_ERROR) {
         MSockError e = MSockGetLastError();
-        if (e.timeout) {
-            if (gotEvent) {
-                return (AwResult){.code=AW_RESULT_OK};
-            } else {
-                return (AwResult){.code=AW_RESULT_TIMEOUT};
-            }
+        if (e.timeout && !gotEvent) {
+            return (AwResult){.code=AW_RESULT_TIMEOUT};
         }
     } else if (r == 0) {
         return (AwResult){.code=AW_RESULT_CONNECTION_CLOSED};
-    } else {
-        return (AwResult){.code=AW_RESULT_OK};
     }
+
+    return (AwResult){.code=AW_RESULT_OK};
 }
 
-static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTP_TRACE("PTPIp_OpenDevice");
+static AwResult AwIp_OpenDevice(AwPtpIpBackend* self, AwDeviceInfo* deviceInfo, AwDevice** deviceOut) {
+    AW_TRACE("AwIp_OpenDevice");
     MMemIO out = {0};
     MMemIO in = {0};
     AwResult error = {AW_RESULT_OK };
@@ -540,13 +537,13 @@ static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, 
         if (responseType == PTPIP_TYPE_INIT_FAIL) {
             u32 failureCode = 0;
             MMemReadU32LE(&inRead, &failureCode);
-            PTP_ERROR_F("PTPIp_OpenDevice init fail: %s (0x%08x)", PTPIp_GetInitFailErrorString(failureCode),
+            AW_ERROR_F("AwIp_OpenDevice init fail: %s (0x%08x)", AwIp_GetInitFailErrorString(failureCode),
                 failureCode);
             error.code = AW_RESULT_PTP_FAILURE;
             error.ptp = failureCode;
             goto exitWithError;
         } else {
-            PTP_ERROR_F("PTPIp_OpenDevice unexpected init response packet type: 0x%08x", responseType);
+            AW_ERROR_F("AwIp_OpenDevice unexpected init response packet type: 0x%08x", responseType);
             error.code = AW_RESULT_MALFORMED_RESPONSE;
             goto exitWithError;
         }
@@ -614,14 +611,14 @@ static AwResult PTPIp_OpenDevice(PTPIpBackend* self, PTPDeviceInfo* deviceInfo, 
     PTPIpDevice* newDev = MArrayAddPtr(self->allocator, self->openDevices);
     memset(newDev, 0, sizeof(PTPIpDevice));
     *newDev = dev;
-    PTPDevice* device = *deviceOut;
-    device->backendType = PTP_BACKEND_IP;
+    AwDevice* device = *deviceOut;
+    device->backendType = AW_BACKEND_IP;
     device->device = newDev;
     device->transport.allocator = self->allocator;
-    device->transport.sendAndRecv = PTPDeviceIp_SendAndRecv;
-    device->transport.reallocBuffer = PTPDeviceIp_ReallocBuffer;
-    device->transport.freeBuffer = PTPDeviceIp_FreeBuffer;
-    device->transport.readEvents = PTPDeviceIp_ReadEvents;
+    device->transport.sendAndRecv = AwDeviceIp_SendAndRecv;
+    device->transport.reallocBuffer = AwDeviceIp_ReallocBuffer;
+    device->transport.freeBuffer = AwDeviceIp_FreeBuffer;
+    device->transport.readEvents = AwDeviceIp_ReadEvents;
     device->transport.reset = NULL;
     device->transport.requiresSessionOpenClose = TRUE;
     device->logger = self->logger;
@@ -637,8 +634,8 @@ exitWithError:
     return error;
 }
 
-static AwResult PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
-    PTP_TRACE("PTPIp_CloseDevice");
+static AwResult AwIp_CloseDevice(AwPtpIpBackend* backend, AwDevice* device) {
+    AW_TRACE("AwIp_CloseDevice");
     PTPIpDevice* dev = (PTPIpDevice*)device->device;
     MSockClose(dev->dataSock);
     MSockClose(dev->eventSock);
@@ -655,8 +652,8 @@ static AwResult PTPIp_CloseDevice(PTPIpBackend* backend, PTPDevice* device) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static AwResult PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
-    PTP_TRACE("PTPIp_RefreshList");
+static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfo** deviceList) {
+    AW_TRACE("AwIp_RefreshList");
 
     self->isDiscoveryInProgress = TRUE;
     self->discoveryStartTime = MGetTimeMilliseconds();
@@ -696,20 +693,20 @@ static AwResult PTPIp_RefreshList(PTPIpBackend* self, PTPDeviceInfo** deviceList
                 ipStr[0] = '\0';
             }
 
-            PTP_INFO_F("SSDP device search on interface: %s", ipStr);
+            AW_INFO_F("SSDP device search on interface: %s", ipStr);
 
             if (setsockopt(self->discoverySock, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip->sin_addr,
                 sizeof(ip->sin_addr)) == MSOCK_ERROR) {
-                PTP_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastError());
+                AW_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastError());
             }
 
             int sent = sendto(self->discoverySock, msg, msgSize, 0, (struct sockaddr*)&addr, sizeof(addr));
             if (sent == MSOCK_ERROR) {
-                PTP_ERROR_F("PTPIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastError());
+                AW_ERROR_F("AwIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastError());
             }
         }
     } else {
-        PTP_ERROR_F("MSockGetInterfaces failed: %d", MSockGetLastError());
+        AW_ERROR_F("MSockGetInterfaces failed: %d", MSockGetLastError());
         goto exitWithError;
     }
     MArrayFree(self->allocator, interfaces);
@@ -722,7 +719,7 @@ exitWithError:
     return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
 }
 
-static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList) {
+static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfo** deviceList) {
     b32 foundDevice = FALSE;
     char buffer[4096];
     struct sockaddr_in from;
@@ -761,7 +758,7 @@ static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList)
 
                 if (isSonyImaging) {
                     MStrView url = MStrViewLeft(location, locEndPos);
-                    PTP_INFO_F("Found Sony Imaging device at location: %.*s", url.size, url.str);
+                    AW_INFO_F("Found Sony Imaging device at location: %.*s", url.size, url.str);
                     HttpResponse resp;
                     if (Http_Get(self->allocator, url, &resp)) {
                         if (resp.statusCode == 200) {
@@ -794,8 +791,8 @@ static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList)
                             }
 
                             if (!MStrIsEmpty(cameraModel)) {
-                                PTPDeviceInfo* info = MArrayAddPtrZ(self->allocator, *deviceList);
-                                info->backendType = PTP_BACKEND_IP;
+                                AwDeviceInfo* info = MArrayAddPtrZ(self->allocator, *deviceList);
+                                info->backendType = AW_BACKEND_IP;
                                 info->product = cameraModel;
                                 info->manufacturer = manufacturer;
 
@@ -816,72 +813,72 @@ static b32 PTPIp_PollListUpdates(PTPIpBackend* self, PTPDeviceInfo** deviceList)
 
     u64 currentTime = MGetTimeMilliseconds();
     if (currentTime - self->discoveryStartTime > 10000) {
-        PTP_TRACE("SSDP discovery stopped after waiting for responses for 10s.");
+        AW_TRACE("SSDP discovery stopped after waiting for responses for 10s.");
         MSockClose(self->discoverySock);
     }
     return foundDevice;
 }
 
-static AwResult PTPIp_Close_(PTPBackend* backend) {
-    PTPIpBackend* self = backend->self;
-    AwResult r = PTPIp_Close(self);
-    MFree(self->allocator, self, sizeof(PTPIpBackend));
+static AwResult AwIp_Close_(AwBackend* backend) {
+    AwPtpIpBackend* self = backend->self;
+    AwResult r = AwIp_Close(self);
+    MFree(self->allocator, self, sizeof(AwPtpIpBackend));
     return r;
 }
 
-static AwResult PTPIp_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
-    PTPIpBackend* self = backend->self;
-    return PTPIp_RefreshList(self, deviceList);
+static AwResult AwIp_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+    AwPtpIpBackend* self = backend->self;
+    return AwIp_RefreshList(self, deviceList);
 }
 
-static b32 PTPIp_NeedsRefresh_(PTPBackend* backend) {
-    PTPIpBackend* self = backend->self;
-    return PTPIp_NeedsRefresh(self);
+static b32 AwIp_NeedsRefresh_(AwBackend* backend) {
+    AwPtpIpBackend* self = backend->self;
+    return AwIp_NeedsRefresh(self);
 }
 
-static b32 PTPIp_IsRefreshingList_(PTPBackend* backend) {
-    PTPIpBackend* self = backend->self;
+static b32 AwIp_IsRefreshingList_(AwBackend* backend) {
+    AwPtpIpBackend* self = backend->self;
     return self->isDiscoveryInProgress;
 }
 
-static b32 PTPIp_PollListUpdates_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
-    PTPIpBackend* self = backend->self;
-    return PTPIp_PollListUpdates(self, deviceList);
+static b32 AwIp_PollListUpdates_(AwBackend* backend, AwDeviceInfo** deviceList) {
+    AwPtpIpBackend* self = backend->self;
+    return AwIp_PollListUpdates(self, deviceList);
 }
 
-static AwResult PTPIp_ReleaseList_(PTPBackend* backend) {
-    PTPIpBackend* self = backend->self;
-    return PTPIp_ReleaseList(self);
+static AwResult AwIp_ReleaseList_(AwBackend* backend) {
+    AwPtpIpBackend* self = backend->self;
+    return AwIp_ReleaseList(self);
 }
 
-static AwResult PTPIp_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTPIpBackend* self = backend->self;
-    return PTPIp_OpenDevice(self, deviceInfo, deviceOut);
+static AwResult AwIp_OpenDevice_(AwBackend* backend, AwDeviceInfo* deviceInfo, AwDevice** deviceOut) {
+    AwPtpIpBackend* self = backend->self;
+    return AwIp_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static AwResult PTPIp_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
-    PTPIpBackend* self = backend->self;
-    return PTPIp_CloseDevice(self, device);
+static AwResult AwIp_CloseDevice_(AwBackend* backend, AwDevice* device) {
+    AwPtpIpBackend* self = backend->self;
+    return AwIp_CloseDevice(self, device);
 }
 
-AwResult PTPIpDeviceList_OpenBackend(PTPBackend* backend, int timeoutMilliseconds) {
-    PTP_LOG_TRACE(&backend->logger, "PTPIpDeviceList_OpenBackend");
+AwResult AwIpDeviceList_OpenBackend(AwBackend* backend, int timeoutMilliseconds) {
+    AW_LOG_TRACE(&backend->logger, "AwIpDeviceList_OpenBackend");
 
     if (timeoutMilliseconds == 0) {
         timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;
     }
 
-    PTPIpBackend* self = MMallocZ(backend->allocator, sizeof(PTPIpBackend));
+    AwPtpIpBackend* self = MMallocZ(backend->allocator, sizeof(AwPtpIpBackend));
     backend->self = self;
-    backend->close = PTPIp_Close_;
-    backend->refreshList = PTPIp_RefreshList_;
-    backend->needsRefresh = PTPIp_NeedsRefresh_;
-    backend->isRefreshingList = PTPIp_IsRefreshingList_;
-    backend->pollListUpdates = PTPIp_PollListUpdates_;
-    backend->releaseList = PTPIp_ReleaseList_;
-    backend->openDevice = PTPIp_OpenDevice_;
-    backend->closeDevice = PTPIp_CloseDevice_;
-    backend->type = PTP_BACKEND_IP;
+    backend->close = AwIp_Close_;
+    backend->refreshList = AwIp_RefreshList_;
+    backend->needsRefresh = AwIp_NeedsRefresh_;
+    backend->isRefreshingList = AwIp_IsRefreshingList_;
+    backend->pollListUpdates = AwIp_PollListUpdates_;
+    backend->releaseList = AwIp_ReleaseList_;
+    backend->openDevice = AwIp_OpenDevice_;
+    backend->closeDevice = AwIp_CloseDevice_;
+    backend->type = AW_BACKEND_IP;
     self->timeoutMilliseconds = timeoutMilliseconds;
     self->logger = backend->logger;
     self->allocator = backend->allocator;

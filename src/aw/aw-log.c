@@ -1,10 +1,10 @@
-#include "ptp/ptp-log.h"
+#include "aw/aw-log.h"
 #include "mlib/mlib.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 
-void PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *format, ...) {
+void AwLog_Log(AwLog* logger, AwLogLevel level, const char *format, ...) {
     if (!logger || !logger->logFunc) {
         return;
     }
@@ -22,23 +22,23 @@ void PTPLog_Log(PTPLog* logger, PTPLogLevel level, const char *format, ...) {
     logger->logFunc(logger, level, buffer);
 }
 
-char* PTPLog_LevelAsStr(PTPLogLevel level) {
+char* AwLog_LevelAsStr(AwLogLevel level) {
     switch (level) {
-        case PTP_LOG_LEVEL_TRACE:
+        case AW_LOG_LEVEL_TRACE:
             return "TRACE";
-        case PTP_LOG_LEVEL_DEBUG:
+        case AW_LOG_LEVEL_DEBUG:
             return "DEBUG";
-        case PTP_LOG_LEVEL_INFO:
+        case AW_LOG_LEVEL_INFO:
             return "INFO";
-        case PTP_LOG_LEVEL_WARNING:
+        case AW_LOG_LEVEL_WARNING:
             return "WARNING";
-        case PTP_LOG_LEVEL_ERROR:
+        case AW_LOG_LEVEL_ERROR:
             return "ERROR";
         default:
             return "UNKNOWN";
     }
 }
 
-void PTPLog_LogDefault(PTPLog* logger, PTPLogLevel level, const char *message) {
-    MLogf("%s: %s", PTPLog_LevelAsStr(level), message);
+void AwLog_LogDefault(AwLog* logger, AwLogLevel level, const char *message) {
+    MLogf("%s: %s", AwLog_LevelAsStr(level), message);
 }

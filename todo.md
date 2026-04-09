@@ -23,12 +23,21 @@ Backends
 - IP: Don't copy packet buffer so much
 - IP: Connect via IP only?
 - IP: Connect with password (TLS)
-- Events for IOKit
-- Rename from PTP to Aw
 
-Commands
+Build
 ===
 
-- Shutdown - 0x9280
+- Meson build system
 
+Python
+===
 
+- Python bindings are broken 
+  - consider switching to building alphawirelib statically
+  - consider alphawirelib as static only
+
+Documentation
+===
+
+- Settings needed to connect to camera.
+- PTPIP setup (pairing and disabling encryption)

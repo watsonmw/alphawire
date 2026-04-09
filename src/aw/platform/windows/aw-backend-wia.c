@@ -1,4 +1,4 @@
-﻿#include "ptp-backend-wia.h"
+﻿#include "aw-backend-wia.h"
 
 #include <windows.h>
 #include <Wia.h>
@@ -73,7 +73,7 @@ typedef struct {
 typedef struct {
     const WiaEventCallbackVtbl* lpVtbl;
     LONG refCount;
-    PTPWiaDeviceList* deviceList;
+    AwWiaDeviceList* deviceList;
 } WiaEventCallback;
 
 static ULONG STDMETHODCALLTYPE WiaEventCallback_AddRef(IWiaEventCallback* This) {
@@ -131,7 +131,7 @@ static HRESULT STDMETHODCALLTYPE WiaEventCallback_ImageEventCallback(IWiaEventCa
     } else if (IsEqualGUID(pEventGuid, &WIA_EVENT_DEVICE_DISCONNECTED)) {
         WiaEventCallback* self = (WiaEventCallback*)This;
         for (int i = 0; i < MArraySize(self->deviceList->openDevices); ++i) {
-            PTPDeviceWia* device = self->deviceList->openDevices + i;
+            AwDeviceWia* device = self->deviceList->openDevices + i;
             HRESULT hr = VarBstrCmp(bstrDeviceID, device->deviceId, LOCALE_USER_DEFAULT, 0);
              if (hr == VARCMP_EQ) {
                  device->disconnected = TRUE;
@@ -152,7 +152,7 @@ static const WiaEventCallbackVtbl WiaEventCallback_Vtbl = {
 };
 
 // Helper function to create the event callback object
-static HRESULT CreateEventCallback(PTPWiaDeviceList* self, IWiaEventCallback** ppCallback) {
+static HRESULT CreateEventCallback(AwWiaDeviceList* self, IWiaEventCallback** ppCallback) {
     WiaEventCallback* callback;
 
     if (!ppCallback) {
@@ -175,7 +175,7 @@ static HRESULT CreateEventCallback(PTPWiaDeviceList* self, IWiaEventCallback** p
     return S_OK;
 }
 
-static HRESULT RegisterForDeviceConnectDisconnectEvents(PTPWiaDeviceList* self) {
+static HRESULT RegisterForDeviceConnectDisconnectEvents(AwWiaDeviceList* self) {
     HRESULT hr = S_OK;
     IWiaEventCallback* pCallback = NULL;
 
@@ -212,7 +212,7 @@ cleanup:
     return hr;
 }
 
-AwResult PTPWiaDeviceList_Open(PTPWiaDeviceList* self) {
+AwResult AwWiaDeviceList_Open(AwWiaDeviceList* self) {
     HRESULT hr = 0;
 
     hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -222,7 +222,7 @@ AwResult PTPWiaDeviceList_Open(PTPWiaDeviceList* self) {
             // We proceed and hope for the best, but we MUST NOT call CoUninitialize later.
             self->comInitialized = FALSE;
         } else {
-            PTP_ERROR_F("Failed to initialize COM: %08x", hr);
+            AW_ERROR_F("Failed to initialize COM: %08x", hr);
             return (AwResult){.code = AW_RESULT_TRANSPORT_ERROR};
         }
     } else {
@@ -238,12 +238,12 @@ AwResult PTPWiaDeviceList_Open(PTPWiaDeviceList* self) {
         RegisterForDeviceConnectDisconnectEvents(self);
         return (AwResult){.code = AW_RESULT_OK};
     } else {
-        PTP_ERROR_F("Failed to create WIA Device Manager: %08x", hr);
+        AW_ERROR_F("Failed to create WIA Device Manager: %08x", hr);
         return (AwResult){.code = AW_RESULT_TRANSPORT_ERROR};
     }
 }
 
-AwResult PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self) {
+AwResult AwWiaDeviceList_ReleaseList(AwWiaDeviceList* self) {
     if (self->devices) {
         MArrayEachPtr(self->devices, it) {
             if (it.p->deviceId) {
@@ -255,8 +255,8 @@ AwResult PTPWiaDeviceList_ReleaseList(PTPWiaDeviceList* self) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-AwResult PTPWiaDeviceList_Close(PTPWiaDeviceList* self) {
-    AwResult r = PTPWiaDeviceList_ReleaseList(self);
+AwResult AwWiaDeviceList_Close(AwWiaDeviceList* self) {
+    AwResult r = AwWiaDeviceList_ReleaseList(self);
     if (self->deviceMgr) {
         self->deviceMgr->lpVtbl->Release(self->deviceMgr);
         self->deviceMgr = NULL;
@@ -282,12 +282,12 @@ AwResult PTPWiaDeviceList_Close(PTPWiaDeviceList* self) {
     return r;
 }
 
-b32 PTPWiaDeviceList_NeedsRefresh(PTPWiaDeviceList* self) {
+b32 AwWiaDeviceList_NeedsRefresh(AwWiaDeviceList* self) {
     return (self->deviceListUpToDate == FALSE);
 }
 
-AwResult PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** deviceList) {
-    PTPWiaDeviceList_ReleaseList(self);
+AwResult AwWiaDeviceList_RefreshList(AwWiaDeviceList* self, AwDeviceInfo** deviceList) {
+    AwWiaDeviceList_ReleaseList(self);
 
     IEnumWIA_DEV_INFO* pEnum = NULL;
     HRESULT hr = self->deviceMgr->lpVtbl->EnumDeviceInfo(self->deviceMgr, WIA_DEVINFO_ENUM_LOCAL, &pEnum);
@@ -326,7 +326,7 @@ AwResult PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** de
         }
 
         WiaDeviceInfo* wiaDeviceInfo = MArrayAddPtr(self->allocator, self->devices);
-        PTPDeviceInfo* deviceInfo = MArrayAddPtrZ(self->allocator, *deviceList);
+        AwDeviceInfo* deviceInfo = MArrayAddPtrZ(self->allocator, *deviceList);
         wiaDeviceInfo->deviceId = SysAllocString(propVar[0].bstrVal);
         deviceInfo->manufacturer = WinUtils_BSTRToUTF8(self->allocator, propVar[1].bstrVal);
         deviceInfo->product = WinUtils_BSTRToUTF8(self->allocator, propVar[2].bstrVal);
@@ -340,9 +340,9 @@ AwResult PTPWiaDeviceList_RefreshList(PTPWiaDeviceList* self, PTPDeviceInfo** de
             }
         }
 
-        deviceInfo->backendType = PTP_BACKEND_WIA;
+        deviceInfo->backendType = AW_BACKEND_WIA;
         deviceInfo->device = wiaDeviceInfo;
-        PTP_INFO_F("Found device: %.*s (%.*s)", deviceInfo->product.size, deviceInfo->product.str,
+        AW_INFO_F("Found device: %.*s (%.*s)", deviceInfo->product.size, deviceInfo->product.str,
             deviceInfo->manufacturer.size, deviceInfo->manufacturer.str);
 
         for (int j = 0; j < PROP_NUM; j++) {
@@ -370,11 +370,11 @@ cleanup:
     }
 }
 
-static void* PTPDeviceWia_ReallocBuffers(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+static void* AwDeviceWia_ReallocBuffers(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = 0;
-    if (type == PTP_BUFFER_IN) {
+    if (type == AW_BUFFER_IN) {
         headerSize = sizeof(WiaPtpRequest);
-    } else if (type == PTP_BUFFER_OUT) {
+    } else if (type == AW_BUFFER_OUT) {
         headerSize = sizeof(WiaPtpResponse);
     }
 
@@ -388,11 +388,11 @@ static void* PTPDeviceWia_ReallocBuffers(PTPDevice* self, PTPBufferType type, vo
     return ((u8*)dataMem) + headerSize;
 }
 
-static void PTPDeviceWia_FreeBuffers(PTPDevice* self, PTPBufferType type, void* dataMem, size_t dataSize) {
+static void AwDeviceWia_FreeBuffers(AwDevice* self, AwBufferType type, void* dataMem, size_t dataSize) {
     size_t headerSize = 0;
-    if (type == PTP_BUFFER_IN) {
+    if (type == AW_BUFFER_IN) {
         headerSize = sizeof(WiaPtpRequest);
-    } else if (type == PTP_BUFFER_OUT) {
+    } else if (type == AW_BUFFER_OUT) {
         headerSize = sizeof(WiaPtpResponse);
     }
 
@@ -402,8 +402,8 @@ static void PTPDeviceWia_FreeBuffers(PTPDevice* self, PTPBufferType type, void* 
     }
 }
 
-static AwResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                         PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+static AwResult AwDeviceWia_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                         AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                          size_t* actualDataOutSize) {
 
     WiaPtpRequest* requestData = (WiaPtpRequest*)(dataIn-sizeof(WiaPtpRequest));
@@ -417,7 +417,7 @@ static AwResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
     }
     requestData->NextPhase = request->NextPhase;
 
-    PTPDeviceWia* wia = ((PTPDevice*)self)->device;
+    AwDeviceWia* wia = ((AwDevice*)self)->device;
     DWORD dwActualDataOutSize = 0;
     WiaPtpResponse* responseData = (WiaPtpResponse*)(dataOut - sizeof(WiaPtpResponse));
 
@@ -446,7 +446,7 @@ static AwResult PTPDeviceWia_SendAndRecv(PTPDevice* self, PTPRequestHeader* requ
     }
 }
 
-AwResult PTPWiaDeviceList_OpenDevice(PTPWiaDeviceList* self, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
+AwResult AwWiaDeviceList_OpenDevice(AwWiaDeviceList* self, AwDeviceInfo* deviceInfo, AwDevice** deviceOut) {
     HRESULT hr = 0;
     IWiaItem* pWiaItemRoot = NULL;
     IWiaItemExtras* pWiaItemExtras = NULL;
@@ -466,22 +466,22 @@ AwResult PTPWiaDeviceList_OpenDevice(PTPWiaDeviceList* self, PTPDeviceInfo* devi
     }
 
     // Store the interface pointer
-    PTPDeviceWia* wiaDevice = MArrayAddPtr(self->allocator, self->openDevices);
+    AwDeviceWia* wiaDevice = MArrayAddPtr(self->allocator, self->openDevices);
     wiaDevice->device = pWiaItemExtras;
     wiaDevice->deviceId = wiaDeviceInfo->deviceId;
     wiaDevice->disconnected = FALSE;
     wiaDevice->logger = self->logger;
 
-    (*deviceOut)->transport.reallocBuffer = PTPDeviceWia_ReallocBuffers;
-    (*deviceOut)->transport.freeBuffer = PTPDeviceWia_FreeBuffers;
-    (*deviceOut)->transport.sendAndRecv = PTPDeviceWia_SendAndRecv;
+    (*deviceOut)->transport.reallocBuffer = AwDeviceWia_ReallocBuffers;
+    (*deviceOut)->transport.freeBuffer = AwDeviceWia_FreeBuffers;
+    (*deviceOut)->transport.sendAndRecv = AwDeviceWia_SendAndRecv;
     (*deviceOut)->transport.requiresSessionOpenClose = FALSE;
     (*deviceOut)->device = wiaDevice;
-    (*deviceOut)->backendType = PTP_BACKEND_WIA;
+    (*deviceOut)->backendType = AW_BACKEND_WIA;
     (*deviceOut)->disconnected = FALSE;
     (*deviceOut)->logger = self->logger;
 
-    pWiaItemExtras = NULL; // Prevent release in cleanup, ownership is now with PTPDeviceWia
+    pWiaItemExtras = NULL; // Prevent release in cleanup, ownership is now with AwDeviceWia
 
 cleanup:
     if (pWiaItemRoot) {
@@ -499,8 +499,8 @@ cleanup:
     }
 }
 
-AwResult PTPWiaDeviceList_CloseDevice(PTPWiaDeviceList* self, PTPDevice* device) {
-    PTPDeviceWia* deviceWia = device->device;
+AwResult AwWiaDeviceList_CloseDevice(AwWiaDeviceList* self, AwDevice* device) {
+    AwDeviceWia* deviceWia = device->device;
     if (deviceWia->device) {
         deviceWia->device->lpVtbl->Release(deviceWia->device);
         deviceWia->device = NULL;
@@ -516,7 +516,7 @@ AwResult PTPWiaDeviceList_CloseDevice(PTPWiaDeviceList* self, PTPDevice* device)
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-AwResult PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device) {
+AwResult AwWiaDeviceList_Reset(AwWiaDeviceList* self, AwDeviceWia* device) {
     DWORD dwActualDataOutSize = 0;
 
     u8* memIn = CoTaskMemAlloc(1000);
@@ -544,50 +544,50 @@ AwResult PTPWiaDeviceList_Reset(PTPWiaDeviceList* self, PTPDeviceWia* device) {
     }
 }
 
-static AwResult PTPWiaDeviceList_Close_(PTPBackend* backend) {
-    PTPWiaDeviceList* self = backend->self;
-    AwResult r = PTPWiaDeviceList_Close(self);
-    MFree(self->allocator, self, sizeof(PTPWiaDeviceList));
+static AwResult AwWiaDeviceList_Close_(AwBackend* backend) {
+    AwWiaDeviceList* self = backend->self;
+    AwResult r = AwWiaDeviceList_Close(self);
+    MFree(self->allocator, self, sizeof(AwWiaDeviceList));
     return r;
 }
 
-static AwResult PTPWiaDeviceList_RefreshList_(PTPBackend* backend, PTPDeviceInfo** deviceList) {
-    PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_RefreshList(self, deviceList);
+static AwResult AwWiaDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+    AwWiaDeviceList* self = backend->self;
+    return AwWiaDeviceList_RefreshList(self, deviceList);
 }
 
-static b32 PTPWiaDeviceList_NeedsRefresh_(PTPBackend* backend) {
-    PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_NeedsRefresh(self);
+static b32 AwWiaDeviceList_NeedsRefresh_(AwBackend* backend) {
+    AwWiaDeviceList* self = backend->self;
+    return AwWiaDeviceList_NeedsRefresh(self);
 }
 
-static AwResult PTPWiaDeviceList_ReleaseList_(PTPBackend* backend) {
-    PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_ReleaseList(self);
+static AwResult AwWiaDeviceList_ReleaseList_(AwBackend* backend) {
+    AwWiaDeviceList* self = backend->self;
+    return AwWiaDeviceList_ReleaseList(self);
 }
 
-static AwResult PTPWiaDeviceList_OpenDevice_(PTPBackend* backend, PTPDeviceInfo* deviceInfo, PTPDevice** deviceOut) {
-    PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_OpenDevice(self, deviceInfo, deviceOut);
+static AwResult AwWiaDeviceList_OpenDevice_(AwBackend* backend, AwDeviceInfo* deviceInfo, AwDevice** deviceOut) {
+    AwWiaDeviceList* self = backend->self;
+    return AwWiaDeviceList_OpenDevice(self, deviceInfo, deviceOut);
 }
 
-static AwResult PTPWiaDeviceList_CloseDevice_(PTPBackend* backend, PTPDevice* device) {
-    PTPWiaDeviceList* self = backend->self;
-    return PTPWiaDeviceList_CloseDevice(self, device);
+static AwResult AwWiaDeviceList_CloseDevice_(AwBackend* backend, AwDevice* device) {
+    AwWiaDeviceList* self = backend->self;
+    return AwWiaDeviceList_CloseDevice(self, device);
 }
 
-AwResult PTPWiaDeviceList_OpenBackend(PTPBackend* backend) {
-    PTPWiaDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(PTPWiaDeviceList));
+AwResult AwWiaDeviceList_OpenBackend(AwBackend* backend) {
+    AwWiaDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(AwWiaDeviceList));
     backend->self = deviceList;
-    backend->close = PTPWiaDeviceList_Close_;
-    backend->refreshList = PTPWiaDeviceList_RefreshList_;
-    backend->needsRefresh = PTPWiaDeviceList_NeedsRefresh_;
-    backend->releaseList = PTPWiaDeviceList_ReleaseList_;
-    backend->openDevice = PTPWiaDeviceList_OpenDevice_;
-    backend->closeDevice = PTPWiaDeviceList_CloseDevice_;
+    backend->close = AwWiaDeviceList_Close_;
+    backend->refreshList = AwWiaDeviceList_RefreshList_;
+    backend->needsRefresh = AwWiaDeviceList_NeedsRefresh_;
+    backend->releaseList = AwWiaDeviceList_ReleaseList_;
+    backend->openDevice = AwWiaDeviceList_OpenDevice_;
+    backend->closeDevice = AwWiaDeviceList_CloseDevice_;
     deviceList->logger = backend->logger;
     deviceList->allocator = backend->allocator;
-    return PTPWiaDeviceList_Open(deviceList);
+    return AwWiaDeviceList_Open(deviceList);
 }
 
 // Function to check if process has admin rights

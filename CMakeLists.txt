@@ -18,19 +18,19 @@ add_library(alphawire SHARED
     src/mlib/mlib.c
     src/mlib/utf8.c
     src/mlib/utf8.h
-    src/ptp/ptp-backend.c
-    src/ptp/ptp-backend.h
-    src/ptp/ptp-const.h
-    src/ptp/ptp-control.c
-    src/ptp/ptp-control.h
-    src/ptp/ptp-device-list.c
-    src/ptp/ptp-device-list.h
-    src/ptp/ptp-log.c
-    src/ptp/ptp-log.h
-    src/ptp/ptp-util.c
-    src/ptp/ptp-util.h
-    src/platform/usb-const.c
-    src/platform/usb-const.h
+    src/aw/aw-backend.c
+    src/aw/aw-backend.h
+    src/aw/aw-const.h
+    src/aw/aw-control.c
+    src/aw/aw-control.h
+    src/aw/aw-device-list.c
+    src/aw/aw-device-list.h
+    src/aw/aw-log.c
+    src/aw/aw-log.h
+    src/aw/aw-util.c
+    src/aw/aw-util.h
+    src/aw/platform/usb-const.c
+    src/aw/platform/usb-const.h
 )
 
 set(PTP_IP_FILES
@@ -38,24 +38,24 @@ set(PTP_IP_FILES
     src/mlib/msock.h
     src/mlib/mxml.c
     src/mlib/mxml.h
-    src/platform/ip/http-client.c
-    src/platform/ip/http-client.h
-    src/platform/ip/ptp-backend-ip.c
-    src/platform/ip/ptp-backend-ip.h
+    src/aw/platform/ip/http-client.c
+    src/aw/platform/ip/http-client.h
+    src/aw/platform/ip/aw-backend-ip.c
+    src/aw/platform/ip/aw-backend-ip.h
 )
 
-target_compile_definitions(alphawire PRIVATE M_USE_SDL M_USE_STDLIB PTP_LOG_LEVEL=3 ALPHAWIRE_BUILDING_SHARED_LIB)
+target_compile_definitions(alphawire PRIVATE M_USE_SDL M_USE_STDLIB AW_LOG_LEVEL=3 ALPHAWIRE_BUILDING_SHARED_LIB)
 target_include_directories(alphawire PUBLIC src)
 target_compile_features(alphawire PUBLIC cxx_std_17)
 
 if(APPLE)
     target_sources(alphawire PRIVATE
-        src/platform/osx/ptp-backend-iokit.c
-        src/platform/osx/ptp-backend-iokit.h
+        src/aw/platform/osx/aw-backend-iokit.c
+        src/aw/platform/osx/aw-backend-iokit.h
         ${PTP_IP_FILES}
     )
 
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_IOKIT PTP_ENABLE_IP M_PTHREADS)
+    target_compile_definitions(alphawire PRIVATE AW_ENABLE_IOKIT AW_ENABLE_IP M_PTHREADS)
     target_compile_options(alphawire PRIVATE -fvisibility=hidden)
 
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
@@ -67,17 +67,17 @@ endif()
 if(WIN32)
     # Add Windows-only sources
     target_sources(alphawire PRIVATE
-        src/platform/windows/ptp-backend-libusbk.c
-        src/platform/windows/ptp-backend-libusbk.h
-        src/platform/windows/ptp-backend-wia.c
-        src/platform/windows/ptp-backend-wia.h
-        src/platform/windows/win-utils.c
-        src/platform/windows/win-utils.h
+        src/aw/platform/windows/aw-backend-libusbk.c
+        src/aw/platform/windows/aw-backend-libusbk.h
+        src/aw/platform/windows/aw-backend-wia.c
+        src/aw/platform/windows/aw-backend-wia.h
+        src/aw/platform/windows/win-utils.c
+        src/aw/platform/windows/win-utils.h
         ${PTP_IP_FILES}
     )
 
     # Configure backends
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA PTP_ENABLE_IP)
+    target_compile_definitions(alphawire PRIVATE AW_ENABLE_LIBUSBK AW_ENABLE_WIA AW_ENABLE_IP)
 
     # Set Windows version to compile to (needed to pick up WIA).
     target_compile_definitions(alphawire PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0600)
@@ -111,8 +111,8 @@ endif()
 
 if(LINUX)
     target_sources(alphawire PRIVATE
-        src/platform/libusb/ptp-backend-libusb.c
-        src/platform/libusb/ptp-backend-libusb.h
+        src/aw/platform/libusb/aw-backend-libusb.c
+        src/aw/platform/libusb/aw-backend-libusb.h
         ${PTP_IP_FILES}
     )
 
@@ -134,8 +134,8 @@ if(LINUX)
         endif()
     endif()
 
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB PTP_ENABLE_IP)
-    target_compile_definitions(alphawire PRIVATE PTP_ENABLE_LIBUSB M_PTHREADS)
+    target_compile_definitions(alphawire PRIVATE AW_ENABLE_LIBUSB AW_ENABLE_IP)
+    target_compile_definitions(alphawire PRIVATE M_PTHREADS)
 endif()
 
 target_link_libraries(alphawire PUBLIC ${ALPHAWIRE_LIBS})
@@ -168,7 +168,7 @@ add_executable(alphawireui
     src/ui/ui-ptp-debug.h
 )
 
-target_compile_definitions(alphawireui PRIVATE M_USE_SDL M_USE_STDLIB PTP_LOG_LEVEL=3)
+target_compile_definitions(alphawireui PRIVATE M_USE_SDL M_USE_STDLIB AW_LOG_LEVEL=3)
 target_include_directories(alphawireui PRIVATE src src/imgui)
 target_compile_features(alphawireui PRIVATE cxx_std_17)
 
@@ -214,7 +214,7 @@ endif()
 if(WIN32)
     # Set Windows version to compile to (this just matches alphawire library - but probably doesnt need to)
     target_compile_definitions(alphawireui PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0600)
-    target_compile_definitions(alphawireui PRIVATE PTP_ENABLE_LIBUSBK PTP_ENABLE_WIA PTP_ENABLE_IP)
+    target_compile_definitions(alphawireui PRIVATE AW_ENABLE_LIBUSBK AW_ENABLE_WIA AW_ENABLE_IP)
 
     # MinGW specific
     if (MINGW)

@@ -15,17 +15,17 @@ It has some advantages over the official SDK:
 - Supports older cameras not covered by official Sony Camera Remote SDK
 - Easy debugging of camera remote features
 
-Downsides to alphawire:
-- Missing metadata for latest properties (will add as needed)
-- No image processing (out of scope for this project)
+Platform Support:
+- Windows (Visual Studio 2018 or MinGW)
+- OSX (clang)
+- Linux (GCC)
+
+Build System:
+- CMake
 
 > **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks or registered
 > trademarks of Sony Corporation.
 
-## Current Status
-- **Platform Support**: Currently Windows (Visual Studio 2018 or MinGW), OSX (clang) and Linux (GCC)
-- **Build System**: CMake
-- **Architecture**: Designed for easy cross-platform expansion
 
 ## Library Features
 
@@ -49,9 +49,14 @@ If your device is not showing up, try updating the libusbk driver with Zadig.
 
 ### OSX Backend Support
 - IOKit
+- TCP/IP
+
+May need to close the 'Preview' application before using the camera, as if open it acquires exclusive access to the
+camera.
 
 ### Linux Backend Support
 - libusb
+- TCP/IP
 
 ## Demo Application
 A GUI application is included for camera control and PTP protocol debugging.
@@ -63,6 +68,12 @@ A GUI application is included for camera control and PTP protocol debugging.
 - Camera settings management
 - Protocol debugging tools
 - Fast image download
+
+### Limitations
+
+- PTPIP backend doesnt support SSL
+- Many properties not implemented (missing naming / description - but can still be controlled/inspected)
+- No ARW / image processing (outside of scope)
 
 ## Roadmap
 - [ ] Build System Improvements

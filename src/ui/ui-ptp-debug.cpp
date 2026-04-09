@@ -8,13 +8,13 @@
 #include "ui-ptp-debug.h"
 #include "ui/ui-live-view.h"
 
-#include "ptp/ptp-control.h"
-#include "ptp/ptp-log.h"
-#include "platform/usb-const.h"
-#include "ptp/ptp-util.h"
+#include "aw/aw-control.h"
+#include "aw/aw-log.h"
+#include "aw/aw-util.h"
+#include "aw/platform/usb-const.h"
 
-#ifdef PTP_ENABLE_WIA
-#include "platform/windows/ptp-backend-wia.h"
+#ifdef AW_ENABLE_WIA
+#include "aw/platform/windows/aw-backend-wia.h"
 #endif
 
 const float AUTO_PROP_REFRESH_INTERVAL_SECS = 1.0f;
@@ -59,7 +59,7 @@ bool ImGuiIntInput1(const char* label, T* value, const char* format, bool isSign
     return false;
 }
 
-bool ImGuiInputInt(const char* label, u16 dataType, PTPPropValue* value) {
+bool ImGuiInputInt(const char* label, u16 dataType, AwPtpPropValue* value) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%hhu", false, 0, 0xff);
@@ -77,7 +77,7 @@ bool ImGuiInputInt(const char* label, u16 dataType, PTPPropValue* value) {
     return false;
 }
 
-bool ImGuiInputHex(const char* label, u16 dataType, PTPPropValue* value) {
+bool ImGuiInputHex(const char* label, u16 dataType, AwPtpPropValue* value) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%02hhx", false, 0, 0xff);
@@ -95,7 +95,7 @@ bool ImGuiInputHex(const char* label, u16 dataType, PTPPropValue* value) {
     return false;
 }
 
-bool ImGuiInputInt(const char* label, u16 dataType, PTPPropValue* value, PTPPropValue min, PTPPropValue max) {
+bool ImGuiInputInt(const char* label, u16 dataType, AwPtpPropValue* value, AwPtpPropValue min, AwPtpPropValue max) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%hhu", false, min.u8, max.u8);
@@ -113,7 +113,7 @@ bool ImGuiInputInt(const char* label, u16 dataType, PTPPropValue* value, PTPProp
     return false;
 }
 
-bool ImGuiInputHex(const char* label, u16 dataType, PTPPropValue* value, PTPPropValue min, PTPPropValue max) {
+bool ImGuiInputHex(const char* label, u16 dataType, AwPtpPropValue* value, AwPtpPropValue min, AwPtpPropValue max) {
     switch (dataType) {
         case PTP_DT_UINT8:
             return ImGuiIntInput1(label, &value->u8, "%02hhx", false, min.u8, max.u8);
@@ -131,7 +131,7 @@ bool ImGuiInputHex(const char* label, u16 dataType, PTPPropValue* value, PTPProp
     return false;
 }
 
-void ImGuiInputIntDuel(u16 dataType, PTPPropValue* value) {
+void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value) {
     float windowWidth = ImGui::GetWindowWidth();
     float inputWidth = (windowWidth * 0.3f) - 10.0f;
     ImGui::SetNextItemWidth(inputWidth);
@@ -141,7 +141,7 @@ void ImGuiInputIntDuel(u16 dataType, PTPPropValue* value) {
     ImGuiInputHex("hex", dataType, value);
 }
 
-void ImGuiInputIntDuel(u16 dataType, PTPPropValue* value, PTPPropValue min, PTPPropValue max) {
+void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value, AwPtpPropValue min, AwPtpPropValue max) {
     float windowWidth = ImGui::GetWindowWidth();
     float inputWidth = (windowWidth * 0.3f) - 10.0f;
     ImGui::SetNextItemWidth(inputWidth);
@@ -151,7 +151,7 @@ void ImGuiInputIntDuel(u16 dataType, PTPPropValue* value, PTPPropValue min, PTPP
     ImGuiInputHex("hex", dataType, value, min, max);
 }
 
-bool ImGuiSlider(u16 dataType, PTPPropValue* value, PTPPropValue minV, PTPPropValue stepV, PTPPropValue maxV) {
+bool ImGuiSlider(u16 dataType, AwPtpPropValue* value, AwPtpPropValue minV, AwPtpPropValue stepV, AwPtpPropValue maxV) {
     int v = 0;
     int min = 0;
     int max = 0;
@@ -243,21 +243,21 @@ bool ImGuiSlider(u16 dataType, PTPPropValue* value, PTPPropValue minV, PTPPropVa
 
 static void ImGuiShowPropertyText(AppContext& c, u16 propCode) {
     MStr str = {};
-    PTPProperty* propAfStatus = PTPControl_GetPropertyByCode(&c.ptp, propCode);
+    AwPtpProperty* propAfStatus = AwControl_GetPropertyByCode(&c.aw, propCode);
     if (propAfStatus) {
-        PTPControl_GetPropertyValueAsStr(&c.ptp, propAfStatus, c.autoReleasePool, &str);
-        const char* label = PTP_GetPropertyLabel(propCode);
+        AwControl_GetPropertyValueAsStr(&c.aw, propAfStatus, c.autoReleasePool, &str);
+        const char* label = AwGetPropertyLabel(propCode);
         ImGui::Text("%s: %.*s", label, str.size, str.str);
     }
 }
 
-void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
-    char* label = PTP_GetPropertyLabel(property->propCode);
+void ShowDebugExtendedPropWindow(AppContext& c, AwPtpProperty *property) {
+    char* label = AwGetPropertyLabel(property->propCode);
     ImGui::AlignTextToFramePadding();
     ImGui::Text("%s", label);
     ImGui::SameLine();
     ImGui::TextDisabled("0x%04X", property->propCode);
-    label = PTP_GetDataTypeStr((PTPDataType)property->dataType);
+    label = AwPtpGetDataTypeStr((PtpDataType)property->dataType);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
     ImGui::SameLine();
@@ -265,11 +265,11 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
     ImGui::Separator();
 
     MStr propAsString = {};
-    if (PTPControl_GetPropertyValueAsStr(&c.ptp, property, c.autoReleasePool, &propAsString)) {
-        ImGui::Text("Value: %s", propAsString.str);
+    if (AwControl_GetPropertyValueAsStr(&c.aw, property, c.autoReleasePool, &propAsString)) {
+        ImGui::Text("Value: %.*s", propAsString.size, propAsString.str);
     } else {
         char text[32];
-        PTP_GetPropValueStr((PTPDataType)property->dataType, property->value, text, sizeof(text));
+        AwPtpGetPropValueStr((PtpDataType)property->dataType, property->value, text, sizeof(text));
         ImGui::Text("Value: %s", text);
     }
 
@@ -277,11 +277,11 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
 
     if (property->isNotch) {
         if (ImGui::Button("Notch Next")) {
-            PTPControl_SetPropertyNotch(&c.ptp, property, 1);
+            AwControl_SetPropertyNotch(&c.aw, property, 1);
         }
         ImGui::SameLine();
         if (ImGui::Button("Notch Prev")) {
-            PTPControl_SetPropertyNotch(&c.ptp, property, -1);
+            AwControl_SetPropertyNotch(&c.aw, property, -1);
         }
     }
 
@@ -295,9 +295,9 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                 ImGuiTableFlags_BordersV |
                 ImGuiTableFlags_ScrollY;
 
-        PTPPropValueEnums outEnums{};
+        AwPtpPropValueEnums outEnums{};
 
-        if (PTPControl_GetEnumsForProperty(&c.ptp, property, c.autoReleasePool, &outEnums) && MArraySize(outEnums.values)) {
+        if (AwControl_GetEnumsForProperty(&c.aw, property, c.autoReleasePool, &outEnums) && MArraySize(outEnums.values)) {
             if (ImGui::BeginTable("Properties", 3, flags)) {
                 ImGui::TableSetupColumn("Option", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed,130.0);
@@ -309,13 +309,13 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                     ImGui::TableNextRow();
                     ImGui::PushID(i);
 
-                    PTPPropValueEnum *valueEnum = outEnums.values + i;
-                    PTP_GetPropValueStr((PTPDataType)property->dataType, valueEnum->propValue, text, sizeof(text));
+                    AwPtpPropValueEnum *valueEnum = outEnums.values + i;
+                    AwPtpGetPropValueStr((PtpDataType)property->dataType, valueEnum->propValue, text, sizeof(text));
 
                     ImGuiSelectableFlags selectFlags =
                             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
 
-                    bool selected = PTP_PropValueEq((PTPDataType)property->dataType,
+                    bool selected = AwPtpPropValueEq((PtpDataType)property->dataType,
                                                     valueEnum->propValue, property->value);
 
                     ImGui::TableNextColumn();
@@ -325,7 +325,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                     }
 
                     if (ImGui::Selectable(str, selected, selectFlags)) {
-                        PTPControl_SetPropertyValue(&c.ptp, property, valueEnum->propValue);
+                        AwControl_SetPropertyValue(&c.aw, property, valueEnum->propValue);
                     }
 
                     ImGui::TableNextColumn();
@@ -334,10 +334,10 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                     ImGui::TableNextColumn();
                     char rStatus = '-';
                     char wStatus = '-';
-                    if (valueEnum->flags & ENUM_VALUE_READ) {
+                    if (valueEnum->flags & AW_ENUM_VALUE_READ) {
                         rStatus = 'R';
                     }
-                    if (valueEnum->flags & ENUM_VALUE_WRITE) {
+                    if (valueEnum->flags & AW_ENUM_VALUE_WRITE) {
                         wStatus = 'W';
                     }
                     ImGui::Text("%c%c", rStatus, wStatus);
@@ -351,13 +351,13 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
     }
     else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
         if (ImGuiSlider(property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
-            PTPControl_SetPropertyValue(&c.ptp, property, property->value);
+            AwControl_SetPropertyValue(&c.aw, property, property->value);
         }
     }
 
     if (c.showWindowPropDebug) {
         char text[32];
-        PTP_GetPropValueStr((PTPDataType) property->dataType, property->defaultValue, text,
+        AwPtpGetPropValueStr((PtpDataType) property->dataType, property->defaultValue, text,
                             sizeof(text));
         ImGui::Text("Default: %s", text);
 
@@ -373,14 +373,14 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
                 ImGuiInputIntDuel(property->dataType, &property->value);
                 ImGui::SameLine();
                 if (ImGui::Button("Send")) {
-                    PTPControl_SetPropertyValue(&c.ptp, property, property->value);
+                    AwControl_SetPropertyValue(&c.aw, property, property->value);
                 }
                 break;
             case PTP_DT_STR: {
                 ImGui::InputText("Value", c.debugSetText, sizeof(c.debugSetText));
                 ImGui::SameLine();
                 if (ImGui::Button("Send")) {
-                    PTPControl_SetPropertyStrRaw(&c.ptp, property, MStr{c.debugSetText, MCStrLen(c.debugSetText), MCStrLen(c.debugSetText)});
+                    AwControl_SetPropertyStrRaw(&c.aw, property, MStr{c.debugSetText, MCStrLen(c.debugSetText), MCStrLen(c.debugSetText)});
                 }
                 break;
             }
@@ -389,13 +389,13 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
         // Show range or enums
         switch (property->formFlag) {
             case PTP_FORM_FLAG_RANGE: {
-                PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.min, text,
+                AwPtpGetPropValueStr((PtpDataType) property->dataType, property->form.range.min, text,
                                     sizeof(text));
                 ImGui::Text("Min: %s", text);
-                PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.max, text,
+                AwPtpGetPropValueStr((PtpDataType) property->dataType, property->form.range.max, text,
                                     sizeof(text));
                 ImGui::Text("Max: %s", text);
-                PTP_GetPropValueStr((PTPDataType) property->dataType, property->form.range.step, text,
+                AwPtpGetPropValueStr((PtpDataType) property->dataType, property->form.range.step, text,
                                     sizeof(text));
                 ImGui::Text("Step: %s", text);
                 break;
@@ -403,14 +403,14 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
             case PTP_FORM_FLAG_ENUM: {
                 ImGui::Text("Set Enum Values:");
                 for (size_t i = 0; i < MArraySize(property->form.enums.set); ++i) {
-                    PTPPropValue v = property->form.enums.set[i];
-                    PTP_GetPropValueStr((PTPDataType) property->dataType, v, text, sizeof(text));
+                    AwPtpPropValue v = property->form.enums.set[i];
+                    AwPtpGetPropValueStr((PtpDataType) property->dataType, v, text, sizeof(text));
                     ImGui::Text("    %s", text);
                 }
                 ImGui::Text("Get/Set Enum Values:");
                 for (size_t i = 0; i < MArraySize(property->form.enums.getSet); ++i) {
-                    PTPPropValue v = property->form.enums.getSet[i];
-                    PTP_GetPropValueStr((PTPDataType) property->dataType, v, text, sizeof(text));
+                    AwPtpPropValue v = property->form.enums.getSet[i];
+                    AwPtpGetPropValueStr((PtpDataType) property->dataType, v, text, sizeof(text));
                     ImGui::Text("    %s", text);
                 }
                 break;
@@ -419,12 +419,12 @@ void ShowDebugExtendedPropWindow(AppContext& c, PTPProperty *property) {
     }
 }
 
-void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
+void ShowDebugExtendedControlWindow(AppContext& c, AwPtpControl *control) {
     ImGui::AlignTextToFramePadding();
     ImGui::Text("%s", control->label);
     ImGui::SameLine();
     ImGui::TextDisabled("0x%04X", control->controlCode);
-    char* label = PTP_GetDataTypeStr((PTPDataType)control->dataType);
+    char* label = AwPtpGetDataTypeStr((PtpDataType)control->dataType);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", label);
     ImGui::SameLine();
@@ -451,8 +451,8 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
                     ImGui::TableNextRow();
                     ImGui::PushID(i);
 
-                    PTPPropValueEnum *valueEnum = control->form.enums.values + i;
-                    PTP_GetPropValueStr((PTPDataType)control->dataType, valueEnum->propValue, text, sizeof(text));
+                    AwPtpPropValueEnum *valueEnum = control->form.enums.values + i;
+                    AwPtpGetPropValueStr((PtpDataType)control->dataType, valueEnum->propValue, text, sizeof(text));
 
                     ImGuiSelectableFlags selectFlags =
                             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
@@ -464,7 +464,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
                     }
 
                     if (ImGui::Selectable(str, false, selectFlags)) {
-                        PTPControl_SetControlValue(&c.ptp, control->controlCode, valueEnum->propValue);
+                        AwControl_SetControlValue(&c.aw, control->controlCode, valueEnum->propValue);
                     }
 
                     ImGui::TableNextColumn();
@@ -481,16 +481,16 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
             ImGuiInputIntDuel(control->dataType, &c.selectedControlValue);
             ImGui::SameLine();
             if (ImGui::Button("Set")) {
-                PTPControl_SetControlValue(&c.ptp, control->controlCode, c.selectedControlValue);
+                AwControl_SetControlValue(&c.aw, control->controlCode, c.selectedControlValue);
             }
         }
     } else if (control->formFlag == PTP_FORM_FLAG_RANGE) {
         char text[32];
-        PTP_GetPropValueStr((PTPDataType)control->dataType, control->form.range.min, text, sizeof(text));
+        AwPtpGetPropValueStr((PtpDataType)control->dataType, control->form.range.min, text, sizeof(text));
         ImGui::Text("Min: %s", text);
-        PTP_GetPropValueStr((PTPDataType)control->dataType, control->form.range.max, text, sizeof(text));
+        AwPtpGetPropValueStr((PtpDataType)control->dataType, control->form.range.max, text, sizeof(text));
         ImGui::Text("Max: %s", text);
-        PTP_GetPropValueStr((PTPDataType)control->dataType, control->form.range.step, text, sizeof(text));
+        AwPtpGetPropValueStr((PtpDataType)control->dataType, control->form.range.step, text, sizeof(text));
         ImGui::Text("Step: %s", text);
 
         ImGuiSlider(control->dataType, &c.selectedControlValue, control->form.range.min, control->form.range.step, control->form.range.max);
@@ -504,7 +504,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, PtpControl *control) {
         ImGui::SameLine();
 
         if (ImGui::Button("Set")) {
-            PTPControl_SetControlValue(&c.ptp, control->controlCode, c.selectedControlValue);
+            AwControl_SetControlValue(&c.aw, control->controlCode, c.selectedControlValue);
         }
         // Display current value
     }
@@ -515,8 +515,8 @@ static void ShowDebugPropertyOrControl(AppContext& c) {
     ImGui::SetNextWindowSize(ImVec2(380, 330), ImGuiCond_FirstUseEver);
 
     ImGui::Begin("Debug Info", &c.showWindowDebugPropertyOrControl);
-    PTPProperty *property = c.selectedProperty;
-    PtpControl *control = c.selectedControl;
+    AwPtpProperty *property = c.selectedProperty;
+    AwPtpControl *control = c.selectedControl;
     if (property) {
         ShowDebugExtendedPropWindow(c, property);
     } else if (control) {
@@ -608,7 +608,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
 
-                PTPProperty *property = uiPtpProperty.prop;
+                AwPtpProperty *property = uiPtpProperty.prop;
                 ImGuiSelectableFlags selectFlags =
                         ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
                 ImGui::PushID(i);
@@ -620,7 +620,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                     c.selectedControlValue = {};
                     c.showWindowDebugPropertyOrControl = true;
                     c.debugSetText[0] = '\0';
-                    PTP_GetPropValueStr((PTPDataType)property->dataType, property->defaultValue, c.debugSetText,sizeof(c.debugSetText));
+                    AwPtpGetPropValueStr((PtpDataType)property->dataType, property->defaultValue, c.debugSetText,sizeof(c.debugSetText));
                 }
 
                 ImGui::TableNextColumn();
@@ -628,20 +628,20 @@ void ShowDebugPropertyListTab(AppContext& c) {
 
                 ImGui::TableNextColumn();
                 MStr name = {};
-                if (PTPControl_GetPropertyId(&c.ptp, property, &name) && name.str) {
+                if (AwControl_GetPropertyId(&c.aw, property, &name) && name.str) {
                     ImGui::TextUnformatted(name.str, MStrEnd(name));
                 } else {
                     ImGui::TextUnformatted(uiPtpProperty.propCode);
                 }
 
                 ImGui::TableNextColumn();
-                char *dataTypeName = PTP_GetDataTypeStr((PTPDataType) property->dataType);
+                char *dataTypeName = AwPtpGetDataTypeStr((PtpDataType) property->dataType);
                 if (dataTypeName) {
                     ImGui::TextUnformatted(dataTypeName);
                 }
 
                 ImGui::TableNextColumn();
-                char *formTypeName = PTP_GetFormFlagStr((PTPFormFlag) property->formFlag);
+                char *formTypeName = AwPtpGetFormFlagStr((PtpFormFlag) property->formFlag);
                 if (formTypeName) {
                     ImGui::TextUnformatted(formTypeName);
                 }
@@ -650,7 +650,7 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 ImGui::Text("%02x", property->getSet);
 
                 ImGui::TableNextColumn();
-                char *isEnabled = PTP_GetPropIsEnabledStr(property->isEnabled);
+                char *isEnabled = AwPtpGetPropIsEnabledStr(property->isEnabled);
                 if (isEnabled) {
                     ImGui::TextUnformatted(isEnabled);
                 } else {
@@ -658,13 +658,13 @@ void ShowDebugPropertyListTab(AppContext& c) {
                 }
 
                 ImGui::TableNextColumn();
-                PTP_GetPropValueStr((PTPDataType) property->dataType, property->value, text,
+                AwPtpGetPropValueStr((PtpDataType) property->dataType, property->value, text,
                                     sizeof(text));
                 ImGui::Text("%s", text);
 
                 ImGui::TableNextColumn();
                 MStr propAsString = {};
-                if (PTPControl_GetPropertyValueAsStr(&c.ptp, property, c.autoReleasePool, &propAsString)) {
+                if (AwControl_GetPropertyValueAsStr(&c.aw, property, c.autoReleasePool, &propAsString)) {
                     ImGui::Text("%.*s", propAsString.size, propAsString.str);
                 }
 
@@ -681,29 +681,29 @@ void ShowDebugPropertyListTab(AppContext& c) {
 
 static void ImGuiControlButton(AppContext &c, const char* buttonName, u16 propertyCode) {
     if (ImGui::Button(buttonName)) {
-        PTPControl_SetControlToggle(&c.ptp, propertyCode, true);
+        AwControl_SetControlToggle(&c.aw, propertyCode, true);
     }
     if (ImGui::IsItemHovered()) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-            PTPControl_SetControlToggle(&c.ptp, propertyCode, false);
+            AwControl_SetControlToggle(&c.aw, propertyCode, false);
         }
     }
 }
 
 static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* label) {
-    if (PTPProperty* property = PTPControl_GetPropertyByCode(&c.ptp, propCode)) {
+    if (AwPtpProperty* property = AwControl_GetPropertyByCode(&c.aw, propCode)) {
         MStr currentValAsStr = {};
-        PTPControl_GetPropertyValueAsStr(&c.ptp, property, c.autoReleasePool, &currentValAsStr);
-        if (PTPControl_IsPropertyWritable(&c.ptp, property)) {
-            PTPPropValueEnums options = {};
-            if (PTPControl_GetEnumsForProperty(&c.ptp, property, c.autoReleasePool, &options) &&
+        AwControl_GetPropertyValueAsStr(&c.aw, property, c.autoReleasePool, &currentValAsStr);
+        if (AwControl_IsPropertyWritable(&c.aw, property)) {
+            AwPtpPropValueEnums options = {};
+            if (AwControl_GetEnumsForProperty(&c.aw, property, c.autoReleasePool, &options) &&
                 MArraySize(options.values)) {
                 if (ImGui::BeginCombo(label, currentValAsStr.str)) {
                     for (size_t i = 0; i < MArraySize(options.values); ++i) {
-                        PTPPropValueEnum* valueEnum = options.values + i;
-                        bool isSelected = PTPProperty_Equals(property, valueEnum->propValue);
+                        AwPtpPropValueEnum* valueEnum = options.values + i;
+                        bool isSelected = AwPtpPropEquals(property, valueEnum->propValue);
                         if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
-                            PTPControl_SetPropertyValue(&c.ptp, property, valueEnum->propValue);
+                            AwControl_SetPropertyValue(&c.aw, property, valueEnum->propValue);
                         }
                     }
                     ImGui::EndCombo();
@@ -717,36 +717,36 @@ static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* lab
         } else {
             ImGui::Text("%s: N/A", label);
         }
-        if (PTPControl_IsPropertyNotch(&c.ptp, property)) {
+        if (AwControl_IsPropertyNotch(&c.aw, property)) {
             ImGui::PushID(propCode);
             ImGui::SameLine();
             if (ImGui::Button("Notch Down")) {
-                PTPControl_SetPropertyNotch(&c.ptp, property, -1);
+                AwControl_SetPropertyNotch(&c.aw, property, -1);
             }
             ImGui::SameLine();
             if (ImGui::Button("Notch Up")) {
-                PTPControl_SetPropertyNotch(&c.ptp, property, 1);
+                AwControl_SetPropertyNotch(&c.aw, property, 1);
             }
             ImGui::PopID();
         }
     }
 }
 
-void CustomLogCallback(PTPLog* logger, PTPLogLevel level, const char* message) {
+void CustomLogCallback(AwLog* logger, AwLogLevel level, const char* message) {
     // Add to UI log window
     AppContext* appContext = (AppContext*)logger->userData;
     if (appContext) {
         appContext->logWindow.AddLog(level, message);
     }
     // Also call default logger
-    PTPLog_LogDefault(logger, level, message);
+    AwLog_LogDefault(logger, level, message);
 }
 
 void UiInitLogging(AppContext& c) {
-    c.ptpDeviceList.logger.userData = &c;
-    c.ptpDeviceList.logger.logFunc = CustomLogCallback;
+    c.deviceList.logger.userData = &c;
+    c.deviceList.logger.logFunc = CustomLogCallback;
     // Log to the highest logging level enabled at compile time
-    c.ptpDeviceList.logger.level = PTP_LOG_LEVEL_TRACE;
+    c.deviceList.logger.level = AW_LOG_LEVEL_TRACE;
 }
 
 static void ShowLogWindow(AppContext& c) {
@@ -796,26 +796,26 @@ static void ShowLogWindow(AppContext& c) {
                 // Color code by log level
                 ImVec4 color;
                 switch (entry.level) {
-                    case PTP_LOG_LEVEL_ERROR:
+                    case AW_LOG_LEVEL_ERROR:
                         color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
                         break;
-                    case PTP_LOG_LEVEL_WARNING:
+                    case AW_LOG_LEVEL_WARNING:
                         color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f);
                         break;
-                    case PTP_LOG_LEVEL_INFO:
+                    case AW_LOG_LEVEL_INFO:
                         color = ImVec4(0.3f, 0.8f, 0.3f, 1.0f);
                         break;
-                    case PTP_LOG_LEVEL_DEBUG:
+                    case AW_LOG_LEVEL_DEBUG:
                         color = ImVec4(0.5f, 0.5f, 1.0f, 1.0f);
                         break;
-                    case PTP_LOG_LEVEL_TRACE:
+                    case AW_LOG_LEVEL_TRACE:
                         color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
                         break;
                     default:
                         color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
                 }
 
-                ImGui::TextColored(color, "%s", PTPLog_LevelAsStr(entry.level));
+                ImGui::TextColored(color, "%s", AwLog_LevelAsStr(entry.level));
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(entry.message.c_str());
             }
@@ -841,30 +841,30 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Checkbox("Inspect Controls", &c.showWindowDeviceDebug);
 
     if (ImGui::Button("Shutter")) {
-        PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER, false);
+        AwControl_SetControlToggle(&c.aw, DPC_SHUTTER, false);
     }
     if (ImGui::IsItemHovered()) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-            PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER, true);
+            AwControl_SetControlToggle(&c.aw, DPC_SHUTTER, true);
         }
     }
 
     ImGui::SameLine();
     if (ImGui::Checkbox("Half-Press", &c.shutterHalfPress)) {
-        PTPControl_SetControlToggle(&c.ptp, DPC_SHUTTER_HALF_PRESS, c.shutterHalfPress);
+        AwControl_SetControlToggle(&c.aw, DPC_SHUTTER_HALF_PRESS, c.shutterHalfPress);
     }
 
     ImGui::Spacing();
     if (ImGui::CollapsingHeader("Live View", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
-        PTPProperty* osdImageModeProp = PTPControl_GetPropertyByCode(&c.ptp, DPC_OSD_IMAGE_MODE);
+        AwPtpProperty* osdImageModeProp = AwControl_GetPropertyByCode(&c.aw, DPC_OSD_IMAGE_MODE);
         if (osdImageModeProp) {
             ImGui::SameLine();
             ImGui::BeginDisabled(!c.liveViewOpen);
             if (ImGui::Checkbox("OSD", &c.osdEnabled)) {
-                PTPPropValue value = {};
+                AwPtpPropValue value = {};
                 value.u8 = c.osdEnabled ? 1 : 0;
-                PTPControl_SetPropertyValue(&c.ptp, osdImageModeProp, value);
+                AwControl_SetPropertyValue(&c.aw, osdImageModeProp, value);
             }
             ImGui::EndDisabled();
         }
@@ -877,15 +877,15 @@ void ShowCameraControlsWindow(AppContext& c) {
         if (!c.liveViewOpen) {
             ImGui::BeginDisabled();
         }
-        PTPProperty* liveViewSettingEffect =
-            PTPControl_GetPropertyByCode(&c.ptp, DPC_LIVE_VIEW_SETTING_EFFECT);
+        AwPtpProperty* liveViewSettingEffect =
+            AwControl_GetPropertyByCode(&c.aw, DPC_LIVE_VIEW_SETTING_EFFECT);
         if (liveViewSettingEffect) {
             ImGui::SameLine();
             bool settingsEffectEnabled = liveViewSettingEffect->value.u8 == 1 ? true : false;
             if (ImGui::Checkbox("Settings Effect", &settingsEffectEnabled)) {
-                PTPPropValue value = {};
+                AwPtpPropValue value = {};
                 value.u8 = settingsEffectEnabled ? 1 : 2;
-                PTPControl_SetPropertyValue(&c.ptp, liveViewSettingEffect, value);
+                AwControl_SetPropertyValue(&c.aw, liveViewSettingEffect, value);
             }
         }
 
@@ -901,8 +901,8 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::SliderFloat("##Size", &c.liveViewOverlayThickness, 0.1, 20.0, "%0.2f");
         ImGui::PopID();
 
-        bool touchEnabled = PTPControl_PropertyEnabledByCode(&c.ptp, DPC_REMOTE_TOUCH_ENABLED);
-        bool focusMagnifyEnabled = PTPControl_SupportsProperty(&c.ptp, DPC_FOCUS_MAGNIFY);
+        bool touchEnabled = AwControl_PropertyEnabledByCode(&c.aw, DPC_REMOTE_TOUCH_ENABLED);
+        bool focusMagnifyEnabled = AwControl_SupportsProperty(&c.aw, DPC_FOCUS_MAGNIFY);
         if (focusMagnifyEnabled || touchEnabled) {
             ImGui::PushID("clickAction");
             ImGui::Text("Click:");
@@ -930,17 +930,17 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         // Focus Mode
         MStr afMode = {};
-        PTPProperty* propFocusMode = PTPControl_GetPropertyByCode(&c.ptp, DPC_FOCUS_MODE);
-        PTPControl_GetPropertyValueAsStr(&c.ptp, propFocusMode, c.autoReleasePool, &afMode);
-        PTPPropValueEnums focusModes = {};
-        if (PTPControl_GetEnumsForProperty(&c.ptp, propFocusMode, c.autoReleasePool, &focusModes) &&
+        AwPtpProperty* propFocusMode = AwControl_GetPropertyByCode(&c.aw, DPC_FOCUS_MODE);
+        AwControl_GetPropertyValueAsStr(&c.aw, propFocusMode, c.autoReleasePool, &afMode);
+        AwPtpPropValueEnums focusModes = {};
+        if (AwControl_GetEnumsForProperty(&c.aw, propFocusMode, c.autoReleasePool, &focusModes) &&
                 MArraySize(focusModes.values)) {
             if (ImGui::BeginCombo("Focus Mode", afMode.str)) {
                 for (size_t i = 0; i < MArraySize(focusModes.values); ++i) {
-                    PTPPropValueEnum *valueEnum = focusModes.values + i;
+                    AwPtpPropValueEnum *valueEnum = focusModes.values + i;
                     bool isSelected = MStrCmp(afMode, valueEnum->str);
                     if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
-                        PTPControl_SetPropertyValue(&c.ptp, propFocusMode, valueEnum->propValue);
+                        AwControl_SetPropertyValue(&c.aw, propFocusMode, valueEnum->propValue);
                     }
                 }
                 ImGui::EndCombo();
@@ -954,14 +954,14 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGuiShowPropertyText(c, DPC_AUTO_FOCUS_STATUS);
 
         if (ImGui::Checkbox("AF-On", &c.autoFocusButton)) {
-            PTPControl_SetControlToggle(&c.ptp, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
+            AwControl_SetControlToggle(&c.aw, DPC_AUTO_FOCUS_HOLD, c.autoFocusButton);
         }
 
         // Manual Focus Adjust
-        PtpControl* focusAdjust = PTPControl_GetControlByCode(&c.ptp, DPC_MANUAL_FOCUS_ADJUST);
+        AwPtpControl* focusAdjust = AwControl_GetControlByCode(&c.aw, DPC_MANUAL_FOCUS_ADJUST);
         if (focusAdjust) {
-            PTPPropValue focusAdjustVal{};
-            bool enable = PTPControl_PropertyEnabledByCode(&c.ptp, DPC_MANUAL_FOCUS_ADJUST_ENABLED);
+            AwPtpPropValue focusAdjustVal{};
+            bool enable = AwControl_PropertyEnabledByCode(&c.aw, DPC_MANUAL_FOCUS_ADJUST_ENABLED);
             if (!enable) {
                 ImGui::BeginDisabled();
             }
@@ -1021,10 +1021,10 @@ void ShowCameraControlsWindow(AppContext& c) {
                 focusAdjustVal.i16 = 7;
             }
             if (focusAdjustVal.i16 != 0) {
-                PTPPropValue focusAdjustOff{};
-                PTPControl_SetControlValue(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
-                PTPControl_SetControlValue(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustVal);
-                PTPControl_SetControlValue(&c.ptp, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
+                AwPtpPropValue focusAdjustOff{};
+                AwControl_SetControlValue(&c.aw, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
+                AwControl_SetControlValue(&c.aw, DPC_MANUAL_FOCUS_ADJUST, focusAdjustVal);
+                AwControl_SetControlValue(&c.aw, DPC_MANUAL_FOCUS_ADJUST, focusAdjustOff);
             }
             if (!enable) {
                 ImGui::EndDisabled();
@@ -1039,7 +1039,7 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Spacing();
     if (ImGui::CollapsingHeader("Capture Files", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Spacing();
-        ImGui::Text("Files On Camera: %d", PTPControl_GetPendingFiles(&c.ptp));
+        ImGui::Text("Files On Camera: %d", AwControl_GetPendingFiles(&c.aw));
         ImGui::Text("Last Download Time: %lldms (%lldms)", c.fileDownloadTotalMillis, c.fileDownloadTimeMillis);
         ImGui::Text("Last Filename: %s", c.fileDownloadPath.c_str());
         ImGui::SameLine();
@@ -1050,7 +1050,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::SameLine();
 
         bool fileDownload = false;
-        if (c.fileDownloadAuto && PTPControl_GetPendingFiles(&c.ptp)) {
+        if (c.fileDownloadAuto && AwControl_GetPendingFiles(&c.aw)) {
             fileDownload = true;
         }
 
@@ -1068,10 +1068,10 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         if (fileDownload) {
             MMemIO fileContents{};
-            PTPCapturedImageInfo cii = {};
+            AwPtpCapturedImageInfo cii = {};
             SDL_Time startTime = 0;
             SDL_GetCurrentTime(&startTime);
-            AwResult r = PTPControl_GetCapturedImage(&c.ptp, &fileContents, &cii);
+            AwResult r = AwControl_GetCapturedImage(&c.aw, &fileContents, &cii);
             SDL_Time dlTime = 0;
             SDL_GetCurrentTime(&dlTime);
             if (r.code != AW_RESULT_OK) {
@@ -1088,7 +1088,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                 c.fileDownloadTotalBytes = fileContents.size;
                 c.fileDownloadPath = cii.filename.str;
                 MMemFree(&fileContents);
-                MStrFree(c.ptp.allocator, cii.filename);
+                MStrFree(c.aw.allocator, cii.filename);
             }
         }
     }
@@ -1098,7 +1098,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::Spacing();
 
         AwMagnifier magnifier = {};
-        if (PTPControl_GetMagnifier(&c.ptp, &magnifier).code == AW_RESULT_OK) {
+        if (AwControl_GetMagnifier(&c.aw, &magnifier).code == AW_RESULT_OK) {
             if (magnifier.ratio.ratioByTen == 0) {
                 ImGui::Text("Magnifier: Off (%d, %d)", magnifier.x, magnifier.y);
             } else {
@@ -1127,7 +1127,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                                 .y = magnifier.y,
                                 .ratio = *ratio
                             };
-                            PTPControl_SetMagnifier(&c.ptp, magnifierSet);
+                            AwControl_SetMagnifier(&c.aw, magnifierSet);
                         }
                         ImGui::PopID();
                     }
@@ -1178,7 +1178,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                         .y = y,
                         .ratio = magnifier.ratio,
                     };
-                    PTPControl_SetMagnifier(&c.ptp, magnifierSet);
+                    AwControl_SetMagnifier(&c.aw, magnifierSet);
                 }
             } else {
                 ImGuiControlButton(c, "Magnify", DPC_FOCUS_MAGNIFIER);
@@ -1225,7 +1225,7 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Spacing();
     if (ImGui::CollapsingHeader("Metadata")) {
         ImGui::Spacing();
-        PTPProperty* dateTimeProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_DATE_TIME_SET);
+        AwPtpProperty* dateTimeProperty = AwControl_GetPropertyByCode(&c.aw, DPC_DATE_TIME_SET);
 
         if (dateTimeProperty) {
             if (ImGui::Button("Set Time Now")) {
@@ -1270,11 +1270,11 @@ void ShowCameraControlsWindow(AppContext& c) {
                 MLogf("Setting time to '%s'", timeBuffer);
 
                 MStr time = MStrMakeStaticCStr(timeBuffer);
-                PTPControl_SetPropertyStrRaw(&c.ptp, dateTimeProperty, time);
+                AwControl_SetPropertyStrRaw(&c.aw, dateTimeProperty, time);
             }
         }
 
-        PTPProperty* copyrightProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_COPYRIGHT);
+        AwPtpProperty* copyrightProperty = AwControl_GetPropertyByCode(&c.aw, DPC_COPYRIGHT);
         if (copyrightProperty) {
             bool set = false;
             if (ImGui::InputText("Copyright", c.copyrightEdit, sizeof(c.copyrightEdit),
@@ -1287,12 +1287,12 @@ void ShowCameraControlsWindow(AppContext& c) {
                 set = true;
             }
             if (set) {
-                PTPControl_SetPropertyStrRaw(&c.ptp, copyrightProperty, MStrMakeStaticCStr(c.copyrightEdit));
+                AwControl_SetPropertyStrRaw(&c.aw, copyrightProperty, MStrMakeStaticCStr(c.copyrightEdit));
             }
             ImGui::PopID();
         }
 
-        PTPProperty* photographerProperty = PTPControl_GetPropertyByCode(&c.ptp, DPC_PHOTOGRAPHER);
+        AwPtpProperty* photographerProperty = AwControl_GetPropertyByCode(&c.aw, DPC_PHOTOGRAPHER);
         if (photographerProperty) {
             bool set = false;
             if (ImGui::InputText("Photographer", c.photographerEdit, sizeof(c.photographerEdit),
@@ -1305,7 +1305,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                 set = true;
             }
             if (set) {
-                PTPControl_SetPropertyStrRaw(&c.ptp, photographerProperty, MStrMakeStaticCStr(c.photographerEdit));
+                AwControl_SetPropertyStrRaw(&c.aw, photographerProperty, MStrMakeStaticCStr(c.photographerEdit));
             }
             ImGui::PopID();
         }
@@ -1325,20 +1325,20 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::Spacing();
         if (ImGui::CollapsingHeader("Buttons", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Spacing();
-            PTPProperty* buttonList = PTPControl_GetPropertyByCode(&c.ptp, DPC_BUTTON_LIST);
+            AwPtpProperty* buttonList = AwControl_GetPropertyByCode(&c.aw, DPC_BUTTON_LIST);
 
             ImGui::PushID("remoteButtons");
-            PTPPropValueEnums buttonListEnum = {};
-            if (PTPControl_GetEnumsForProperty(&c.ptp, buttonList, c.autoReleasePool, &buttonListEnum)) {
+            AwPtpPropValueEnums buttonListEnum = {};
+            if (AwControl_GetEnumsForProperty(&c.aw, buttonList, c.autoReleasePool, &buttonListEnum)) {
                 for (size_t i = 0; i < MArraySize(buttonListEnum.values); ++i) {
                     MStr* buttonName = &buttonListEnum.values[i].str;
                     char buffer[256];
                     if (snprintf(buffer, sizeof(buffer), "%.*s", buttonName->size, buttonName->str) >= 0) {
                         if (ImGui::Button(buffer)) {
-                            PTPControl_RemoteButtonPress(&c.ptp, buttonListEnum.values[i].propValue.u16, TRUE);
+                            AwControl_RemoteButtonPress(&c.aw, buttonListEnum.values[i].propValue.u16, TRUE);
                         }
                         if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-                            PTPControl_RemoteButtonPress(&c.ptp, buttonListEnum.values[i].propValue.u16, FALSE);
+                            AwControl_RemoteButtonPress(&c.aw, buttonListEnum.values[i].propValue.u16, FALSE);
                         }
                     }
                     if ((i + 1) % 5) {
@@ -1359,11 +1359,11 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         if (c.cameraSettingsReadEnabled) {
             if (ImGui::Button("Load")) {
-                MReadFileRet file = MFileReadFully(c.ptp.allocator, c.cameraSettingsPathBuffer);
+                MReadFileRet file = MFileReadFully(c.aw.allocator, c.cameraSettingsPathBuffer);
                 if (file.size > 0) {
                     MMemIO memIo{};
-                    MMemInit(&memIo, c.ptp.allocator, file.data, file.size);
-                    AwResult r = PTPControl_PutCameraSettingsFile(&c.ptp, &memIo);
+                    MMemInit(&memIo, c.aw.allocator, file.data, file.size);
+                    AwResult r = AwControl_PutCameraSettingsFile(&c.aw, &memIo);
                     if (r.code != AW_RESULT_OK) {
                         MLogf("Error uploading file %s", c.cameraSettingsPathBuffer);
                     }
@@ -1376,7 +1376,7 @@ void ShowCameraControlsWindow(AppContext& c) {
             ImGui::SameLine();
             if (ImGui::Button("Save")) {
                 MMemIO memIo{};
-                AwResult r = PTPControl_GetCameraSettingsFile(&c.ptp, &memIo);
+                AwResult r = AwControl_GetCameraSettingsFile(&c.aw, &memIo);
                 if (r.code != AW_RESULT_OK) {
                     MLogf("Error fetching settings from camera: %d", r);
                 } else {
@@ -1398,15 +1398,15 @@ void ShowCameraControlsWindow(AppContext& c) {
 
 static void FetchEvents(AppContext& c, float currentTime) {
     if (currentTime - c.eventRefreshTime >= AUTO_EVENT_FETCH_INTERVAL_SECS) {
-        PTPEvent* events = NULL;
-        PTPControl_ReadEvents(&c.ptp, 10, c.autoReleasePool, &events);
+        AwPtpEvent* events = NULL;
+        AwControl_ReadEvents(&c.aw, 10, c.autoReleasePool, &events);
         for (int i = 0; i < MArraySize(events); ++i) {
-            PTPEvent* event = events + i;
-            const char* eventName = PTP_GetEventLabel(event->code);
+            AwPtpEvent* event = events + i;
+            const char* eventName = AwGetEventLabel(event->code);
             if (!eventName) {
                 eventName = "UnknownEvent";
             }
-            PTP_LOG_INFO_F(&c.ptp.logger, "%s(%04x) 0x%08x 0x%08x 0x%08x", eventName, event->code, event->param1, event->param2, event->param3);
+            AW_LOG_INFO_F(&c.aw.logger, "%s(%04x) 0x%08x 0x%08x 0x%08x", eventName, event->code, event->param1, event->param2, event->param3);
         }
         c.eventRefreshTime = currentTime;
     }
@@ -1424,14 +1424,14 @@ static void RefreshProperties(AppContext& c, float currentTime) {
     }
 
     if (propRefresh) {
-        PTPControl_UpdateProperties(&c.ptp, fullRefresh);
+        AwControl_UpdateProperties(&c.aw, fullRefresh);
         c.propRefresh = false;
         c.propertyLastRefreshTime = currentTime;
         c.propTable.needsRebuild = true;
     }
 
     if (c.propTable.needsRebuild) {
-        c.propTable.rebuild(c.ptp);
+        c.propTable.rebuild(c.aw);
         c.propTable.needsSort = true;
     }
 }
@@ -1443,20 +1443,20 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
     if (c.connected) {
         if (ImGui::BeginTabBar("Device Info Tabs")) {
             if (ImGui::BeginTabItem("Info")) {
-                int majorVersion = c.ptp.protocolVersion / 100;
-                int minorVersion = c.ptp.protocolVersion % 100;
+                int majorVersion = c.aw.protocolVersion / 100;
+                int minorVersion = c.aw.protocolVersion % 100;
                 ImGui::Text("Protocol Version: %d.%02d", majorVersion, minorVersion);
 
-                ImGui::Text("Manufacturer: %.*s", c.ptp.manufacturer.size, c.ptp.manufacturer.str);
-                ImGui::Text("Model: %.*s", c.ptp.model.size, c.ptp.model.str);
-                ImGui::Text("Device Version: %.*s", c.ptp.deviceVersion.size, c.ptp.deviceVersion.str);
-                ImGui::Text("Serial Number: %.*s", c.ptp.serialNumber.size, c.ptp.serialNumber.str);
+                ImGui::Text("Manufacturer: %.*s", c.aw.manufacturer.size, c.aw.manufacturer.str);
+                ImGui::Text("Model: %.*s", c.aw.model.size, c.aw.model.str);
+                ImGui::Text("Device Version: %.*s", c.aw.deviceVersion.size, c.aw.deviceVersion.str);
+                ImGui::Text("Serial Number: %.*s", c.aw.serialNumber.size, c.aw.serialNumber.str);
 
-                ImGui::Text("Vendor Extension Id: %d", c.ptp.vendorExtensionId);
-                majorVersion = c.ptp.vendorExtensionVersion / 100;
-                minorVersion = c.ptp.vendorExtensionVersion % 100;
+                ImGui::Text("Vendor Extension Id: %d", c.aw.vendorExtensionId);
+                majorVersion = c.aw.vendorExtensionVersion / 100;
+                minorVersion = c.aw.vendorExtensionVersion % 100;
                 ImGui::Text("Vendor Extension Version: %d.%02d", majorVersion, minorVersion);
-                ImGui::Text("Vendor Extension: %.*s", c.ptp.vendorExtension.size, c.ptp.vendorExtension.str);
+                ImGui::Text("Vendor Extension: %.*s", c.aw.vendorExtension.size, c.aw.vendorExtension.str);
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1476,10 +1476,10 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (size_t i = 0; i < MArraySize(c.ptp.imageFormats); i++) {
+                    for (size_t i = 0; i < MArraySize(c.aw.imageFormats); i++) {
                         ImGui::TableNextRow();
 
-                        u16 imageFormat = c.ptp.imageFormats[i];
+                        u16 imageFormat = c.aw.imageFormats[i];
 
                         ImGui::TableNextColumn();
 
@@ -1490,7 +1490,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
-                        char *objectFormatStr = PTP_GetObjectFormatStr(imageFormat);
+                        char *objectFormatStr = AwGetObjectFormatStr(imageFormat);
                         if (objectFormatStr == NULL) {
                             objectFormatStr = label;
                         }
@@ -1504,7 +1504,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
             }
 
             if (ImGui::BeginTabItem("Operations")) {
-                ImGui::Text("Operations: %zu", MArraySize(c.ptp.supportedOperations));
+                ImGui::Text("Operations: %zu", MArraySize(c.aw.supportedOperations));
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1525,10 +1525,10 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (int i = 0; i < MArraySize(c.ptp.supportedOperations); i++) {
+                    for (int i = 0; i < MArraySize(c.aw.supportedOperations); i++) {
                         ImGui::TableNextRow();
 
-                        u16 opCode = c.ptp.supportedOperations[i];
+                        u16 opCode = c.aw.supportedOperations[i];
 
                         ImGui::TableNextColumn();
 
@@ -1539,7 +1539,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
-                        char *opName = PTP_GetOperationLabel(opCode);
+                        char *opName = AwGetOperationLabel(opCode);
                         if (opName == NULL) {
                             opName = label;
                         }
@@ -1553,7 +1553,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
             }
 
             if (ImGui::BeginTabItem("Controls")) {
-                ImGui::Text("Controls: %zu", MArraySize(c.ptp.supportedControls));
+                ImGui::Text("Controls: %zu", MArraySize(c.aw.supportedControls));
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1578,10 +1578,10 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (size_t i = 0; i < MArraySize(c.ptp.controls); i++) {
+                    for (size_t i = 0; i < MArraySize(c.aw.controls); i++) {
                         ImGui::TableNextRow();
 
-                        PtpControl* control = c.ptp.controls + i;
+                        AwPtpControl* control = c.aw.controls + i;
                         u16 controlCode = control->controlCode;
 
                         ImGui::TableNextColumn();
@@ -1608,14 +1608,14 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TextUnformatted(controlLabel);
 
                         ImGui::TableNextColumn();
-                        const char *dataType = PTP_GetDataTypeStr((PTPDataType)control->dataType);
+                        const char *dataType = AwPtpGetDataTypeStr((PtpDataType)control->dataType);
                         if (dataType == NULL) {
                             dataType = "";
                         }
                         ImGui::TextUnformatted(dataType);
 
                         ImGui::TableNextColumn();
-                        const char *formFlagStr = PTP_GetFormFlagStr((PTPFormFlag)control->formFlag);
+                        const char *formFlagStr = AwPtpGetFormFlagStr((PtpFormFlag)control->formFlag);
                         if (formFlagStr == NULL) {
                             formFlagStr = "";
                         }
@@ -1631,7 +1631,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
             }
 
             if (ImGui::BeginTabItem("Events")) {
-                ImGui::Text("Events: %zu", MArraySize(c.ptp.supportedEvents));
+                ImGui::Text("Events: %zu", MArraySize(c.aw.supportedEvents));
 
                 ImGuiTableFlags flags =
                         ImGuiTableFlags_Sortable |
@@ -1652,10 +1652,10 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (size_t i = 0; i < MArraySize(c.ptp.supportedEvents); i++) {
+                    for (size_t i = 0; i < MArraySize(c.aw.supportedEvents); i++) {
                         ImGui::TableNextRow();
 
-                        u16 eventCode = c.ptp.supportedEvents[i];
+                        u16 eventCode = c.aw.supportedEvents[i];
 
                         ImGui::TableNextColumn();
 
@@ -1666,7 +1666,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                         ImGui::TextUnformatted(label);
 
                         ImGui::TableNextColumn();
-                        char *name = PTP_GetEventLabel(eventCode);
+                        char *name = AwGetEventLabel(eventCode);
                         if (name == NULL) {
                             name = label;
                         }
@@ -1692,12 +1692,12 @@ static void ShowDeviceListWindow(AppContext& c) {
     ImGui::SetNextWindowSize(ImVec2(910, 150), ImGuiCond_FirstUseEver);
     ImGui::Begin("Device List");
 
-    if (PTPDeviceList_IsRefreshingList(&c.ptpDeviceList)) {
-        if (PTPDeviceList_PollUpdates(&c.ptpDeviceList)) {
+    if (AwDeviceList_IsRefreshingList(&c.deviceList)) {
+        if (AwDeviceList_PollUpdates(&c.deviceList)) {
             c.selectedDeviceIndex = -1;
         }
     }
-    if (PTPDeviceList_NeedsRefresh(&c.ptpDeviceList)) {
+    if (AwDeviceList_NeedsRefresh(&c.deviceList)) {
         c.RefreshDevices();
     }
     if (c.device && c.device->disconnected) {
@@ -1721,11 +1721,11 @@ static void ShowDeviceListWindow(AppContext& c) {
     // if (c.device) {
     //     ImGui::SameLine();
     //     if (ImGui::Button("Reset")) {
-    //         PTPDeviceList_Reset(&c.ptpDeviceList, c.device);
+    //         AwDeviceList_Reset(&c.awDeviceList, c.device);
     //     }
     // }
 
-#ifdef PTP_ENABLE_WIA
+#ifdef AW_ENABLE_WIA
     ImGui::SameLine();
     if (ImGui::Button("Restart WIA Service")) {
         PTPWiaServiceRestart();
@@ -1749,12 +1749,12 @@ static void ShowDeviceListWindow(AppContext& c) {
         ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
-        for (size_t i = 0; i < MArraySize(c.ptpDeviceList.devices); i++) {
+        for (size_t i = 0; i < MArraySize(c.deviceList.devices); i++) {
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
 
-            PTPDeviceInfo *deviceInfo = c.ptpDeviceList.devices + i;
+            AwDeviceInfo *deviceInfo = c.deviceList.devices + i;
             ImGuiSelectableFlags selectFlags =
                     ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
             ImGui::PushID(i);
@@ -1793,7 +1793,7 @@ static void ShowDeviceListWindow(AppContext& c) {
             }
 
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(PTPBackend_GetTypeAsStr(deviceInfo->backendType));
+            ImGui::TextUnformatted(AwBackend_GetTypeAsStr(deviceInfo->backendType));
 
             ImGui::PopID();
         }
