@@ -210,6 +210,7 @@ struct AppContext {
     AwPtpProperty* selectedProperty = nullptr;
     AwPtpControl* selectedControl = nullptr;
     AwPtpPropValue selectedControlValue;
+    AwPtpPropValue selectedPropValue;
     PropTable propTable{};
 
     // Debug set props

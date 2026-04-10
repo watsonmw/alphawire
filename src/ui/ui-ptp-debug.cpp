@@ -131,7 +131,7 @@ bool ImGuiInputHex(const char* label, u16 dataType, AwPtpPropValue* value, AwPtp
     return false;
 }
 
-void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value) {
+static void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value) {
     float windowWidth = ImGui::GetWindowWidth();
     float inputWidth = (windowWidth * 0.3f) - 10.0f;
     ImGui::SetNextItemWidth(inputWidth);
@@ -141,7 +141,7 @@ void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value) {
     ImGuiInputHex("hex", dataType, value);
 }
 
-void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value, AwPtpPropValue min, AwPtpPropValue max) {
+static void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value, AwPtpPropValue min, AwPtpPropValue max) {
     float windowWidth = ImGui::GetWindowWidth();
     float inputWidth = (windowWidth * 0.3f) - 10.0f;
     ImGui::SetNextItemWidth(inputWidth);
@@ -151,7 +151,7 @@ void ImGuiInputIntDuel(u16 dataType, AwPtpPropValue* value, AwPtpPropValue min, 
     ImGuiInputHex("hex", dataType, value, min, max);
 }
 
-bool ImGuiSlider(u16 dataType, AwPtpPropValue* value, AwPtpPropValue minV, AwPtpPropValue stepV, AwPtpPropValue maxV) {
+static bool ImGuiSlider(const char* label, u16 dataType, AwPtpPropValue* value, AwPtpPropValue minV, AwPtpPropValue stepV, AwPtpPropValue maxV) {
     int v = 0;
     int min = 0;
     int max = 0;
@@ -198,8 +198,12 @@ bool ImGuiSlider(u16 dataType, AwPtpPropValue* value, AwPtpPropValue minV, AwPtp
     if (displaySlider) {
         int orig = v;
 
+        if (label == NULL) {
+            label = "##stepped_slider";
+        }
+
         // Create the slider with the AlwaysSnap flag to force stepping
-        if (ImGui::SliderInt("##stepped_slider", &v, min, max, "%d",
+        if (ImGui::SliderInt(label, &v, min, max, "%d",
                              ImGuiSliderFlags_AlwaysClamp)) {
             // Round to nearest step
             v = min + ((v - min + step / 2) / step) * step;
@@ -350,7 +354,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, AwPtpProperty *property) {
         }
     }
     else if (property->formFlag == PTP_FORM_FLAG_RANGE) {
-        if (ImGuiSlider(property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
+        if (ImGuiSlider(NULL, property->dataType, &property->value, property->form.range.min, property->form.range.step, property->form.range.max)) {
             AwControl_SetPropertyValue(&c.aw, property, property->value);
         }
     }
@@ -493,7 +497,7 @@ void ShowDebugExtendedControlWindow(AppContext& c, AwPtpControl *control) {
         AwPtpGetPropValueStr((PtpDataType)control->dataType, control->form.range.step, text, sizeof(text));
         ImGui::Text("Step: %s", text);
 
-        ImGuiSlider(control->dataType, &c.selectedControlValue, control->form.range.min, control->form.range.step, control->form.range.max);
+        ImGuiSlider(NULL, control->dataType, &c.selectedControlValue, control->form.range.min, control->form.range.step, control->form.range.max);
 
         if (c.showWindowPropDebug) {
             ImGuiInputIntDuel(control->dataType, &c.selectedControlValue);
@@ -728,6 +732,26 @@ static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* lab
                 AwControl_SetPropertyNotch(&c.aw, property, 1);
             }
             ImGui::PopID();
+        }
+    }
+}
+
+static void ImGuiBuildPropertySlider(AppContext& c, u16 propCode, const char* label) {
+    if (AwPtpProperty* property = AwControl_GetPropertyByCode(&c.aw, propCode)) {
+        if (AwControl_IsPropertyWritable(&c.aw, property)) {
+            if (ImGuiSlider(label, property->dataType, &property->value, property->form.range.min,
+                    property->form.range.step, property->form.range.max)) {
+                AwControl_SetPropertyValue(&c.aw, property, property->value);
+            }
+            return;
+        }
+
+        MStr currentValAsStr = {};
+        AwControl_GetPropertyValueAsStr(&c.aw, property, c.autoReleasePool, &currentValAsStr);
+        if (currentValAsStr.size) {
+            ImGui::Text("%s: %.*s", label, currentValAsStr.size, currentValAsStr.str);
+        } else {
+            ImGui::Text("%s: N/A", label);
         }
     }
 }
@@ -1223,6 +1247,22 @@ void ShowCameraControlsWindow(AppContext& c) {
     }
 
     ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Image", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Spacing();
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_FILE_FORMAT, "Image File Format");
+        ImGuiBuildPropertyCombo(c, DPC_RAW_FILE_TYPE, "Raw File Type");
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_COMPRESSED_FILE_TYPE, "Compressed File Type");
+        ImGuiBuildPropertyCombo(c, DPC_COMPRESSION_SETTING, "Image Compression");
+        ImGuiBuildPropertyCombo(c, DPC_IMAGE_QUALITY, "Image Compression Quality");
+        ImGuiBuildPropertyCombo(c, DPC_DRO_HDR_MODE, "DRO");
+        ImGuiBuildPropertyCombo(c, DPC_WHITE_BALANCE, "White Balance");
+        ImGuiBuildPropertySlider(c, DPC_COLOR_TEMPERATURE, "Custom Color Temp");
+        // ImGuiBuildPropertyCombo(c, DPC_WHITE_BALANCE, "Custom White Balance");
+        ImGuiBuildPropertyCombo(c, DPC_CREATIVE_LOOK, "Creative Look");
+        ImGuiBuildPropertyCombo(c, DPC_PICTURE_PROFILE, "Picture Profile");
+    }
+
+    ImGui::Spacing();
     if (ImGui::CollapsingHeader("Metadata")) {
         ImGui::Spacing();
         AwPtpProperty* dateTimeProperty = AwControl_GetPropertyByCode(&c.aw, DPC_DATE_TIME_SET);
@@ -1311,19 +1351,9 @@ void ShowCameraControlsWindow(AppContext& c) {
         }
     }
 
-    ImGui::Spacing();
-    if (ImGui::CollapsingHeader("Image Type")) {
-        ImGui::Spacing();
-        ImGuiBuildPropertyCombo(c, DPC_IMAGE_FILE_FORMAT, "Image File Format");
-        ImGuiBuildPropertyCombo(c, DPC_RAW_FILE_TYPE, "Raw File Type");
-        ImGuiBuildPropertyCombo(c, DPC_IMAGE_COMPRESSED_FILE_TYPE, "Compressed File Type");
-        ImGuiBuildPropertyCombo(c, DPC_COMPRESSION_SETTING, "Image Compression");
-        ImGuiBuildPropertyCombo(c, DPC_IMAGE_QUALITY, "Image Compression Quality");
-    }
-
     if (c.remoteButtonsEnabled) {
         ImGui::Spacing();
-        if (ImGui::CollapsingHeader("Buttons", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::CollapsingHeader("Buttons")) {
             ImGui::Spacing();
             AwPtpProperty* buttonList = AwControl_GetPropertyByCode(&c.aw, DPC_BUTTON_LIST);
 
