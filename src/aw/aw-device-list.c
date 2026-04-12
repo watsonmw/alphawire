@@ -1,7 +1,7 @@
 ﻿#include "aw-device-list.h"
 
 #ifdef AW_ENABLE_IOKIT
-#include "platform/osx/ptp-backend-iokit.h"
+#include "platform/osx/aw-backend-iokit.h"
 #endif
 #ifdef AW_ENABLE_WIA
 #include "platform/windows/aw-backend-wia.h"
@@ -10,7 +10,7 @@
 #include "platform/windows/aw-backend-libusbk.h"
 #endif
 #ifdef AW_ENABLE_LIBUSB
-#include "platform/libusb/ptp-backend-libusb.h"
+#include "platform/libusb/aw-backend-libusb.h"
 #endif
 #ifdef AW_ENABLE_IP
 #include "platform/ip/aw-backend-ip.h"

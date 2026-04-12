@@ -164,7 +164,7 @@ AwResult AwLibusbDeviceList_ReleaseList(AwLibusbDeviceList* self) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static void* AwDeviceLibusb_ReallocBuffer(AwDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+static void* AwDeviceLibusb_ReallocBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -175,7 +175,7 @@ static void* AwDeviceLibusb_ReallocBuffer(AwDevice* self, PTPBufferType type, vo
     return data + headerSize;
 }
 
-static void AwDeviceLibusb_FreeBuffer(AwDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
+static void AwDeviceLibusb_FreeBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -211,8 +211,8 @@ static int BulkTransferOut(AwDeviceLibusb* device, u8* data, size_t transferLen,
     return 0;
 }
 
-static AwResult AwDeviceLibusb_SendAndRecv(AwDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                           PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+static AwResult AwDeviceLibusb_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                           AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                            size_t* actualDataOutSize) {
     AwDeviceLibusb* deviceLibusb = self->device;
     libusb_device_handle* handle = deviceLibusb->handle;

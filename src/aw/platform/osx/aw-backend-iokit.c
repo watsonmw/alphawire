@@ -475,7 +475,7 @@ AwResult AwIokitDeviceList_ReleaseList(AwIokitDeviceList* self) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static void* AwDeviceIokit_ReallocBuffer(AwDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
+static void* AwDeviceIokit_ReallocBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize, size_t dataNewSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataNewSize + headerSize;
     if (dataMem) {
@@ -486,7 +486,7 @@ static void* AwDeviceIokit_ReallocBuffer(AwDevice* self, PTPBufferType type, voi
     return ((u8*)dataMem) + headerSize;
 }
 
-static void AwDeviceIokit_FreeBuffer(AwDevice* self, PTPBufferType type, void* dataMem, size_t dataOldSize) {
+static void AwDeviceIokit_FreeBuffer(AwDevice* self, AwBufferType type, void* dataMem, size_t dataOldSize) {
     size_t headerSize = sizeof(PTPContainerHeader);
     size_t dataSize = dataOldSize + headerSize;
     if (dataMem) {
@@ -495,8 +495,8 @@ static void AwDeviceIokit_FreeBuffer(AwDevice* self, PTPBufferType type, void* d
     }
 }
 
-static AwResult AwDeviceIokit_SendAndRecv(AwDevice* self, PTPRequestHeader* request, u8* dataIn, size_t dataInSize,
-                                           PTPResponseHeader* response, u8* dataOut, size_t dataOutSize,
+static AwResult AwDeviceIokit_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
+                                           AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                            size_t* actualDataOutSize) {
     AwDeviceIOKit * deviceIokit = self->device;
     IOReturn result;
@@ -635,7 +635,7 @@ static b32 AwDeviceIokit_Reset(AwDevice* dev) {
     return (r == kIOReturnSuccess) ? TRUE : FALSE;
 }
 
-static b32 ReadEventFromBuffer(AwDeviceIOKit* dev, UInt32 transferred, AwEvent* outEvent) {
+static b32 ReadEventFromBuffer(AwDeviceIOKit* dev, UInt32 transferred, AwPtpEvent* outEvent) {
     MMemIO payloadRead;
     MMemInitRead(&payloadRead, dev->eventMem.mem, transferred);
 
@@ -678,10 +678,10 @@ static void HandleInterruptResponse(void *refcon, IOReturn result, void *arg0) {
 
     // Add event to event list
     if (result == kIOReturnSuccess && transferred > 0) {
-        AwEvent tempEvent = {};
+        AwPtpEvent tempEvent = {};
         if (ReadEventFromBuffer(dev, transferred, &tempEvent)) {
             pthread_mutex_lock(&dev->eventLock);
-            AwEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
+            AwPtpEvent* event = MArrayAddPtr(dev->allocator, dev->eventList);
             *event = tempEvent;
             pthread_mutex_unlock(&dev->eventLock);
         }
@@ -696,7 +696,7 @@ static void HandleInterruptResponse(void *refcon, IOReturn result, void *arg0) {
 }
 
 static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc,
-                                         AwEvent** outEvents) {
+                                         AwPtpEvent** outEvents) {
     AwDeviceIOKit* dev = self->device;
 
     if (outEvents == NULL) {
@@ -707,7 +707,7 @@ static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds
     // Copy all events to output
     if (MArraySize(dev->eventList) > 0) {
         for (int i = 0; i < MArraySize(dev->eventList); i++) {
-            AwEvent* event = MArrayAddPtr(alloc, *outEvents);
+            AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
             *event = dev->eventList[i];
         }
         // Clear the stored events
