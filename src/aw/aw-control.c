@@ -298,7 +298,7 @@ static MStr GetPredictedMaxFileSizeAsString(AwControl* self, MAllocator* allocat
     return r;
 }
 
-static MStr GetTemperatureAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
+static MStr GetCustomColorTempAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
     if (value == 0x0000) {
@@ -1727,7 +1727,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("iris-mode", DPC_IRIS_MODE, sProp_IrisMode),
 
     META_ENUM_U16("white-balance", DPC_WHITE_BALANCE, sProp_WhiteBalance),
-    META_FUNC_U16("white-balance-custom-temp", DPC_COLOR_TEMPERATURE, GetTemperatureAsString),
+    META_FUNC_U16("white-balance-custom-temp", DPC_CUSTOM_COLOR_TEMP, GetCustomColorTempAsString),
     META_FUNC_U8 ("white-balance-gm", DPC_WHITE_BALANCE_GM, GetWhiteBalanceGMAsString),
     META_FUNC_U8 ("white-balance-ab", DPC_WHITE_BALANCE_AB, GetWhiteBalanceABAsString),
 
@@ -2269,7 +2269,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD20C, "Camera Button Status"},
     {DPC_SHUTTER_SPEED, "Shutter Speed"},
     {DPC_BATTERY_LEVEL, "Battery Level Indicator"},
-    {DPC_COLOR_TEMPERATURE, "Color Temperature"},
+    {DPC_CUSTOM_COLOR_TEMP, "Color Temperature"},
     {DPC_WHITE_BALANCE_GM, "White Balance - Fine-Tune G-M"},
     {DPC_ASPECT_RATIO, "Aspect Ratio"},
     {DPC_AUTO_FOCUS_STATUS, "Focus Indication"},

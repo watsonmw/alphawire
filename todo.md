@@ -1,17 +1,24 @@
 UI
 ===
 
-- Build list of property editors / widgets?
-  - Debug Set widgets
-  - Enum List Read only support (except in debug)
-- Remove sorting for other tabs
-- Timing / Position
 - Connect multiple cameras
-- Simple bool setter for properties that have an on/off enabled/disabled state
 - Detect transport errors and disconnect
 - Button list and control 
   - Add buttons UI
-- Add all new controls
+
+API
+===
+
+- Settings apply from JSON file
+  - Save settings to JSON file
+  - Load/Apply settings from JSON file
+  - API updates
+    - Str setter
+      - Str: set directly
+    - int setter
+      - Enum: Set based on index or value?
+      - Int Range: set directly if in range
+
 
 Backends
 ===

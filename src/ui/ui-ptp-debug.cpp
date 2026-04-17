@@ -1256,8 +1256,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGuiBuildPropertyCombo(c, DPC_IMAGE_QUALITY, "Image Compression Quality");
         ImGuiBuildPropertyCombo(c, DPC_DRO_HDR_MODE, "DRO");
         ImGuiBuildPropertyCombo(c, DPC_WHITE_BALANCE, "White Balance");
-        ImGuiBuildPropertySlider(c, DPC_COLOR_TEMPERATURE, "Custom Color Temp");
-        // ImGuiBuildPropertyCombo(c, DPC_WHITE_BALANCE, "Custom White Balance");
+        ImGuiBuildPropertySlider(c, DPC_CUSTOM_COLOR_TEMP, "Custom Color Temp");
         ImGuiBuildPropertyCombo(c, DPC_CREATIVE_LOOK, "Creative Look");
         ImGuiBuildPropertyCombo(c, DPC_PICTURE_PROFILE, "Picture Profile");
     }
