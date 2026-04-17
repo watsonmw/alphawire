@@ -190,7 +190,7 @@ AW_EXPORT AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index
  * @param fullRefresh When set to TRUE: Refresh all properties, FALSE: Refresh only changed properties
  *                    NOTE: Most property changes are correctly tracked by the camera, but AwControl_GetPendingFiles()
  *                    may not update when 'fullRefresh' is set to FALSE.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh);
 
@@ -240,6 +240,14 @@ AW_EXPORT void AwPtp_FreePropValueEnums(MAllocator* self, AwPtpPropValueEnums* o
 AW_EXPORT b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MAllocator* allocator, MStr* outStr);
 
 /**
+ *
+ * @param property
+ * @param outValue
+ * @return AW_RESULT_OK on success, or an appropriate error code on failure.
+ */
+AW_EXPORT AwResult AwControl_GetPropertyValueAsBool(AwControl* self, AwPtpProperty* property, b32* outValue);
+
+/**
  * Check if a property can be written/modified.
  * @param property The property to check.
  * @return TRUE if the property is writable, FALSE otherwise.
@@ -265,7 +273,7 @@ AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, 
  * Set a property value on the device.
  * @param property The property to modify.
  * @param value The new value to set.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, AwPtpPropValue value);
 
@@ -273,9 +281,17 @@ AW_EXPORT AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* pr
  * Set a property value using a string representation.
  * @param property The property to modify.
  * @param value The string value to set.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value);
+
+/**
+ * Set a property that has a bool representation
+ * @param property
+ * @param value TRUE or FALSE
+ * @return AW_RESULT_OK if it was set, AW_RESULT_UNSUPPORTED if the property does support a bool representation
+ */
+AW_EXPORT AwResult AwControl_SetPropertyBool(AwControl* self, AwPtpProperty* property, b32 value);
 
 /**
  * Adjust 'notch' properties that are used for some shot settings when using older Sony 2.0 PTP interface.
@@ -337,7 +353,7 @@ AW_EXPORT AwPtpControl* AwControl_GetControlByCode(AwControl* self, u16 controlC
  * Set a control value on the device.
  * @param controlCode The control code to modify.
  * @param value The new value to set.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_SetControlValue(AwControl* self, u16 controlCode, AwPtpPropValue value);
 
@@ -345,7 +361,7 @@ AW_EXPORT AwResult AwControl_SetControlValue(AwControl* self, u16 controlCode, A
  * Toggle a control on or off.
  * @param controlCode The control code to toggle.
  * @param pressed TRUE to press/enable, FALSE to release/disable.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_SetControlToggle(AwControl* self, u16 controlCode, b32 pressed);
 
@@ -420,14 +436,14 @@ AW_EXPORT AwResult AwControl_GetOSDImage(AwControl* self, MMemIO* outFile);
 /**
  * Download camera settings file from the device.
  * @param outFile MemIO to write the settings file to.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_GetCameraSettingsFile(AwControl* self, MMemIO* outFile);
 
 /**
  * Upload camera settings file to the device.
  * @param file MemIO containing the settings file data.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_PutCameraSettingsFile(AwControl* self, MMemIO* file);
 
@@ -441,7 +457,7 @@ AW_EXPORT AwResult AwControl_PutCameraSettingsFile(AwControl* self, MMemIO* file
  * @param timeoutMilliseconds Maximum time to wait for events in milliseconds.
  * @param alloc Allocator to use for the event array.
  * @param outEvents Output pointer to array of events (caller must free).
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_ReadEvents(AwControl* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents);
 
@@ -495,14 +511,14 @@ typedef struct AwPosInt2 {
 /**
  * Get current magnifier state from the device.
  * @param outMagnifier Output structure to receive magnifier state.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_GetMagnifier(AwControl* self, AwMagnifier* outMagnifier);
 
 /**
  * Set magnifier position and zoom level.
  * @param magnifier Magnifier parameters to set.
- * @return Returns PTP_OK on success, or an appropriate error code on failure.
+ * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_SetMagnifier(AwControl* self, AwMagnifierSet magnifier);
 

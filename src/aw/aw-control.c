@@ -10,16 +10,19 @@
 typedef struct {
     u8 value;
     char* str;
+    u16 flag;
 } EnumValueU8;
 
 typedef struct {
     u16 value;
     char* str;
+    u16 flag;
 } EnumValueU16;
 
 typedef struct {
     u32 value;
     char* str;
+    u16 flag;
 } EnumValueU32;
 
 typedef union uFixedEnums {
@@ -37,13 +40,15 @@ typedef struct {
 } PtpPropNames;
 
 typedef struct PTPPropertyMetadata {
-    char *id;
-    u16 propCode;
-    u16 type;
+    char* id; // string code for this property
+    u16 propCode; // the ptp property code
+    u16 type; // PtpDataType
 
+    // Fixed mapping of values to string
     FixedEnums fixedEnums;
     u32 fixedEnumsSize;
 
+    // dynamically create the strings for each enum
     PTP_PropBuildEnumsFunc_t buildEnumsFunc;
     PTP_PropValueAsStringFunc_t valueAsStringFunc;
 
@@ -410,29 +415,34 @@ static MStr GetZoomBarInfo(AwControl* self, MAllocator* allocator, AwPtpProperty
     return r;
 }
 
+typedef enum {
+    EnumFlag_OFF = 1,
+    EnumFlag_ON = 2
+} EnumFlag;
+
 static EnumValueU8 sProp_OnOff0[] = {
-    {0x00, "Off"},
-    {0x01, "On"}
+    {0x00, "Off", EnumFlag_OFF},
+    {0x01, "On", EnumFlag_ON}
 };
 
 static EnumValueU8 sProp_OnOff1[] = {
-    {0x01, "Off"},
-    {0x02, "On"}
+    {0x01, "Off", EnumFlag_OFF},
+    {0x02, "On", EnumFlag_ON}
 };
 
 static EnumValueU8 sProp_EnabledDisabled[] = {
-    {0x00, "Disabled"},
-    {0x01, "Enabled"}
+    {0x00, "Disabled", EnumFlag_OFF},
+    {0x01, "Enabled", EnumFlag_ON}
 };
 
 static EnumValueU8 sProp_PixelShiftShootingMode[] = {
-    {0x00, "Off"},
-    {0x01, "Burst Shooting"}
+    {0x00, "Off", EnumFlag_OFF},
+    {0x01, "Burst Shooting", EnumFlag_ON}
 };
 
 static EnumValueU8 sProp_PixelShiftShootingStatus[] = {
-    {0x00, "Not Shooting"},
-    {0x01, "Shooting"}
+    {0x00, "Not Shooting", EnumFlag_OFF},
+    {0x01, "Shooting", EnumFlag_ON}
 };
 
 static EnumValueU8 sProp_CompressionSetting[] = {
@@ -1154,8 +1164,8 @@ static EnumValueU16 sProp_FocusArea[] = {
 
 static EnumValueU8 sProp_LiveViewSettingEffect[] = {
     {0x00, "N/A"},
-    {0x01, "On"},
-    {0x02, "Off"}
+    {0x01, "On", EnumFlag_ON},
+    {0x02, "Off", EnumFlag_OFF}
 };
 
 static EnumValueU8 sProp_PictureProfile[] = {
@@ -1675,13 +1685,13 @@ static MStr GetFocalDistanceMeters(AwControl* self, MAllocator* allocator, AwPtp
 #define META_ENUM_I16(n, c, e) {n, c, PTP_DT_IINT16, .fixedEnums.i16=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_U16(n, c, e) {n, c, PTP_DT_UINT16, .fixedEnums.u16=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_U32(n, c, e) {n, c, PTP_DT_UINT32, .fixedEnums.u32=(e), .fixedEnumsSize=MStaticArraySize(e)}
-#define META_FUNC_I8(n, c, f, g) {n, c, PTP_DT_INT8, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
-#define META_FUNC_U8(n, c, f, g) {n, c, PTP_DT_UINT8, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
-#define META_FUNC_I16(n, c, f, g) {n, c, PTP_DT_INT16, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
-#define META_FUNC_U16(n, c, f, g) {n, c, PTP_DT_UINT16, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
-#define META_FUNC_I32(n, c, f, g) {n, c, PTP_DT_INT32, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
-#define META_FUNC_U32(n, c, f, g) {n, c, PTP_DT_UINT32, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
-#define META_FUNC_U64(n, c, f, g) {n, c, PTP_DT_UINT64, .buildEnumsFunc=(f), .valueAsStringFunc=(g)}
+#define META_FUNC_I8(n, c, g) {n, c, PTP_DT_INT8, .valueAsStringFunc=(g)}
+#define META_FUNC_U8(n, c, g) {n, c, PTP_DT_UINT8, .valueAsStringFunc=(g)}
+#define META_FUNC_I16(n, c, g) {n, c, PTP_DT_INT16, .valueAsStringFunc=(g)}
+#define META_FUNC_U16(n, c, g) {n, c, PTP_DT_UINT16, .valueAsStringFunc=(g)}
+#define META_FUNC_I32(n, c, g) {n, c, PTP_DT_INT32, .valueAsStringFunc=(g)}
+#define META_FUNC_U32(n, c, g) {n, c, PTP_DT_UINT32, .valueAsStringFunc=(g)}
+#define META_FUNC_U64(n, c, g) {n, c, PTP_DT_UINT64, .valueAsStringFunc=(g)}
 
 static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("image-file-format", DPC_COMPRESSION_SETTING, sProp_CompressionSetting),
@@ -1699,10 +1709,10 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("dial-override", DPC_DIAL_MODE, sProp_DialOverride),
     META_ENUM_U16("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode16),
     META_ENUM_U32("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode32),
-    META_FUNC_U16("f-number", DPC_F_NUMBER, NULL, GetFNumberAsString),
-    META_FUNC_U32("shutter-speed", DPC_SHUTTER_SPEED, NULL, GetShutterSpeedAsString),
-    META_FUNC_U32("iso", DPC_ISO, NULL, GetIsoAsString),
-    META_FUNC_U32("iso-current", DPC_ISO_CURRENT, NULL, GetIsoAsString),
+    META_FUNC_U16("f-number", DPC_F_NUMBER, GetFNumberAsString),
+    META_FUNC_U32("shutter-speed", DPC_SHUTTER_SPEED, GetShutterSpeedAsString),
+    META_FUNC_U32("iso", DPC_ISO, GetIsoAsString),
+    META_FUNC_U32("iso-current", DPC_ISO_CURRENT, GetIsoAsString),
     META_ENUM_U8 ("image-stabilization", DPC_IMAGE_STABILIZATION, sProp_OnOff1),
     META_ENUM_U8 ("shutter-mode", DPC_SHUTTER_MODE, sProp_ShutterMode),
     META_ENUM_U8 ("shutter-type", DPC_SHUTTER_TYPE, sProp_ShutterType),
@@ -1717,13 +1727,13 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("iris-mode", DPC_IRIS_MODE, sProp_IrisMode),
 
     META_ENUM_U16("white-balance", DPC_WHITE_BALANCE, sProp_WhiteBalance),
-    META_FUNC_U16("white-balance-custom-temp", DPC_COLOR_TEMPERATURE, NULL, GetTemperatureAsString),
-    META_FUNC_U8 ("white-balance-gm", DPC_WHITE_BALANCE_GM, NULL, GetWhiteBalanceGMAsString),
-    META_FUNC_U8 ("white-balance-ab", DPC_WHITE_BALANCE_AB, NULL, GetWhiteBalanceABAsString),
+    META_FUNC_U16("white-balance-custom-temp", DPC_COLOR_TEMPERATURE, GetTemperatureAsString),
+    META_FUNC_U8 ("white-balance-gm", DPC_WHITE_BALANCE_GM, GetWhiteBalanceGMAsString),
+    META_FUNC_U8 ("white-balance-ab", DPC_WHITE_BALANCE_AB, GetWhiteBalanceABAsString),
 
     META_ENUM_U8 ("gain-control", DPC_GAIN_CONTROL, sProp_GainControl),
     META_ENUM_U16("exposure-metering-mode", DPC_EXPOSURE_METERING_MODE, sProp_ExposureMeteringMode),
-    META_FUNC_I16("exposure-bias-compensation", DPC_EXPOSURE_COMPENSATION, NULL, GetExposureBiasAsString),
+    META_FUNC_I16("exposure-bias-compensation", DPC_EXPOSURE_COMPENSATION, GetExposureBiasAsString),
     META_ENUM_U8 ("dro-hdr-mode", DPC_DRO_HDR_MODE, sProp_DRO),
 
     META_ENUM_U8 ("awb-lock-satus", DPC_AWB_LOCK_STATUS, sProp_LockedUnlocked),
@@ -1735,18 +1745,18 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("manual-focus-adjust-enabled", DPC_MANUAL_FOCUS_ADJUST_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("af-tracking-sens", DPC_AF_TRACKING_SENS, sProp_AFTrackingSensitivity),
     META_ENUM_U8 ("auto-focus-status", DPC_AUTO_FOCUS_STATUS, sProp_AutoFocusStatus),
-    META_FUNC_U16("focus-magnify-scale", DPC_FOCUS_MAGNIFY_SCALE, NULL, GetFocusMagnifyScale),
-    META_FUNC_U32("focus-magnify-pos", DPC_FOCUS_MAGNIFY_POS, NULL, GetFocusMagnifyPos),
-    META_FUNC_U64("focus-magnify", DPC_FOCUS_MAGNIFY, NULL, GetFocusMagnify),
-    META_FUNC_U32("focus-spot-pos", DPC_FOCUS_AREA_POS_OLD, NULL, GetFocusSpotPos),
-    META_FUNC_U8("focus-position", DPC_FOCUS_POSITION, NULL, NULL),
-    META_FUNC_U16("focus-position-abs", DPC_FOCUS_POSITION_ABS, NULL, NULL),
-    META_FUNC_U32("focal-distance-meters", DPC_FOCAL_DISTANCE_METER, NULL, GetFocalDistanceMeters),
+    META_FUNC_U16("focus-magnify-scale", DPC_FOCUS_MAGNIFY_SCALE, GetFocusMagnifyScale),
+    META_FUNC_U32("focus-magnify-pos", DPC_FOCUS_MAGNIFY_POS, GetFocusMagnifyPos),
+    META_FUNC_U64("focus-magnify", DPC_FOCUS_MAGNIFY, GetFocusMagnify),
+    META_FUNC_U32("focus-spot-pos", DPC_FOCUS_AREA_POS_OLD, GetFocusSpotPos),
+    META_FUNC_U8("focus-position", DPC_FOCUS_POSITION, NULL),
+    META_FUNC_U16("focus-position-abs", DPC_FOCUS_POSITION_ABS, NULL),
+    META_FUNC_U32("focal-distance-meters", DPC_FOCAL_DISTANCE_METER, GetFocalDistanceMeters),
 
     META_ENUM_U16("flash-mode", DPC_FLASH_MODE, sProp_FlashMode),
     META_ENUM_U8 ("wireless-flash", DPC_WIRELESS_FLASH, sProp_OnOff0),
     META_ENUM_U8 ("red-eye-reduction", DPC_RED_EYE_REDUCTION, sProp_OnOff0),
-    META_FUNC_I16("flash-compensation", DPC_FLASH_COMPENSATION, NULL, GetFlashCompAsString),
+    META_FUNC_I16("flash-compensation", DPC_FLASH_COMPENSATION, GetFlashCompAsString),
 
     META_ENUM_U16("picture-effect", DPC_PICTURE_EFFECT, sProp_PictureEffect),
     META_ENUM_U8 ("picture-profile", DPC_PICTURE_PROFILE, sProp_PictureProfile),
@@ -1778,7 +1788,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("live-view-setting-effect", DPC_LIVE_VIEW_SETTING_EFFECT, sProp_LiveViewSettingEffect),
     META_ENUM_U8 ("osd-image-mode", DPC_OSD_IMAGE_MODE, sProp_OnOff0),
 
-    META_FUNC_I8 ("battery-remaining", DPC_BATTERY_REMAINING, NULL, GetBatteryRemainingAsString),
+    META_FUNC_I8 ("battery-remaining", DPC_BATTERY_REMAINING, GetBatteryRemainingAsString),
     META_ENUM_U8 ("battery-level", DPC_BATTERY_LEVEL, sProp_BatteryLevel),
     META_ENUM_U8 ("device-overheating-state", DPC_DEVICE_OVERHEATING_STATE, sProp_DeviceOverheatingState),
     META_ENUM_U8 ("touch-operation", DPC_TOUCH_OPERATION, sProp_TouchOperation),
@@ -1786,20 +1796,20 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("remote-touch-enabled", DPC_REMOTE_TOUCH_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("remote-touch-cancel-enabled", DPC_REMOTE_TOUCH_CANCEL_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("time-code-format", DPC_TIME_CODE_FORMAT, sProp_TimeCodeFormat),
-    META_FUNC_U32("predicted-max-file-size", DPC_PREDICTED_MAX_FILE_SIZE, NULL, GetPredictedMaxFileSizeAsString),
-    META_FUNC_U16("pending-files", DPC_PENDING_FILES, NULL, GetPendingFileInfoAsString),
+    META_FUNC_U32("predicted-max-file-size", DPC_PREDICTED_MAX_FILE_SIZE, GetPredictedMaxFileSizeAsString),
+    META_FUNC_U16("pending-files", DPC_PENDING_FILES, GetPendingFileInfoAsString),
 
     META_ENUM_U8 ("pixel-shift-shooting-mode", DPC_PIXEL_SHIFT_SHOOTING_MODE, sProp_PixelShiftShootingMode),
-    META_FUNC_U16("pixel-shift-shooting-number", DPC_PIXEL_SHIFT_SHOOTING_NUMBER, NULL, GetPixelShootingNumberAsString),
-    META_FUNC_U16("pixel-shift-shooting-interval", DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, NULL, GetPixelShootingIntervalAsString),
+    META_FUNC_U16("pixel-shift-shooting-number", DPC_PIXEL_SHIFT_SHOOTING_NUMBER, GetPixelShootingNumberAsString),
+    META_FUNC_U16("pixel-shift-shooting-interval", DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, GetPixelShootingIntervalAsString),
     META_ENUM_U8 ("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_STATUS, sProp_PixelShiftShootingStatus),
-    META_FUNC_U16("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, NULL, GetPixelShootingProgressAsString),
+    META_FUNC_U16("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, GetPixelShootingProgressAsString),
 
     META_ENUM_U8 ("zoom-operation-enabled", DPC_ZOOM_OPERATION_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("zoom-setting", DPC_ZOOM_SETTING, sProp_ZoomSetting),
     META_ENUM_U8 ("zoom-type-status", DPC_ZOOM_TYPE_STATUS, sProp_ZoomSetting),
-    META_FUNC_U32("zoom-scale", DPC_ZOOM_SCALE, NULL, GetZoomScale),
-    META_FUNC_U32("zoom-bar-info", DPC_ZOOM_BAR_INFO, NULL, GetZoomBarInfo),
+    META_FUNC_U32("zoom-scale", DPC_ZOOM_SCALE, GetZoomScale),
+    META_FUNC_U32("zoom-bar-info", DPC_ZOOM_BAR_INFO, GetZoomBarInfo),
 
     META_ENUM_U8 ("remote-restrict-status", DPC_REMOTE_RESTRICT_STATUS, sProp_EnabledDisabled),
     META_ENUM_U16("button-list", DPC_BUTTON_LIST, sProp_ButtonList),
@@ -5023,8 +5033,182 @@ AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, Aw
 }
 
 AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value) {
-    // TODO: generic and per prop string parsing
-    return RESULT_OK();
+    if (property->dataType != PTP_DT_STR) {
+        return AwControl_SetPropertyValue(self, property, (AwPtpPropValue) { .str = value });
+    }
+    if (property->formFlag == PTP_FORM_FLAG_ENUM) {
+        AwPtpPropValueEnums enums;
+        if (AwControl_GetEnumsForProperty(self, property, self->allocator, &enums)) {
+            for (int i = 0; i < MArraySize(enums.values); i++) {
+                AwPtpPropValueEnum* enumValue = enums.values + i;
+                if (MStrCmp(enumValue->str, value)) {
+                    AwControl_SetPropertyValue(self, property, enumValue->propValue);
+                    return RESULT_CODE(AW_RESULT_OK);
+                }
+            }
+            // Not found, see if the value is a number and select that option
+            i32 valueI32 = 0;
+            MParseResult result = MParseI32(value.str, value.str + value.size,  &valueI32);
+            if (result.result && valueI32 > 0) {
+                if (valueI32 < MArraySize(enums.values)) {
+                    AwPtpPropValueEnum* enumValue = enums.values + valueI32;
+                    AwControl_SetPropertyValue(self, property, enumValue->propValue);
+                    return RESULT_CODE(AW_RESULT_OK);
+                }
+            }
+        }
+    }
+
+    return RESULT_CODE(AW_RESULT_PARAM_ERROR);
+}
+
+AW_EXPORT AwResult AwControl_SetPropertyBool(AwControl* self, AwPtpProperty* property, b32 value) {
+    if (!property) {
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
+    }
+    PTPPropertyMetadata* meta = property->meta;
+    if (meta->fixedEnumsSize) {
+        u16 flag = value ? EnumFlag_ON : EnumFlag_OFF;
+
+        switch (meta->type) {
+            case PTP_DT_UINT8: {
+                for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+                    u8 val = property->form.enums.getSet[i].u8;
+                    for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                        if (meta->fixedEnums.u8[j].value == val) {
+                            if (meta->fixedEnums.u8[j].flag == flag) {
+                                return AwControl_SetPropertyU8(self, property, val);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            case PTP_DT_UINT16: {
+                for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+                    u16 val = property->form.enums.getSet[i].u16;
+                    for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                        if (meta->fixedEnums.u16[j].value == val) {
+                            if (meta->fixedEnums.u16[j].flag == flag) {
+                                return AwControl_SetPropertyU16(self, property, val);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            case PTP_DT_UINT32: {
+                for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+                    u32 val = property->form.enums.getSet[i].u32;
+                    for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                        if (meta->fixedEnums.u32[j].value == val) {
+                            if (meta->fixedEnums.u32[j].flag == flag) {
+                                return AwControl_SetPropertyU32(self, property, val);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            default:
+                AW_ERROR_F("Unhandled prop type %d", (int)meta->type);
+                return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
+        }
+
+        switch (meta->type) {
+            case PTP_DT_UINT8: {
+                for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
+                    u8 val = property->form.enums.getSet[i].u8;
+                    for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                        if (meta->fixedEnums.u8[j].value == val) {
+                            if (meta->fixedEnums.u8[j].flag == flag) {
+                                return AwControl_SetPropertyU8(self, property, val);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            case PTP_DT_UINT16: {
+                for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+                    u16 val = property->form.enums.getSet[i].u16;
+                    for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                        if (meta->fixedEnums.u16[j].value == val) {
+                            if (meta->fixedEnums.u16[j].flag == flag) {
+                                return AwControl_SetPropertyU16(self, property, val);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            case PTP_DT_UINT32: {
+                for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
+                    u32 val = property->form.enums.getSet[i].u32;
+                    for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                        if (meta->fixedEnums.u32[j].value == val) {
+                            if (meta->fixedEnums.u32[j].flag == flag) {
+                                return AwControl_SetPropertyU32(self, property, val);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            default:
+                AW_ERROR_F("Unhandled prop type %d", (int)meta->type);
+                return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
+        }
+    }
+    return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
+}
+
+AwResult AwControl_GetPropertyValueAsBool(AwControl* self, AwPtpProperty* property, b32* outValue) {
+    // Find the current value in the fixed enum list, and return its flag as outValue
+    if (!property || !outValue) {
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
+    }
+    PTPPropertyMetadata* meta = property->meta;
+    if (!meta || !meta->fixedEnumsSize) {
+        return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
+    }
+
+    switch (meta->type) {
+        case PTP_DT_UINT8: {
+            u8 currentValue = property->value.u8;
+            for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                if (meta->fixedEnums.u8[j].value == currentValue) {
+                    *outValue = (meta->fixedEnums.u8[j].flag == EnumFlag_ON);
+                    return RESULT_CODE(AW_RESULT_OK);
+                }
+            }
+            break;
+        }
+        case PTP_DT_UINT16: {
+            u16 currentValue = property->value.u16;
+            for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                if (meta->fixedEnums.u16[j].value == currentValue) {
+                    *outValue = (meta->fixedEnums.u16[j].flag == EnumFlag_ON);
+                    return RESULT_CODE(AW_RESULT_OK);
+                }
+            }
+            break;
+        }
+        case PTP_DT_UINT32: {
+            u32 currentValue = property->value.u32;
+            for (int j = 0; j < meta->fixedEnumsSize; j++) {
+                if (meta->fixedEnums.u32[j].value == currentValue) {
+                    *outValue = (meta->fixedEnums.u32[j].flag == EnumFlag_ON);
+                    return RESULT_CODE(AW_RESULT_OK);
+                }
+            }
+            break;
+        }
+        default:
+            AW_ERROR_F("Unhandled prop type %d", (int)meta->type);
+            return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
+    }
+    return RESULT_CODE(AW_RESULT_NOT_SUPPORTED);
 }
 
 AwResult AwControl_SetPropertyNotch(AwControl* self, AwPtpProperty* property, i8 notch) {

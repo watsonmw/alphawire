@@ -1,3 +1,7 @@
+#
+# Alphawire Python extension library
+#
+
 import cffi
 import os
 import sys
@@ -337,13 +341,16 @@ if __name__ == "__main__":
     build_dir = project_dir + "/build"
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
+
     src_dir = project_dir + "/src"
 
     ffi.set_source(module_name="_alphawire_cffi",
                    source=lib_source_code,
+                   sources=['src/mylib.c'],
                    extra_link_args=extra_link_args,
                    include_dirs=[src_dir],   # Add include path
                    library_dirs=[build_dir], # Add library path
-                   libraries=['alphawire'])  # library name, for the linker
+                   libraries=['alphawire'],  # library name, for the linker
+                   )
 
     ffi.compile(verbose=True, debug=False, tmpdir=build_dir)

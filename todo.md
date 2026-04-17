@@ -1,10 +1,6 @@
 UI
 ===
 
-- Settings apply
-  - Str setter (match based on enums)
-  - int setter (try to find matching enum)
-  - bool setter1945
 - Build list of property editors / widgets?
   - Debug Set widgets
   - Enum List Read only support (except in debug)

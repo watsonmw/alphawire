@@ -1,3 +1,6 @@
+#
+# Alphawire Python API
+#
 import os
 import sys
 import time

@@ -788,6 +788,9 @@ i32 MStrViewCmp(MStrView str1, MStrView str2);
 MINLINE i32 MStrCmp(MStr str1, MStr str2) {
     return MStrViewCmp(M_STRUCT(MStrView){str1.str, str1.size}, M_STRUCT(MStrView){str2.str, str2.size});
 }
+MINLINE b32 MStrEq(MStr str1, MStr str2) {
+    return MStrCmp(str1, str2) == 0;
+}
 void MCStrCopyN(char* dest, const char* src, size_t size);
 void MCStrU32ToBinary(u32 val, i32 outSize, char* outStr);
 
