@@ -110,7 +110,7 @@ AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfo**
             libusb_device_handle* handle = NULL;
             r = libusb_open(dev, &handle);
             if (r < 0) {
-                PTP_WARNING("Failed to open Sony device for string retrieval");
+                AW_WARNING("Failed to open Sony device for string retrieval");
                 continue;
             }
 
@@ -354,7 +354,7 @@ static b32 AwDeviceLibusb_Reset(AwDevice* self) {
     return ok ? TRUE : FALSE;
 }
 
-static b32 ReadEventFromBuffer(AwDeviceLibusb* dev, int transferred, PTPEvent* outEvent) {
+static b32 ReadEventFromBuffer(AwDeviceLibusb* dev, int transferred, AwPtpEvent* outEvent) {
     MMemIO payloadRead;
     MMemInitRead(&payloadRead, dev->eventMem.mem, transferred);
 
@@ -432,7 +432,7 @@ static AwResult AwDeviceLibusb_ReadEvents(AwDevice* self, int timeoutMillisecond
         // Copy all events to output
         if (dev->eventList && MArraySize(dev->eventList) > 0) {
             for (int i = 0; i < MArraySize(dev->eventList); i++) {
-                PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+                AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
                 *event = dev->eventList[i];
             }
             // Clear the stored events
@@ -455,9 +455,9 @@ static AwResult AwDeviceLibusb_ReadEvents(AwDevice* self, int timeoutMillisecond
         dev->eventMem.mem, dev->eventMem.capacity, &transferred, timeoutMilliseconds);
 
     if (r == 0 && transferred > 0) {
-        PTPEvent outEvent = {};
+        AwPtpEvent outEvent = {};
         if (ReadEventFromBuffer(dev, transferred, &outEvent)) {
-            PTPEvent* event = MArrayAddPtr(alloc, *outEvents);
+            AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
             *event = outEvent;
         }
     }

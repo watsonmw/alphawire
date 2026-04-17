@@ -1,8 +1,8 @@
 #pragma once
 
 #include "mlib/mlib.h"
-#include "ptp/ptp-const.h"
-#include "platform/usb-const.h"
+#include "aw/aw-const.h"
+#include "aw/platform/usb-const.h"
 
 #ifdef __cplusplus
 extern "C" {
