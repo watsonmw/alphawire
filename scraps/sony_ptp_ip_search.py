@@ -4,7 +4,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from urllib.parse import urljoin, urlparse
 
-
+# Test script for Alpha SSDP discovery and fetching device description
+# c code follows this
 def parse_ssdp_response(response):
     headers = {}
     for line in response.split("\r\n"):
@@ -225,6 +226,7 @@ def discover_sony_cameras_ptp_ip(timeout=10):
                     digital_image_desc_url = urljoin(root_url, dd['digitalImagingUrl'])
                     print(f"Fetching digital imaging desc description from {digital_image_desc_url}...")
                     did_xml = fetch_digital_imaging_desc(digital_image_desc_url)
+                    print(did_xml)
                     did = parse_digital_imaging_info(did_xml)
                     print(did)
                     if host and check_tcp_connection(host, 15740):
