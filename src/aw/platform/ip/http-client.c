@@ -206,7 +206,7 @@ b32 Http_Get(MAllocator* allocator, MStrView url, HttpResponse* outResponse) {
     }
 
     MSockSetSocketTimeout(sock, 5000);
-    if (MSockConnectHost(sock, parsedUrl.host, (u16)parsedUrl.port, NULL) == MSOCK_ERROR) {
+    if (MSockConnectHost(sock, parsedUrl.host, (u16)parsedUrl.port, NULL) != MSOCK_OK) {
         MSockClose(sock);
         Http_FreeUrl(allocator, &parsedUrl);
         return FALSE;

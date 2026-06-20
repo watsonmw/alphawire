@@ -41,13 +41,16 @@ typedef enum PTPIpInitFailError {
     PTPIP_FAIL_INVALID_GUID = 0x00000004,
 } PTPIpInitFailError;
 
+const i16 PTPIP_PORT = 15740;
+
+
 // SSDP Multicast IP address is 239.255.255.250
 #define SSDP_MULTICAST_ADDR 0xEFFFFFFA
 
 static const char * AwIp_GetInitFailErrorString(u32 failureCode) {
     switch (failureCode) {
         case PTPIP_FAIL_REJECTED_INITIATOR:
-            return "Connection rejected for client (often due to GUID/name mismatch).";
+            return "Connection rejected for client (is it paired?).";
         case PTPIP_FAIL_BUSY:
             return "Currently busy and cannot accept new connections (e.g. maximum sessions reached).";
         case PTPIP_FAIL_UNSPECIFIED:
@@ -68,18 +71,34 @@ typedef struct {
     MSock eventSock;
     MMemIO eventMem; // Event buffer for reading and parsing events (reused across calls)
     u32 eventSockTimeoutMilliseconds; // Cached timeout for event socket operations in milliseconds
-} PTPIpDevice;
+} AwIpDevice;
+
+typedef struct {
+    struct sockaddr_in from;
+    MMemIO data;
+    MStrView location;
+    MStrView usn;
+    int parsedBytes;
+} AwSdpRecvBuf;
 
 typedef struct {
     AwDeviceInfo* deviceList;
-    PTPIpDevice* openDevices;
+    AwIpDevice* openDevices;
     MSock discoverySock;
+    AwSdpRecvBuf* sdpRecvBuf;
     u64 discoveryStartTime;
     b32 isDiscoveryInProgress;
     u32 timeoutMilliseconds;
     MAllocator* allocator;
     AwLog logger;
 } AwPtpIpBackend;
+
+static void AwIp_ClearSdpRecvBufs(AwPtpIpBackend* backend) {
+    MArrayEachPtr(backend->sdpRecvBuf, it) {
+        MMemFree(&it.p->data);
+    }
+    MArrayFree(backend->allocator, backend->sdpRecvBuf);
+}
 
 static AwResult AwIp_ReleaseList(AwPtpIpBackend* backend) {
     return (AwResult){.code=AW_RESULT_OK};
@@ -92,6 +111,7 @@ static b32 AwIp_NeedsRefresh(AwPtpIpBackend* backend) {
 static AwResult AwIp_Close(AwPtpIpBackend* backend) {
     AW_TRACE("AwIp_Close");
     AwIp_ReleaseList(backend);
+    AwIp_ClearSdpRecvBufs(backend);
     if (backend->openDevices) {
         MArrayFree(backend->allocator, backend->openDevices);
     }
@@ -170,7 +190,7 @@ static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
 static AwResult AwDeviceIp_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
                                         AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                         size_t* actualDataOutSize) {
-    PTPIpDevice* dev = (PTPIpDevice*)self->device;
+    AwIpDevice* dev = (AwIpDevice*)self->device;
     MAllocator* allocator = self->transport.allocator;
     AwResult error = {AW_RESULT_OK, PTP_OK};
 
@@ -358,7 +378,7 @@ static AwResult AwDeviceIp_ReadEvents(AwDevice* self, int timeoutMilliseconds, M
     }
     b32 gotEvent = FALSE;
 
-    PTPIpDevice* dev = (PTPIpDevice*)self->device;
+    AwIpDevice* dev = (AwIpDevice*)self->device;
     if (!dev || dev->eventSock == MSOCK_INVALID) {
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
@@ -443,7 +463,7 @@ static AwResult AwDeviceIp_ReadEvents(AwDevice* self, int timeoutMilliseconds, M
     }
 
     if (r == MSOCK_ERROR) {
-        MSockError e = MSockGetLastError();
+        MSockOsError e = MSockGetLastOsError();
         if (e.timeout && !gotEvent) {
             return (AwResult){.code=AW_RESULT_TIMEOUT};
         }
@@ -460,15 +480,17 @@ static AwResult AwIp_OpenDevice(AwPtpIpBackend* self, AwDeviceInfo* deviceInfo, 
     MMemIO in = {0};
     AwResult error = {AW_RESULT_OK };
 
-    PTPIpDevice dev = {};
+    AwIpDevice dev = {};
     dev.eventSock = MSOCK_INVALID;
     dev.dataSock = MSockMakeTcpSocket();
 
     MSockSetSocketTimeout(dev.dataSock, 60000);
     MSockAddress socketAddr = {};
-    if (MSockConnectHost(dev.dataSock, MStrViewFromStr(deviceInfo->ipAddress), 15740, &socketAddr)
-            == MSOCK_ERROR) {
-        error.code = AW_RESULT_TRANSPORT_ERROR;
+    if (MSockConnectHost(dev.dataSock, MStrViewFromStr(deviceInfo->ipAddress), PTPIP_PORT, &socketAddr)
+            != MSOCK_OK) {
+        AW_ERROR_F("Unable to connect to %.*s:%d - Please set \"Network > SSH > SSH Setting\" to \"On\"",
+            deviceInfo->ipAddress.size, deviceInfo->ipAddress.str, PTPIP_PORT);
+        error.code = AW_RESULT_PTPIP_NO_CONNECT_UNENCRYPTED;
         goto exitWithError;
     }
 
@@ -608,8 +630,8 @@ static AwResult AwIp_OpenDevice(AwPtpIpBackend* self, AwDeviceInfo* deviceInfo, 
 
     MMemFree(&in);
 
-    PTPIpDevice* newDev = MArrayAddPtr(self->allocator, self->openDevices);
-    memset(newDev, 0, sizeof(PTPIpDevice));
+    AwIpDevice* newDev = MArrayAddPtr(self->allocator, self->openDevices);
+    memset(newDev, 0, sizeof(AwIpDevice));
     *newDev = dev;
     AwDevice* device = *deviceOut;
     device->backendType = AW_BACKEND_IP;
@@ -636,7 +658,7 @@ exitWithError:
 
 static AwResult AwIp_CloseDevice(AwPtpIpBackend* backend, AwDevice* device) {
     AW_TRACE("AwIp_CloseDevice");
-    PTPIpDevice* dev = (PTPIpDevice*)device->device;
+    AwIpDevice* dev = (AwIpDevice*)device->device;
     MSockClose(dev->dataSock);
     MSockClose(dev->eventSock);
 
@@ -658,6 +680,7 @@ static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfo** deviceList
     self->isDiscoveryInProgress = TRUE;
     self->discoveryStartTime = MGetTimeMilliseconds();
     MSockClose(self->discoverySock);
+    AwIp_ClearSdpRecvBufs(self);
 
     // SSDP Discovery
     self->discoverySock = MSockMakeUdpSocket();
@@ -697,16 +720,16 @@ static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfo** deviceList
 
             if (setsockopt(self->discoverySock, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip->sin_addr,
                 sizeof(ip->sin_addr)) == MSOCK_ERROR) {
-                AW_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastError());
+                AW_ERROR_F("Failed to set IP_MULTICAST_IF for %s: %d", ipStr, MSockGetLastOsError());
             }
 
             int sent = sendto(self->discoverySock, msg, msgSize, 0, (struct sockaddr*)&addr, sizeof(addr));
             if (sent == MSOCK_ERROR) {
-                AW_ERROR_F("AwIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastError());
+                AW_ERROR_F("AwIp_RefreshList: sendto failed for %s with error %d", ipStr, MSockGetLastOsError());
             }
         }
     } else {
-        AW_ERROR_F("MSockGetInterfaces failed: %d", MSockGetLastError());
+        AW_ERROR_F("MSockGetInterfaces failed: %d", MSockGetLastOsError());
         goto exitWithError;
     }
     MArrayFree(self->allocator, interfaces);
@@ -719,94 +742,216 @@ exitWithError:
     return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
 }
 
-static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfo** deviceList) {
+static b32 AwIp_TryReadHttpHeaderLine(MStrView* response, MStrView* lineOut) {
+    if (response->size == 0) {
+        return FALSE;
+    }
+
+    u32 lineSize = 0;
+    while (lineSize < response->size && response->str[lineSize] != '\r' && response->str[lineSize] != '\n') {
+        ++lineSize;
+    }
+
+    if (lineSize == response->size) {
+        return FALSE;
+    }
+
+    *lineOut = MStrViewLeft(*response, lineSize);
+
+    u32 advance = lineSize;
+    if (response->str[advance] == '\r' && advance + 1 < response->size && response->str[advance + 1] == '\n') {
+        advance += 2;
+    } else {
+        advance += 1;
+    }
+
+    MStrViewAdvance(response, (i32)advance);
+    return TRUE;
+}
+
+static b32 AwIp_ParseSsdpDiscoveryResponsePartial(MStrView response, MStrView* locationOut, MStrView* usnOut,
+                                                  u32* parsedSizeOut, b32* messageDoneOut) {
+    *locationOut = (MStrView){0};
+    *usnOut = (MStrView){0};
+    *parsedSizeOut = 0;
+    *messageDoneOut = FALSE;
+
+    MStrView line;
+    MStrView parse = response;
+    while (AwIp_TryReadHttpHeaderLine(&parse, &line)) {
+        *parsedSizeOut = response.size - parse.size;
+
+        line = MStrViewTrimWhitespace(line);
+        if (line.size == 0) {
+            *messageDoneOut = TRUE;
+            if (!MStrViewIsEmpty(*locationOut) && !MStrViewIsEmpty(*usnOut)) {
+                return TRUE;
+            } else {
+                return FALSE;
+            }
+        }
+
+        i32 colon = MStrViewFindChar(line, ':');
+        if (colon <= 0) {
+            continue;
+        }
+
+        MStrView name = MStrViewTrimWhitespace(MStrViewLeft(line, (u32)colon));
+        MStrView value = MStrViewTrimWhitespace(MStrViewSub(line, colon + 1, -1));
+
+        if (MStrViewEqIgnoreCaseC(name, "location")) {
+            *locationOut = value;
+        } else if (MStrViewEqIgnoreCaseC(name, "usn")) {
+            *usnOut = value;
+        }
+    }
+
+    if (!MStrViewIsEmpty(*locationOut) && !MStrViewIsEmpty(*usnOut)) {
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+static b32 AwIp_SockAddrInEq(const struct sockaddr_in* a, const struct sockaddr_in* b) {
+    return a->sin_family == b->sin_family
+        && a->sin_port == b->sin_port
+        && a->sin_addr.s_addr == b->sin_addr.s_addr;
+}
+
+static AwSdpRecvBuf* AwIp_GetSdpRecvBuf(AwPtpIpBackend* self, const struct sockaddr_in* from) {
+    MArrayEachPtr(self->sdpRecvBuf, it) {
+        if (AwIp_SockAddrInEq(&it.p->from, from)) {
+            return it.p;
+        }
+    }
+
+    return NULL;
+}
+
+static AwSdpRecvBuf* AwIp_FindFreeRecvBuf(AwPtpIpBackend* self) {
+    for (int i = MArraySize(self->sdpRecvBuf) - 1; i >= 0; --i) {
+        struct sockaddr_in* s = &self->sdpRecvBuf[i].from;
+        if (s->sin_addr.s_addr == 0 && s->sin_family == 0 && s->sin_port == 0) {
+            return self->sdpRecvBuf + i;
+        }
+    }
+
+    AwSdpRecvBuf* recvBuf = MArrayAddPtrZ(self->allocator, self->sdpRecvBuf);
+    MMemInitAlloc(&recvBuf->data, self->allocator, 1 << 16);
+    return recvBuf;
+}
+
+static void AwIp_FreeSdpRecvBuf(AwPtpIpBackend* self, AwSdpRecvBuf* recvBuf) {
+    MMemFree(&recvBuf->data);
+    MArrayRemovePtr(self->sdpRecvBuf, recvBuf);
+}
+
+static b32 AddDeviceFromDiscoveryUrl(AwPtpIpBackend *self, AwDeviceInfo **deviceList, MStrView url) {
+    // TODO: may want to add additional call to see if ssl is required
     b32 foundDevice = FALSE;
-    char buffer[4096];
-    struct sockaddr_in from;
-    unsigned int fromLen = sizeof(from);
-    int n;
+    HttpResponse resp;
+    if (Http_Get(self->allocator, url, &resp)) {
+        if (resp.statusCode == 200) {
+            MXml parser;
+            MXml_Init(&parser, resp.body);
 
-    while ((n = recvfrom(self->discoverySock, buffer, sizeof(buffer)-1, 0, (struct sockaddr*)&from, &fromLen)) > 0) {
-        MStrView view = MStrViewMakeP(buffer, n);
-        i32 locPos = MStrViewFindC(view, "LOCATION:");
-        if (locPos == -1) {
-            locPos = MStrViewFindC(view, "location:");
-        }
+            MStrView currentTag = {0};
+            MStr cameraModel = {0};
+            MStr manufacturer = {0};
 
-        i32 usnPos = MStrViewFindC(view, "USN:");
-        if (usnPos == -1) {
-            usnPos = MStrViewFindC(view, "usn:");
-        }
+            MStrView cameraModelTag = MStrViewFromCStr("friendlyName");
+            MStrView manufacturerTag = MStrViewFromCStr("manufacturer");
 
-        if (locPos != -1 && usnPos != -1) {
-            MStrView location = MStrViewSub(view, locPos + 9, -1);
-            while (!MStrViewIsEmpty(location) && location.str[0] == ' ') {
-                MStrViewAdvance(&location, 1);
-            }
-            i32 locEndPos = MStrViewFindC(location, "\r\n");
-
-            MStrView usn = MStrViewSub(view, usnPos + 4, -1);
-            while (!MStrViewIsEmpty(usn) && usn.str[0] == ' ') {
-                MStrViewAdvance(&usn, 1);
-            }
-
-            i32 usnEndPos = MStrViewFindC(usn, "\r\n");
-
-            if (locEndPos != -1 && usnEndPos != -1) {
-                usn = MStrViewLeft(usn, usnEndPos);
-                b32 isSonyImaging = MStrViewFindC(usn, ":urn:schemas-sony-com:service:DigitalImaging") != -1;
-
-                if (isSonyImaging) {
-                    MStrView url = MStrViewLeft(location, locEndPos);
-                    AW_INFO_F("Found Sony Imaging device at location: %.*s", url.size, url.str);
-                    HttpResponse resp;
-                    if (Http_Get(self->allocator, url, &resp)) {
-                        if (resp.statusCode == 200) {
-                            MXml parser;
-                            MXml_Init(&parser, resp.body);
-
-                            MStrView cameraModelTag = MStrViewFromCStr("friendlyName");
-                            MStrView manufacturerTag = MStrViewFromCStr("manufacturer");
-                            MStrView currentTag = {0};
-                            MStr cameraModel = {0};
-                            MStr manufacturer = {0};
-
-                            MXmlToken token;
-                            while ((token = MXml_NextToken(&parser)).type != MXmlTokenType_EOF && token.type != MXmlTokenType_ERROR) {
-                                if (token.type == MXmlTokenType_TAG_START) {
-                                    currentTag = token.name;
-                                } else if (token.type == MXmlTokenType_TEXT) {
-                                    if (MStrViewEq(&cameraModelTag, &currentTag)) {
-                                        cameraModel = MStrMakeCopyLen(self->allocator, token.value.str, token.value.size);
-                                    } else if (MStrViewEq(&manufacturerTag, &currentTag)) {
-                                        manufacturer = MStrMakeCopyLen(self->allocator, token.value.str, token.value.size);
-                                    }
-                                } else if (token.type == MXmlTokenType_TAG_CLOSE) {
-                                    currentTag = (MStrView){0};
-                                }
-
-                                if (!MStrIsEmpty(cameraModel) && !MStrIsEmpty(manufacturer)) {
-                                    break;
-                                }
-                            }
-
-                            if (!MStrIsEmpty(cameraModel)) {
-                                AwDeviceInfo* info = MArrayAddPtrZ(self->allocator, *deviceList);
-                                info->backendType = AW_BACKEND_IP;
-                                info->product = cameraModel;
-                                info->manufacturer = manufacturer;
-
-                                HttpUrl hurl = {};
-                                Http_ParseUrl(self->allocator, url, &hurl);
-                                info->ipAddress = MStrMakeCopyLen(self->allocator, hurl.host.str, hurl.host.size);
-                                info->device = (void*)info->ipAddress.str; // Store host as device data
-                                Http_FreeUrl(self->allocator, &hurl);
-                                foundDevice = TRUE;
-                            }
-                        }
-                        Http_FreeResponse(self->allocator, &resp);
+            MXmlToken token;
+            while ((token = MXml_NextToken(&parser)).type != MXmlTokenType_EOF && token.type != MXmlTokenType_ERROR) {
+                if (token.type == MXmlTokenType_TAG_START) {
+                    currentTag = token.name;
+                } else if (token.type == MXmlTokenType_TEXT) {
+                    if (MStrViewEq(&cameraModelTag, &currentTag) && MStrIsEmpty(cameraModel)) {
+                        cameraModel = MStrMakeCopyLen(self->allocator, token.value.str, token.value.size);
+                    } else if (MStrViewEq(&manufacturerTag, &currentTag) && MStrIsEmpty(manufacturer)) {
+                        manufacturer = MStrMakeCopyLen(self->allocator, token.value.str, token.value.size);
                     }
+                } else if (token.type == MXmlTokenType_TAG_CLOSE) {
+                    currentTag = (MStrView){0};
                 }
+
+                if (!MStrIsEmpty(cameraModel) && !MStrIsEmpty(manufacturer)) {
+                    break;
+                }
+            }
+
+            if (!MStrIsEmpty(cameraModel)) {
+                AwDeviceInfo* info = MArrayAddPtrZ(self->allocator, *deviceList);
+                info->backendType = AW_BACKEND_IP;
+                info->product = cameraModel;
+                info->manufacturer = manufacturer;
+
+                HttpUrl hurl = {};
+                Http_ParseUrl(self->allocator, url, &hurl);
+                info->ipAddress = MStrMakeCopyLen(self->allocator, hurl.host.str, hurl.host.size);
+                info->device = (void*)info->ipAddress.str; // Store host as device data
+                Http_FreeUrl(self->allocator, &hurl);
+                foundDevice = TRUE;
+            } else {
+                MStrFree(self->allocator, manufacturer);
+            }
+        }
+        Http_FreeResponse(self->allocator, &resp);
+    }
+    return foundDevice;
+}
+
+static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfo** deviceList) {
+    struct sockaddr_in from = {};
+    int n = 0;
+    b32 foundDevice = FALSE;
+    while (TRUE) {
+        unsigned int fromLen = sizeof(from);
+
+        AwSdpRecvBuf* buf = AwIp_FindFreeRecvBuf(self);
+        n = recvfrom(self->discoverySock, buf->data.mem, buf->data.capacity, 0, (struct sockaddr*)&from, &fromLen);
+        if (n <= 0) {
+            break;
+        }
+
+        MStrView view = {0};
+
+        AwSdpRecvBuf* recvBuf = AwIp_GetSdpRecvBuf(self, &from);
+        if (recvBuf != NULL) {
+            u8* dst = MMemAddBytes(&recvBuf->data, (u32)n);
+            memcpy(dst, buf->data.mem, (u32)n);
+            buf = recvBuf;
+            view = (MStrView){buf->data.mem + recvBuf->parsedBytes,
+                recvBuf->data.size - recvBuf->parsedBytes};
+        } else {
+            view = (MStrView) {buf->data.mem, (u32)n};
+        }
+
+        u32 parsedSize = 0;
+        b32 messageDone = FALSE;
+        MStrView location = {};
+        MStrView usn = {};
+        if (AwIp_ParseSsdpDiscoveryResponsePartial(view, &location, &usn, &parsedSize,
+                &messageDone)) {
+            b32 isSonyImaging = MStrViewFindIgnoreCaseC(usn,
+                "urn:schemas-sony-com:service:DigitalImaging") != -1;
+            if (isSonyImaging) {
+                AW_INFO_F("Found Sony Imaging device at location: %.*s", location.size, location.str);
+                if (AddDeviceFromDiscoveryUrl(self, deviceList, location)) {
+                    foundDevice = TRUE;
+                }
+            }
+        }
+
+        if (messageDone) {
+            if (recvBuf) {
+                AwIp_FreeSdpRecvBuf(self, recvBuf);
+            }
+        } else {
+            if (!recvBuf) {
+                buf->from = from;
             }
         }
     }
@@ -815,6 +960,8 @@ static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfo** deviceList)
     if (currentTime - self->discoveryStartTime > 10000) {
         AW_TRACE("SSDP discovery stopped after waiting for responses for 10s.");
         MSockClose(self->discoverySock);
+        self->isDiscoveryInProgress = FALSE;
+        AwIp_ClearSdpRecvBufs(self);
     }
     return foundDevice;
 }

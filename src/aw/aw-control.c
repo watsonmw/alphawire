@@ -39,7 +39,7 @@ typedef struct {
     char* label;
 } PtpPropNames;
 
-typedef struct PTPPropertyMetadata {
+typedef struct AwPtpPropertyMetadata {
     char* id; // string code for this property
     u16 propCode; // the ptp property code
     u16 type; // PtpDataType
@@ -5239,14 +5239,14 @@ b32 AwControl_IsPropertyNotch(AwControl* self, AwPtpProperty* property) {
     return property->isNotch && property->isEnabled == 1;
 }
 
-AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* strOut) {
+AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* idOut) {
     if (!property->meta) {
         return FALSE;
     }
     MStr str = {};
     str.str = property->meta->id;
     str.size = MCStrLen(str.str);
-    *strOut = str;
+    *idOut = str;
     return TRUE;
 }
 

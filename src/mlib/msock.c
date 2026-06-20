@@ -126,7 +126,7 @@ int MSockConnectAddress(MSock s, MSockAddress* address) {
     return connect(s, (struct sockaddr*)address, sizeof(*address));
 }
 
-int MSockConnectHost(MSock sock, MStrView host, u16 port, MSockAddress* outAddr) {
+MSockError MSockConnectHost(MSock sock, MStrView host, u16 port, MSockAddress* outAddr) {
     // getaddrinfo requires null-terminated strings, so create a temporary copy
     char hostStr[256];
     u32 hostLen = host.size < sizeof(hostStr) - 1 ? host.size : sizeof(hostStr) - 1;
@@ -137,7 +137,7 @@ int MSockConnectHost(MSock sock, MStrView host, u16 port, MSockAddress* outAddr)
     struct addrinfo* res;
     memset(&hints, 0, sizeof(hints));
     if (getaddrinfo(hostStr, NULL, &hints, &res) != 0) {
-        return -2;
+        return MSOCK_ERROR_INVALID_HOST;
     }
 
     if (res->ai_family == AF_INET) {
@@ -148,9 +148,10 @@ int MSockConnectHost(MSock sock, MStrView host, u16 port, MSockAddress* outAddr)
         addr->sin6_port = htons(port);
     }
 
-    if (connect(sock, res->ai_addr, (int)res->ai_addrlen) == MSOCK_ERROR) {
+    int r = connect(sock, res->ai_addr, (int)res->ai_addrlen);
+    if (r == MSOCK_ERROR) {
         freeaddrinfo(res);
-        return -3;
+        return MSOCK_ERROR_CONNECT;
     }
 
     if (outAddr) {
@@ -159,7 +160,7 @@ int MSockConnectHost(MSock sock, MStrView host, u16 port, MSockAddress* outAddr)
 
     freeaddrinfo(res);
 
-    return 0;
+    return MSOCK_OK;
 }
 
 int MSockSend(MSock s, const void* buf, int len) {
@@ -261,7 +262,7 @@ int M_SockClose(MSock s) {
 #endif
 }
 
-MSockError MSockGetLastError() {
+MSockOsError MSockGetLastOsError() {
     int error = 0;
     b32 timeout = FALSE;
 #ifdef _WIN32
@@ -274,7 +275,7 @@ MSockError MSockGetLastError() {
 #else
     timeout = (error == EAGAIN || error == EWOULDBLOCK);
 #endif
-    return (MSockError){ error, timeout };
+    return (MSockOsError){ error, timeout };
 }
 
 // #ifndef INET6_ADDRSTRLEN

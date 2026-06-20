@@ -25,6 +25,20 @@ extern "C" {
     #define MSOCK_ERROR (-1)
 #endif
 
+typedef enum MSockError {
+    MSOCK_OK = 0,
+    MSOCK_ERROR_INVALID_HOST,
+    MSOCK_ERROR_INVALID_ADDRESS,
+    MSOCK_ERROR_CONNECT,
+} MSockError;
+
+typedef struct MSockOsError {
+    int code; // Platform error code
+    b32 timeout; // Set to TRUE if (the error is a timeout) or (a blocking operation on a non-blocking socket)
+} MSockOsError;
+
+MSockOsError MSockGetLastOsError();
+
 //
 // Socket interface for working with WinSock and POSIX sockets
 //
@@ -47,7 +61,9 @@ int MSockListen(MSock s, int backlog);
 MSock MSockAccept(MSock s);
 int MSockConnect(MSock s, const char* ip, u16 port);
 int MSockConnectAddress(MSock s, MSockAddress* address);
-int MSockConnectHost(MSock s, MStrView host, u16 port, MSockAddress* outAddr);
+
+// Resolve host address and connect
+MSockError MSockConnectHost(MSock s, MStrView host, u16 port, MSockAddress* outAddr);
 
 int MSockSend(MSock s, const void* buf, int len);
 int MSockSendAll(MSock s, MMemIO* memIo);
@@ -57,13 +73,6 @@ int MSockSendTo(MSock s, const void* buf, int len, const char* ip, u16 port);
 int MSockRecvFrom(MSock s, void* buf, int len, char* outIp, int outIpLen, u16* outPort);
 
 #define MSockClose(s) if ((s) != MSOCK_INVALID) { M_SockClose((s)); (s) = MSOCK_INVALID; }
-
-typedef struct MSockError {
-    int code; // Platform error code
-    b32 timeout; // Set to TRUE if (the error is a timeout) or (a blocking operation on a non-blocking socket)
-} MSockError;
-
-MSockError MSockGetLastError();
 
 typedef struct MSockInterface {
     MStrView name;                  // interface name (e.g. "eth0", "en0")

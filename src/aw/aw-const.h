@@ -121,7 +121,7 @@ typedef struct {
     // needed for some properties on older pre-2020 cameras
     u8 isNotch;
 
-    struct PTPPropertyMetadata* meta;
+    struct AwPtpPropertyMetadata* meta;
 } AwPtpProperty;
 
 typedef enum {
@@ -483,6 +483,7 @@ typedef enum {
     AW_RESULT_CONNECTION_CLOSED,
     AW_RESULT_MALFORMED_RESPONSE,
     AW_RESULT_TRANSPORT_ERROR,
+    AW_RESULT_PTPIP_NO_CONNECT_UNENCRYPTED,
     AW_RESULT_PTP_FAILURE,
     AW_RESULT_PARAM_ERROR,
     AW_RESULT_NOT_SUPPORTED,

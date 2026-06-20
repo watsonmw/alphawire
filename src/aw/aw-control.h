@@ -178,14 +178,6 @@ AW_EXPORT b32 AwControl_PropertyEnabledByCode(AwControl* self, u16 propCode);
 AW_EXPORT size_t AwControl_NumProperties(AwControl* self);
 
 /**
- * Get Property at index (no particular order)
- * Use with AwControl_NumProperties() to list all properties.
- * @param index
- * @return property at index
- */
-AW_EXPORT AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index);
-
-/**
  * Pull latest property values from device
  * @param fullRefresh When set to TRUE: Refresh all properties, FALSE: Refresh only changed properties
  *                    NOTE: Most property changes are correctly tracked by the camera, but AwControl_GetPendingFiles()
@@ -193,6 +185,14 @@ AW_EXPORT AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index
  * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
 AW_EXPORT AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh);
+
+/**
+ * Get Property at index (no particular order, but order stays the same between refreshes)
+ * Use with AwControl_NumProperties() to list all properties.
+ * @param index
+ * @return property at index
+ */
+AW_EXPORT AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index);
 
 /**
  * Get property by property code
@@ -232,6 +232,10 @@ AW_EXPORT void AwPtp_FreePropValueEnums(MAllocator* self, AwPtpPropValueEnums* o
 
 /**
  * Get the property value as a human-readable string.
+ * For enums will lookup from list of known strings.
+ * For str types directly return the string.
+ * For properties that have a known str representation e.g. 'focal distance' = '0.3m' return it.
+ * Other types return a null str
  * @param property The property to convert.
  * @param allocator Allocator to use for the output string.
  * @param outStr Output string containing the property value.
@@ -262,12 +266,16 @@ AW_EXPORT b32 AwControl_IsPropertyWritable(AwControl* self, AwPtpProperty* prope
 AW_EXPORT b32 AwControl_IsPropertyNotch(AwControl* self, AwPtpProperty* property);
 
 /**
- * Get the string identifier for a property.
+ * Get property id for a given property.
+ * This id is specific to AlphaWire and used as way to refer to properties by string identifier.
+ * For example 'capture-mode', 'image-file-format' or 'shutter-speed'.  Useful for serialization / logging, or when
+ * a setting can have different property codes depending on the model of camera connected.  For displaying in a UI
+ * use the property label instead.
  * @param property The property to query.
- * @param strOut Output string containing the property ID.
+ * @param idOut Output string containing the property ID.
  * @return TRUE on success, FALSE on failure.
  */
-AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* strOut);
+AW_EXPORT b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* idOut);
 
 /**
  * Set a property value on the device.

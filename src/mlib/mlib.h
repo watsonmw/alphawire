@@ -579,7 +579,11 @@ typedef struct {
 
 #define MArrayCopy(m, a, b) ((b) = M_ArrayCopy(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), M_ArrayUnpack(b)))
 
-#define MArrayRemoveIndex(a, b) (memcpy((a)+(b), (a)+(b)+1, (MArraySize(a)-(b)-1)*(sizeof*(a))))
+#define MArrayRemoveIndex(a, b) (memcpy((a)+(b), (a)+(b)+1, (MArraySize(a)-(b)-1)*(sizeof*(a))), \
+    M_ArrayHeader(a)->size -= 1)
+
+#define MArrayRemovePtr(a, b) (memcpy((b), (b)+1, (MArraySize(a)-1)*(sizeof*(a))), \
+    M_ArrayHeader(a)->size -= 1)
 
 #define MArrayEach(a, i) for (size_t i = 0; (i) < MArraySize(a); ++(i))
 
@@ -734,6 +738,7 @@ MINLINE int MCharIsNewLine(char c) { return (c == '\n' || c == '\r'); }
 MINLINE int MCharIsWhitespace(char c) { return (c == '\t' || c == ' '); }
 MINLINE int MCharIsAnyWhitespace(char c) { return (c == '\t' || c == ' ' ||
     c == '\n' || c == '\r' || c == '\v'); }
+MINLINE char MCharToLowerAscii(char c) { if (c >= 'A' && c <= 'Z') { return c + ('a' - 'A'); } return c; }
 
 // Get pointer to end of str (scan for null terminator)
 MINLINE const char* MCStrEnd(const char* str) {
@@ -771,6 +776,20 @@ MINLINE b32 MStrViewIsEmpty(MStrView str) {
 
 MINLINE b32 MStrViewEq(MStrView* a, MStrView* b) {
     return (a->size == b->size && memcmp(a->str, b->str, a->size) == 0);
+}
+
+MINLINE b32 MStrViewEqIgnoreCaseC(MStrView a, const char* b) {
+    u32 bLen = MCStrLen(b);
+    if (a.size != bLen) {
+        return FALSE;
+    }
+
+    for (u32 i = 0; i < a.size; ++i) {
+        if (MCharToLowerAscii(a.str[i]) != MCharToLowerAscii(b[i])) {
+            return FALSE;
+        }
+    }
+    return TRUE;
 }
 
 MINLINE u32 MStrViewLen(MStrView str) {
@@ -948,6 +967,30 @@ MINLINE i32 MStrViewFind(MStrView str, MStrView substring) {
     return -1;
 }
 
+static i32 MStrViewFindIgnoreCaseC(MStrView haystack, const char* needle) {
+    i32 needleLen = (i32)MCStrLen(needle);
+    if (needleLen == 0) {
+        return 0;
+    }
+    if (needleLen > haystack.size) {
+        return -1;
+    }
+
+    for (i32 i = 0; i <= haystack.size - needleLen; ++i) {
+        b32 found = TRUE;
+        for (u32 j = 0; j < needleLen; ++j) {
+            if (MCharToLowerAscii(haystack.str[i + j]) != MCharToLowerAscii(needle[j])) {
+                found = FALSE;
+                break;
+            }
+        }
+        if (found) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 MINLINE i32 MStrViewFindChar(MStrView str, char c) {
     for (i32 i = 0; i < str.size; i++) {
         if (str.str[i] == c) {
@@ -960,6 +1003,30 @@ MINLINE i32 MStrViewFindChar(MStrView str, char c) {
 MINLINE void MStrViewAdvance(MStrView* str, i32 advanceChars) {
     str->str += advanceChars;
     str->size -= advanceChars;
+}
+
+MINLINE MStrView MStrViewTrimWhitespace(MStrView value) {
+    while (value.size > 0 && MCharIsWhitespace(value.str[0])) {
+        MStrViewAdvance(&value, 1);
+    }
+
+    while (value.size > 0 && MCharIsWhitespace(value.str[value.size - 1])) {
+        --value.size;
+    }
+
+    return value;
+}
+
+MINLINE MStrView MStrViewTrimAnyWhitespace(MStrView value) {
+    while (value.size > 0 && MCharIsAnyWhitespace(value.str[0])) {
+        MStrViewAdvance(&value, 1);
+    }
+
+    while (value.size > 0 && MCharIsAnyWhitespace(value.str[value.size - 1])) {
+        --value.size;
+    }
+
+    return value;
 }
 
 u32 MStrAppend(MMemIO* memIo, const char* str);
