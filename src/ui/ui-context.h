@@ -105,8 +105,8 @@ struct PropTable {
 
     void rebuild(AwControl& ptp) {
         items.clear();
-        for (size_t i = 0; i < MArraySize(ptp.properties); i++) {
-            AwPtpProperty *property = ptp.properties.data + i;
+        MArrayEachPtr(ptp.properties, it) {
+            AwPtpProperty *property = it.p;
 
             UiPtpProperty uiPtpProperty{};
             snprintf(uiPtpProperty.propCode,  sizeof(uiPtpProperty.propCode), "0x%04x", property->propCode);

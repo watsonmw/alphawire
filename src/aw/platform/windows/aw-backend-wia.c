@@ -130,10 +130,10 @@ static HRESULT STDMETHODCALLTYPE WiaEventCallback_ImageEventCallback(IWiaEventCa
         MLogf("Device Connected");
     } else if (IsEqualGUID(pEventGuid, &WIA_EVENT_DEVICE_DISCONNECTED)) {
         WiaEventCallback* self = (WiaEventCallback*)This;
-        for (int i = 0; i < MArraySize(self->deviceList->openDevices); ++i) {
-            AwDeviceWia* device = self->deviceList->openDevices + i;
+        MArrayEachPtr(self->deviceList->openDevices, it) {
+            AwDeviceWia* device = it.p;
             HRESULT hr = VarBstrCmp(bstrDeviceID, device->deviceId, LOCALE_USER_DEFAULT, 0);
-             if (hr == VARCMP_EQ) {
+            if (hr == VARCMP_EQ) {
                  device->disconnected = TRUE;
             }
         }

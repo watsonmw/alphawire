@@ -260,7 +260,7 @@ static AwResult AwDeviceUsbk_ReadEvents(AwDevice* self, int timeoutMilliseconds,
 
         // Copy all events to output
         if (dev->eventList.data && MArraySize(dev->eventList) > 0) {
-            for (int i = 0; i < MArraySize(dev->eventList); i++) {
+            MArrayEach(dev->eventList, i) {
                 AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
                 *event = dev->eventList.data[i];
             }
@@ -429,7 +429,7 @@ AwResult AwUsbkDeviceList_ReleaseList(AwUsbkBackend* self) {
         self->deviceListHandle = NULL;
     }
 
-    for (int i = 0; i < MArraySize(self->deviceList); i++) {
+    MArrayEach(self->deviceList, i) {
         UsbkDeviceInfo* deviceInfo = self->deviceList.data + i;
         deviceInfo->deviceId = NULL;
     }

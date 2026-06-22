@@ -462,7 +462,7 @@ b32 AwIokitDeviceList_NeedsRefresh(AwIokitDeviceList* self) {
 AwResult AwIokitDeviceList_ReleaseList(AwIokitDeviceList* self) {
     AW_TRACE("AwIokitDeviceList_ReleaseList");
 
-    for (int i = 0; i < MArraySize(self->devices); i++) {
+    MArrayEach(self->devices, i) {
         IOKitDeviceInfo* deviceInfo = self->devices.data + i;
         IOObjectRelease(deviceInfo->deviceId);
         deviceInfo->deviceId = 0;

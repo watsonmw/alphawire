@@ -309,11 +309,11 @@ void ShowDebugExtendedPropWindow(AppContext& c, AwPtpProperty *property) {
                 ImGui::TableHeadersRow();
 
                 char text[32];
-                for (size_t i = 0; i < MArraySize(outEnums.values); ++i) {
+                MArrayEachPtr(outEnums.values, it) {
                     ImGui::TableNextRow();
-                    ImGui::PushID(i);
+                    ImGui::PushID(it.i);
 
-                    AwPtpPropValueEnum *valueEnum = outEnums.values.data + i;
+                    AwPtpPropValueEnum *valueEnum = it.p;
                     AwPtpGetPropValueStr((PtpDataType)property->dataType, valueEnum->propValue, text, sizeof(text));
 
                     ImGuiSelectableFlags selectFlags =
@@ -406,13 +406,13 @@ void ShowDebugExtendedPropWindow(AppContext& c, AwPtpProperty *property) {
             }
             case PTP_FORM_FLAG_ENUM: {
                 ImGui::Text("Set Enum Values:");
-                for (size_t i = 0; i < MArraySize(property->form.enums.set); ++i) {
+                MArrayEach(property->form.enums.set, i) {
                     AwPtpPropValue v = property->form.enums.set.data[i];
                     AwPtpGetPropValueStr((PtpDataType) property->dataType, v, text, sizeof(text));
                     ImGui::Text("    %s", text);
                 }
                 ImGui::Text("Get/Set Enum Values:");
-                for (size_t i = 0; i < MArraySize(property->form.enums.getSet); ++i) {
+                MArrayEach(property->form.enums.getSet, i) {
                     AwPtpPropValue v = property->form.enums.getSet.data[i];
                     AwPtpGetPropValueStr((PtpDataType) property->dataType, v, text, sizeof(text));
                     ImGui::Text("    %s", text);
@@ -703,8 +703,8 @@ static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* lab
             if (AwControl_GetEnumsForProperty(&c.aw, property, c.autoReleasePool, &options) &&
                 MArraySize(options.values)) {
                 if (ImGui::BeginCombo(label, currentValAsStr.str)) {
-                    for (size_t i = 0; i < MArraySize(options.values); ++i) {
-                        AwPtpPropValueEnum* valueEnum = options.values.data + i;
+                    MArrayEachPtr(options.values, it) {
+                        AwPtpPropValueEnum* valueEnum = it.p;
                         bool isSelected = AwPtpPropEquals(property, valueEnum->propValue);
                         if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
                             AwControl_SetPropertyValue(&c.aw, property, valueEnum->propValue);
@@ -960,8 +960,8 @@ void ShowCameraControlsWindow(AppContext& c) {
         if (AwControl_GetEnumsForProperty(&c.aw, propFocusMode, c.autoReleasePool, &focusModes) &&
                 MArraySize(focusModes.values)) {
             if (ImGui::BeginCombo("Focus Mode", afMode.str)) {
-                for (size_t i = 0; i < MArraySize(focusModes.values); ++i) {
-                    AwPtpPropValueEnum *valueEnum = focusModes.values.data + i;
+                MArrayEachPtr(focusModes.values, it) {
+                    AwPtpPropValueEnum *valueEnum = it.p;
                     bool isSelected = MStrCmp(afMode, valueEnum->str);
                     if (ImGui::Selectable(valueEnum->str.str, isSelected)) {
                         AwControl_SetPropertyValue(&c.aw, propFocusMode, valueEnum->propValue);
@@ -1359,18 +1359,18 @@ void ShowCameraControlsWindow(AppContext& c) {
             ImGui::PushID("remoteButtons");
             AwPtpPropValueEnums buttonListEnum = {};
             if (AwControl_GetEnumsForProperty(&c.aw, buttonList, c.autoReleasePool, &buttonListEnum)) {
-                for (size_t i = 0; i < MArraySize(buttonListEnum.values); ++i) {
-                    MStr* buttonName = &buttonListEnum.values.data[i].str;
+                MArrayEachPtr(buttonListEnum.values, it) {
+                    MStr* buttonName = &it.p->str;
                     char buffer[256];
                     if (snprintf(buffer, sizeof(buffer), "%.*s", buttonName->size, buttonName->str) >= 0) {
                         if (ImGui::Button(buffer)) {
-                            AwControl_RemoteButtonPress(&c.aw, buttonListEnum.values.data[i].propValue.u16, TRUE);
+                            AwControl_RemoteButtonPress(&c.aw, it.p->propValue.u16, TRUE);
                         }
                         if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-                            AwControl_RemoteButtonPress(&c.aw, buttonListEnum.values.data[i].propValue.u16, FALSE);
+                            AwControl_RemoteButtonPress(&c.aw, it.p->propValue.u16, FALSE);
                         }
                     }
-                    if ((i + 1) % 5) {
+                    if ((it.i + 1) % 5) {
                         ImGui::SameLine();
                     }
                 }
@@ -1429,8 +1429,8 @@ static void FetchEvents(AppContext& c, float currentTime) {
     if (currentTime - c.eventRefreshTime >= AUTO_EVENT_FETCH_INTERVAL_SECS) {
         AwPtpEventArray events = {0};
         AwControl_ReadEvents(&c.aw, 10, c.autoReleasePool, &events);
-        for (int i = 0; i < MArraySize(events); ++i) {
-            AwPtpEvent* event = events.data + i;
+        MArrayEachPtr(events, it) {
+            AwPtpEvent* event = it.p;
             const char* eventName = AwGetEventLabel(event->code);
             if (!eventName) {
                 eventName = "UnknownEvent";
@@ -1505,7 +1505,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (size_t i = 0; i < MArraySize(c.aw.imageFormats); i++) {
+                    MArrayEach(c.aw.imageFormats, i) {
                         ImGui::TableNextRow();
 
                         u16 imageFormat = c.aw.imageFormats.data[i];
@@ -1554,7 +1554,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (int i = 0; i < MArraySize(c.aw.supportedOperations); i++) {
+                    MArrayEach(c.aw.supportedOperations, i) {
                         ImGui::TableNextRow();
 
                         u16 opCode = c.aw.supportedOperations.data[i];
@@ -1607,16 +1607,16 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (size_t i = 0; i < MArraySize(c.aw.controls); i++) {
+                    MArrayEachPtr(c.aw.controls, it) {
                         ImGui::TableNextRow();
 
-                        AwPtpControl* control = c.aw.controls.data + i;
+                        AwPtpControl* control = it.p;
                         u16 controlCode = control->controlCode;
 
                         ImGui::TableNextColumn();
                         ImGuiSelectableFlags selectFlags =
                                 ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
-                        ImGui::PushID(i);
+                        ImGui::PushID(it.i);
 
                         char label[32];
                         snprintf(label, sizeof(label), "0x%04x", controlCode);
@@ -1681,7 +1681,7 @@ static void ShowMainDeviceDebugWindow(AppContext& c) {
                                             ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort);
                     ImGui::TableHeadersRow();
 
-                    for (size_t i = 0; i < MArraySize(c.aw.supportedEvents); i++) {
+                    MArrayEach(c.aw.supportedEvents, i) {
                         ImGui::TableNextRow();
 
                         u16 eventCode = c.aw.supportedEvents.data[i];
@@ -1778,19 +1778,19 @@ static void ShowDeviceListWindow(AppContext& c) {
         ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
-        for (size_t i = 0; i < MArraySize(c.deviceList.devices); i++) {
+        MArrayEachPtr(c.deviceList.devices, it) {
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
 
-            AwDeviceInfo *deviceInfo = c.deviceList.devices.data + i;
+            AwDeviceInfo *deviceInfo = it.p;
             ImGuiSelectableFlags selectFlags =
                     ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
-            ImGui::PushID(i);
+            ImGui::PushID(it.i);
             char label[32];
-            snprintf(label, sizeof(label), "##%04zu", i);
-            if (ImGui::Selectable(label, c.selectedDeviceIndex == i, selectFlags)) {
-                c.selectedDeviceIndex = i;
+            snprintf(label, sizeof(label), "##%04zu", it.i);
+            if (ImGui::Selectable(label, c.selectedDeviceIndex == it.i, selectFlags)) {
+                c.selectedDeviceIndex = it.i;
             }
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                 c.Connect();

@@ -122,8 +122,8 @@ AwBackend* AwDeviceList_GetBackend(AwDeviceList* self, AwBackendType backendType
 
 void AwDeviceList_ReleaseList(AwDeviceList* self, b32 free) {
     AW_TRACE("AwDeviceList_ReleaseList");
-    for (int i = 0; i < MArraySize(self->devices); i++) {
-        AwDeviceInfo* deviceInfo = self->devices.data + i;
+    MArrayEachPtr(self->devices, it) {
+        AwDeviceInfo* deviceInfo = it.p;
         MStrFree(self->allocator, deviceInfo->manufacturer);
         MStrFree(self->allocator, deviceInfo->product);
         MStrFree(self->allocator, deviceInfo->serial);

@@ -3138,7 +3138,7 @@ void AwControl_FreeLiveViewFrames(AwControl* self, AwLiveViewFrames* liveViewFra
 }
 
 void AwPtp_FreePropValueEnums(MAllocator* allocator, AwPtpPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(outEnums->values); ++i) {
+    MArrayEach(outEnums->values, i) {
         if (outEnums->values.data[i].str.capacity) {
             MStrFree(allocator, outEnums->values.data[i].str);
         }
@@ -4567,8 +4567,8 @@ AwResult AwControl_Cleanup(AwControl* self) {
     MArrayFree(self->allocator, self->supportedOperations);
     MArrayFree(self->allocator, self->captureFormats);
     MArrayFree(self->allocator, self->imageFormats);
-    for (int i = 0; i < MArraySize(self->properties); ++i) {
-        AwPtpProperty* property = self->properties.data + i;
+    MArrayEachPtr(self->properties, it) {
+        AwPtpProperty* property = it.p;
         PropValueFree(self->allocator, property->dataType, &property->value);
         PropValueFree(self->allocator, property->dataType, &property->defaultValue);
         if (property->formFlag == PTP_FORM_FLAG_ENUM) {
@@ -4582,8 +4582,8 @@ AwResult AwControl_Cleanup(AwControl* self) {
     }
     MArrayFree(self->allocator, self->properties);
 
-    for (int i = 0; i < MArraySize(self->controls); ++i) {
-        AwPtpControl* control = self->controls.data + i;
+    MArrayEachPtr(self->controls, it) {
+        AwPtpControl* control = it.p;
         if (control->formFlag == PTP_FORM_FLAG_ENUM) {
             if (control->form.enums.owned) {
                 MArrayFree(self->allocator, control->form.enums.values);
@@ -4602,7 +4602,7 @@ AwResult AwControl_Cleanup(AwControl* self) {
 }
 
 b32 AwControl_SupportsEvent(AwControl* self, u16 eventCode) {
-    for (int i = 0; i < MArraySize(self->supportedEvents); ++i) {
+    MArrayEach(self->supportedEvents, i) {
         if (self->supportedEvents.data[i] == eventCode) {
             return TRUE;
         }
@@ -4611,7 +4611,7 @@ b32 AwControl_SupportsEvent(AwControl* self, u16 eventCode) {
 }
 
 b32 AwControl_SupportsControl(AwControl* self, u16 controlCode) {
-    for (int i = 0; i < MArraySize(self->supportedControls); ++i) {
+    MArrayEach(self->supportedControls, i) {
         if (self->supportedControls.data[i] == controlCode) {
             return TRUE;
         }
@@ -4620,7 +4620,7 @@ b32 AwControl_SupportsControl(AwControl* self, u16 controlCode) {
 }
 
 b32 AwControl_SupportsProperty(AwControl* self, u16 propCode) {
-    for (int i = 0; i < MArraySize(self->supportedProperties); ++i) {
+    MArrayEach(self->supportedProperties, i) {
         if (self->supportedProperties.data[i] == propCode) {
             return TRUE;
         }
@@ -4650,9 +4650,9 @@ b32 AwControl_PropertyEnabledByCode(AwControl* self, u16 propCode) {
 }
 
 AwPtpProperty* AwControl_GetPropertyByCode(AwControl* self, u16 propertyCode) {
-    for (int i = 0; i < MArraySize(self->properties); ++i) {
-        if (self->properties.data[i].propCode == propertyCode) {
-            return self->properties.data + i;
+    MArrayEachPtr(self->properties, it) {
+        if (it.p->propCode == propertyCode) {
+            return it.p;
         }
     }
     return NULL;
@@ -4696,8 +4696,8 @@ static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8
 
 static b32 BuildEnumsFromListU8(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
         EnumValueU8* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        u8 lookupValue = property->form.enums.getSet.data[i].u8;
+    MArrayEachPtr(property->form.enums.getSet, it) {
+        u8 lookupValue = it.p->u8;
         char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
         AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
@@ -4707,12 +4707,12 @@ static b32 BuildEnumsFromListU8(AwControl* self, MAllocator* allocator, AwPtpPro
 
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
-        for (int j = 0; j < getSetItems; j++) {
+        MArrayEach(outEnums->values, j) {
             AwPtpPropValueEnum* prop = outEnums->values.data + j;
             prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ;
         }
-        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            u8 lookupValue = property->form.enums.set.data[i].u8;
+        MArrayEachPtr(property->form.enums.set, it) {
+            u8 lookupValue = it.p->u8;
             AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u8 enumValue = outEnums->values.data[j].propValue.u8;
@@ -4748,8 +4748,8 @@ static char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, 
 
 static b32 BuildEnumsFromListU16(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
         EnumValueU16* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        u16 lookupValue = property->form.enums.getSet.data[i].u16;
+    MArrayEachPtr(property->form.enums.getSet, it) {
+        u16 lookupValue = it.p->u16;
         char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
         AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
@@ -4759,12 +4759,12 @@ static b32 BuildEnumsFromListU16(AwControl* self, MAllocator* allocator, AwPtpPr
 
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
-        for (int j = 0; j < getSetItems; j++) {
+        MArrayEach(outEnums->values, j) {
             AwPtpPropValueEnum* prop = outEnums->values.data + j;
             prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ;
         }
-        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            u16 lookupValue = property->form.enums.set.data[i].u16;
+        MArrayEachPtr(property->form.enums.set, it) {
+            u16 lookupValue = it.p->u16;
             AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u16 enumValue = outEnums->values.data[j].propValue.u16;
@@ -4800,8 +4800,8 @@ static char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, 
 
 static b32 BuildEnumsFromListU32(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
                                  EnumValueU32* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
-    for (int i = 0; i < MArraySize(property->form.enums.getSet); i++) {
-        u32 lookupValue = property->form.enums.getSet.data[i].u32;
+    MArrayEachPtr(property->form.enums.getSet, it) {
+        u32 lookupValue = it.p->u32;
         char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
         AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
@@ -4811,12 +4811,12 @@ static b32 BuildEnumsFromListU32(AwControl* self, MAllocator* allocator, AwPtpPr
 
     if (MArraySize(property->form.enums.set)) {
         size_t getSetItems = MArraySize(outEnums->values);
-        for (int j = 0; j < getSetItems; j++) {
+        MArrayEach(outEnums->values, j) {
             AwPtpPropValueEnum* prop = outEnums->values.data + j;
             prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ;
         }
-        for (int i = 0; i < MArraySize(property->form.enums.set); i++) {
-            u32 lookupValue = property->form.enums.set.data[i].u32;
+        MArrayEachPtr(property->form.enums.set, it) {
+            u32 lookupValue = it.p->u32;
             AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 u32 enumValue = outEnums->values.data[j].propValue.u32;
@@ -5262,9 +5262,9 @@ AwPtpControl* AwControl_GetControlByIndex(AwControl* self, u16 index) {
 }
 
 AwPtpControl* AwControl_GetControlByCode(AwControl* self, u16 controlCode) {
-    for (int i = 0; i < MArraySize(self->controls); ++i) {
-        if (self->controls.data[i].controlCode == controlCode) {
-            return self->controls.data + i;
+    MArrayEachPtr(self->controls, it) {
+        if (it.p->controlCode == controlCode) {
+            return it.p;
         }
     }
     return NULL;
@@ -5294,10 +5294,10 @@ b32 AwControl_GetEnumsForControl(AwControl* self, u16 controlCode, AwPtpPropValu
         return FALSE;
     }
 
-    for (int i = 0; i < MArraySize(control->form.enums.values); i++) {
+    MArrayEachPtr(control->form.enums.values, it) {
         AwPtpPropValueEnum *propEnum = MArrayAddPtr(self->allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
-        propEnum->propValue = control->form.enums.values.data[i].propValue;
+        propEnum->propValue = it.p->propValue;
         MStrZero(&propEnum->str);
     }
 

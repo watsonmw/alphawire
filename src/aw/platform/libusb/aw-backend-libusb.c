@@ -154,7 +154,7 @@ AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfoAr
 
 AwResult AwLibusbDeviceList_ReleaseList(AwLibusbDeviceList* self) {
     AW_TRACE("AwLibusbDeviceList_ReleaseList");
-    for (int i = 0; i < MArraySize(self->devices); i++) {
+    MArrayEach(self->devices, i) {
         libusb_unref_device((libusb_device*)self->devices.data[i].device);
     }
     MArrayFree(self->allocator, self->devices);
@@ -427,7 +427,7 @@ static AwResult AwDeviceLibusb_ReadEvents(AwDevice* self, int timeoutMillisecond
         pthread_mutex_lock(&dev->eventLock);
         // Copy all events to output
         if (MArraySize(dev->eventList) > 0) {
-            for (int i = 0; i < MArraySize(dev->eventList); i++) {
+            MArrayEach(dev->eventList, i) {
                 AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
                 *event = dev->eventList.data[i];
             }
