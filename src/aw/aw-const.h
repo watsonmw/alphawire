@@ -61,6 +61,8 @@ typedef union {
     MStr str;
 } AwPtpPropValue;
 
+typedef MArray(AwPtpPropValue) AwPtpPropValueArray;
+
 typedef struct {
     AwPtpPropValue min;
     AwPtpPropValue max;
@@ -68,8 +70,8 @@ typedef struct {
 } AwPtpRange;
 
 typedef struct {
-    AwPtpPropValue* set;
-    AwPtpPropValue* getSet;
+    AwPtpPropValueArray set;
+    AwPtpPropValueArray getSet;
 } AwPtpPropertyEnum;
 
 enum AwPtpEnumValueFlags {
@@ -85,11 +87,11 @@ typedef struct {
 } AwPtpPropValueEnum;
 
 typedef struct {
-    AwPtpPropValueEnum* values;
+    MArray(AwPtpPropValueEnum) values;
 } AwPtpPropValueEnums;
 
 typedef struct {
-    AwPtpPropValueEnum* values;
+    MArray(AwPtpPropValueEnum) values;
     size_t size;
     b32 owned;
 } AwPtpPropValueEnumArray;
@@ -604,7 +606,7 @@ typedef struct {
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    AwFocusFrame* frames;
+    MArray(AwFocusFrame) frames;
 } AwFocusFrames;
 
 typedef struct {
@@ -621,7 +623,7 @@ typedef struct {
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    AwFocusFrameFace* frames;
+    MArray(AwFocusFrameFace) frames;
 } AwFaceFrames;
 
 typedef struct {
@@ -637,7 +639,7 @@ typedef struct {
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    AwFocusFrameTracking* frames;
+    MArray(AwFocusFrameTracking) frames;
 } AwTrackingFrames;
 
 typedef struct {
@@ -693,6 +695,8 @@ typedef struct {
         };
     };
 } AwPtpEvent;
+
+typedef MArray(AwPtpEvent) AwPtpEventArray;
 
 #define PTP_MAX_PARAMS 5
 

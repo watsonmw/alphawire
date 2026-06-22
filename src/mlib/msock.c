@@ -318,7 +318,7 @@ static b32 M_SockFamilyAllowed(int family, int isUp, int isLoopback, int flags) 
     return FALSE;
 }
 
-int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flags) {
+int MSockGetInterfaces(MAllocator* allocator, MArraySockInterface* outAddr, int flags) {
     MArrayClear(*outAddr);
 
 #ifndef _WIN32

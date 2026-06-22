@@ -28,12 +28,12 @@ typedef struct {
     // Background event thread
     CFRunLoopSourceRef asyncEventSource;
     pthread_mutex_t eventLock;
-    AwPtpEvent* eventList;
+    AwPtpEventArray eventList;
 } AwDeviceIOKit;
 
 typedef struct {
-    IOKitDeviceInfo* devices;
-    AwDeviceIOKit* openDevices;
+    MArray(IOKitDeviceInfo) devices;
+    MArray(AwDeviceIOKit) openDevices;
     int timeoutMilliseconds;
     // Device attach notification
     IONotificationPortRef notifyPort;
@@ -49,7 +49,7 @@ typedef struct {
 AW_EXPORT AwResult AwIokitDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMilliseconds);
 AW_EXPORT AwResult AwIokitDeviceList_Open(AwIokitDeviceList* self);
 AW_EXPORT AwResult AwIokitDeviceList_Close(AwIokitDeviceList* self);
-AW_EXPORT AwResult AwIokitDeviceList_RefreshList(AwIokitDeviceList* self, AwDeviceInfo** devices);
+AW_EXPORT AwResult AwIokitDeviceList_RefreshList(AwIokitDeviceList* self, AwDeviceInfoArray* devices);
 AW_EXPORT AwResult AwIokitDeviceList_ReleaseList(AwIokitDeviceList* self);
 AW_EXPORT AwResult AwIokitDeviceList_OpenDevice(AwIokitDeviceList* self, AwDeviceInfo* deviceId, AwDevice** deviceOut);
 AW_EXPORT AwResult AwIokitDeviceList_CloseDevice(AwIokitDeviceList* self, AwDevice* device);

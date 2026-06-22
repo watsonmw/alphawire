@@ -26,10 +26,10 @@ typedef struct {
 
 typedef struct {
     IWiaDevMgr* deviceMgr;
-    WiaDeviceInfo* devices;
-    IUnknown** eventListeners;
+    MArray(WiaDeviceInfo) devices;
+    MArray(IUnknown*) eventListeners;
     b32 deviceListUpToDate;
-    AwDeviceWia* openDevices;
+    MArray(AwDeviceWia) openDevices;
     MAllocator* allocator;
     b32 comInitialized;
     AwLog logger;
@@ -40,7 +40,7 @@ AwResult AW_EXPORT AwWiaDeviceList_OpenBackend(AwBackend* backend);
 AW_EXPORT AwResult AwWiaDeviceList_Open(AwWiaDeviceList* self);
 AW_EXPORT AwResult AwWiaDeviceList_Close(AwWiaDeviceList* self);
 AW_EXPORT AwResult AwWiaDeviceList_Reset(AwWiaDeviceList* self, AwDeviceWia* device);
-AW_EXPORT AwResult AwWiaDeviceList_RefreshList(AwWiaDeviceList* self, AwDeviceInfo** devices);
+AW_EXPORT AwResult AwWiaDeviceList_RefreshList(AwWiaDeviceList* self, AwDeviceInfoArray* devices);
 AW_EXPORT AwResult AwWiaDeviceList_ReleaseList(AwWiaDeviceList* self);
 AW_EXPORT AwResult AwWiaDeviceList_OpenDevice(AwWiaDeviceList* self, AwDeviceInfo* deviceId, AwDevice** deviceOut);
 AW_EXPORT AwResult AwWiaDeviceList_CloseDevice(AwWiaDeviceList* self, AwDevice* device);

@@ -29,12 +29,12 @@ typedef struct {
     b32 eventThreadStop : 1;
     b32 eventThreadStarted : 1;
     pthread_mutex_t eventLock;
-    AwPtpEvent* eventList; // MArray of stored events
+    MArray(AwPtpEvent) eventList; // MArray of stored events
 } AwDeviceLibusb;
 
 typedef struct {
-    LibusbDeviceInfo* devices;
-    AwDeviceLibusb* openDevices;
+    MArray(LibusbDeviceInfo) devices;
+    MArray(AwDeviceLibusb) openDevices;
     void* context; // libusb_context*
     int timeoutMilliseconds;
     MAllocator* allocator;
@@ -45,7 +45,7 @@ typedef struct {
 AW_EXPORT AwResult AwLibusbDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMilliseconds);
 AW_EXPORT AwResult AwLibusbDeviceList_Open(AwLibusbDeviceList* self);
 AW_EXPORT AwResult AwLibusbDeviceList_Close(AwLibusbDeviceList* self);
-AW_EXPORT AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfo** devices);
+AW_EXPORT AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfoArray* devices);
 AW_EXPORT AwResult AwLibusbDeviceList_ReleaseList(AwLibusbDeviceList* self);
 AW_EXPORT AwResult AwLibusbDeviceList_OpenDevice(AwLibusbDeviceList* self, AwDeviceInfo* deviceInfo, AwDevice** deviceOut);
 AW_EXPORT AwResult AwLibusbDeviceList_CloseDevice(AwLibusbDeviceList* self, AwDevice* device);

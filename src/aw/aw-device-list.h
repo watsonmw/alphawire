@@ -42,9 +42,9 @@ extern "C" {
  * @endcode
  */
 typedef struct AwDeviceList {
-    AwDeviceInfo* devices;
-    AwBackend* backends;
-    AwDevice* openDevices;
+    AwDeviceInfoArray devices;
+    MArray(AwBackend) backends;
+    MArray(AwDevice) openDevices;
     // Set before calling When AwDeviceList_Open().  When et to 0 will block during device enumeration.
     u32 timeoutMilliseconds;
     AwBackendConfig backendConfig;

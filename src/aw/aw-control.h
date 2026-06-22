@@ -36,17 +36,17 @@ typedef struct {
     i32 vendorExtensionVersion;
     MStr vendorExtension;
 
-    u16* supportedEvents;
-    u16* supportedControls;
-    u16* supportedOperations;
-    u16* supportedProperties;
+    MArrayU16 supportedEvents;
+    MArrayU16 supportedControls;
+    MArrayU16 supportedOperations;
+    MArrayU16 supportedProperties;
 
     u16 standardVersion;
-    u16* captureFormats;
-    u16* imageFormats;
+    MArrayU16 captureFormats;
+    MArrayU16 imageFormats;
 
-    AwPtpProperty* properties;
-    AwPtpControl* controls;
+    MArray(AwPtpProperty) properties;
+    MArray(AwPtpControl) controls;
 
     u32 sessionId;
     u32 transactionId;
@@ -60,7 +60,7 @@ typedef struct {
     AwPtpRequestHeader ptpRequest;
     AwPtpResponseHeader ptpResponse;
 
-    AwPtpEvent* eventQueue;  // Array of queued events
+    AwPtpEventArray eventQueue;  // Array of queued events
 
     MAllocator* allocator;
     AwLog logger;
@@ -467,7 +467,7 @@ AW_EXPORT AwResult AwControl_PutCameraSettingsFile(AwControl* self, MMemIO* file
  * @param outEvents Output pointer to array of events (caller must free).
  * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
-AW_EXPORT AwResult AwControl_ReadEvents(AwControl* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents);
+AW_EXPORT AwResult AwControl_ReadEvents(AwControl* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEventArray* outEvents);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////

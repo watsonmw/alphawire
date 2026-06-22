@@ -25,6 +25,10 @@ def basic_example():
             print(f"Found {len(device_list)} devices")
             break
 
+    if len(device_list) == 0:
+        print("No devices found!")
+        return
+
     for device_info in device_list:
         print(f"    {device_info.manufacturer} - {device_info.product} (S/N: {device_info.serial})")
 

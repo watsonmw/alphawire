@@ -156,7 +156,7 @@ b32 MArenaInitGrowable(MArena* arena, MAllocator* allocator, size_t blockSize, s
 
 void MArenaFreeGrowable(MArena* arena) {
 #ifdef M_MEM_DEBUG
-    MMemDebugDeinit2(&arena->alloc, FALSE);
+    MMemDebugDeinit(&arena->alloc);
 #endif
     MArenaBlock* block = arena->curBlock;
     if (block) {
@@ -180,23 +180,38 @@ void MArenaFreeGrowable(MArena* arena) {
 }
 
 MArenaBlockCheckpoint MArenaCheckpoint(MArena* arena) {
-    MArenaBlockCheckpoint checkpoint = {
-        arena->end,
+    MArenaBlockCheckpoint checkpoint = {0};
+    checkpoint.pos = arena->end;
 #ifdef M_MEM_DEBUG
-        arena->alloc.debug.allocSlots,
-        arena->alloc.debug.freeSlots,
-        arena->alloc.debug.stacktraces
+    checkpoint.allocSlots.data = arena->alloc.debug.allocSlots.data;
+    checkpoint.allocSlots.size = arena->alloc.debug.allocSlots.size;
+    checkpoint.allocSlots.capacity = arena->alloc.debug.allocSlots.capacity;
+    checkpoint.freeSlots.data = arena->alloc.debug.freeSlots.data;
+    checkpoint.freeSlots.size = arena->alloc.debug.freeSlots.size;
+    checkpoint.freeSlots.capacity = arena->alloc.debug.freeSlots.capacity;
+#ifdef M_STACKTRACE
+    checkpoint.stacktraces.data = arena->alloc.debug.stacktraces.data;
+    checkpoint.stacktraces.size = arena->alloc.debug.stacktraces.size;
+    checkpoint.stacktraces.capacity = arena->alloc.debug.stacktraces.capacity;
 #endif
-    };
+#endif
     return checkpoint;
 }
 
 void MArenaResetToCheckpoint(MArena* arena, MArenaBlockCheckpoint checkpoint) {
     MArenaBlock *block = arena->curBlock;
 #ifdef M_MEM_DEBUG
-    arena->alloc.debug.allocSlots = checkpoint.allocSlots;
-    arena->alloc.debug.freeSlots = checkpoint.freeSlots;
-    arena->alloc.debug.stacktraces = checkpoint.stacktraces;
+    arena->alloc.debug.allocSlots.data = checkpoint.allocSlots.data;
+    arena->alloc.debug.allocSlots.size = checkpoint.allocSlots.size;
+    arena->alloc.debug.allocSlots.capacity = checkpoint.allocSlots.capacity;
+    arena->alloc.debug.freeSlots.data = checkpoint.freeSlots.data;
+    arena->alloc.debug.freeSlots.size = checkpoint.freeSlots.size;
+    arena->alloc.debug.freeSlots.capacity = checkpoint.freeSlots.capacity;
+#ifdef M_STACKTRACE
+    arena->alloc.debug.stacktraces.data = checkpoint.stacktraces.data;
+    arena->alloc.debug.stacktraces.size = checkpoint.stacktraces.size;
+    arena->alloc.debug.stacktraces.capacity = checkpoint.stacktraces.capacity;
+#endif
 #endif
     while (block) {
         u8* blockStart = (u8*)block;

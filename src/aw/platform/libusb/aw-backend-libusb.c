@@ -71,7 +71,7 @@ AwResult AwLibusbDeviceList_Open(AwLibusbDeviceList* self) {
 AwResult AwLibusbDeviceList_Close(AwLibusbDeviceList* self) {
     AW_TRACE("AwLibusbDeviceList_Close");
     AwLibusbDeviceList_ReleaseList(self);
-    if (self->openDevices) {
+    if (self->openDevices.data) {
         MArrayFree(self->allocator, self->openDevices);
     }
     if (self->context) {
@@ -85,7 +85,7 @@ b32 AwLibusbDeviceList_NeedsRefresh(AwLibusbDeviceList* self) {
     return FALSE;
 }
 
-AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfo** devices) {
+AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfoArray* devices) {
     AW_TRACE("AwLibusbDeviceList_RefreshList");
     libusb_device** list;
     ssize_t count = libusb_get_device_list((libusb_context*)self->context, &list);
@@ -154,13 +154,10 @@ AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfo**
 
 AwResult AwLibusbDeviceList_ReleaseList(AwLibusbDeviceList* self) {
     AW_TRACE("AwLibusbDeviceList_ReleaseList");
-    if (self->devices) {
-        for (int i = 0; i < MArraySize(self->devices); i++) {
-            libusb_unref_device((libusb_device*)self->devices[i].device);
-        }
-        MArrayFree(self->allocator, self->devices);
-        self->devices = NULL;
+    for (int i = 0; i < MArraySize(self->devices); i++) {
+        libusb_unref_device((libusb_device*)self->devices.data[i].device);
     }
+    MArrayFree(self->allocator, self->devices);
     return (AwResult){.code=AW_RESULT_OK};
 }
 
@@ -428,17 +425,15 @@ static AwResult AwDeviceLibusb_ReadEvents(AwDevice* self, int timeoutMillisecond
     // If event thread is running, return stored events
     if (dev->eventThreadStarted) {
         pthread_mutex_lock(&dev->eventLock);
-
         // Copy all events to output
-        if (dev->eventList && MArraySize(dev->eventList) > 0) {
+        if (MArraySize(dev->eventList) > 0) {
             for (int i = 0; i < MArraySize(dev->eventList); i++) {
                 AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
-                *event = dev->eventList[i];
+                *event = dev->eventList.data[i];
             }
             // Clear the stored events
             MArrayClear(dev->eventList);
         }
-
         pthread_mutex_unlock(&dev->eventLock);
         return (AwResult){.code=AW_RESULT_OK};
     }
@@ -505,7 +500,7 @@ AwResult AwLibusbDeviceList_OpenDevice(AwLibusbDeviceList* self, AwDeviceInfo* d
     deviceLibusb->logger = self->logger;
     deviceLibusb->usbInterruptInterval = 0;
     deviceLibusb->eventThreadStop = FALSE;
-    deviceLibusb->eventList = NULL;
+    deviceLibusb->eventList.data = NULL;
 
     (*deviceOut)->transport.reallocBuffer = AwDeviceLibusb_ReallocBuffer;
     (*deviceOut)->transport.freeBuffer = AwDeviceLibusb_FreeBuffer;
@@ -555,9 +550,9 @@ AwResult AwLibusbDeviceList_CloseDevice(AwLibusbDeviceList* self, AwDevice* devi
         pthread_join(deviceLibusb->eventThread, NULL);
 
         // Clean up event list
-        if (deviceLibusb->eventList) {
+        if (deviceLibusb->eventList.data) {
             MArrayFree(deviceLibusb->allocator, deviceLibusb->eventList);
-            deviceLibusb->eventList = NULL;
+            deviceLibusb->eventList.data = NULL;
         }
 
         pthread_mutex_destroy(&deviceLibusb->eventLock);
@@ -591,7 +586,7 @@ static AwResult AwLibusbDeviceList_Close_(AwBackend* backend) {
     return r;
 }
 
-static AwResult AwLibusbDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+static AwResult AwLibusbDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfoArray* deviceList) {
     AwLibusbDeviceList* self = backend->self;
     return AwLibusbDeviceList_RefreshList(self, deviceList);
 }

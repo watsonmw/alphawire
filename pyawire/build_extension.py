@@ -79,10 +79,15 @@ typedef struct AwDevice {
 } AwDevice;
 
 typedef struct {
-    AwDeviceInfo* devices;
-    AwBackend* backends;
-    AwDevice* openDevices;
+    b32 disallowSpawnEventThread;
+} AwBackendConfig;
+
+typedef struct {
+    struct { size_t size; size_t capacity; AwDeviceInfo* data; } devices;
+    struct { size_t size; size_t capacity; AwBackend* data; } backends;
+    struct { size_t size; size_t capacity; AwDevice* data; } openDevices;
     u32 timeoutMilliseconds;
+    AwBackendConfig backendConfig;
     MAllocator* allocator;
     ...;
 } AwDeviceList;
@@ -143,8 +148,8 @@ typedef struct {
 } AwPtpRange;
 
 typedef struct {
-    AwPtpPropValue* set;
-    AwPtpPropValue* getSet;
+    struct { size_t size; size_t capacity; AwPtpPropValue* data; } set;
+    struct { size_t size; size_t capacity; AwPtpPropValue* data; } getSet;
 } AwPtpPropertyEnum;
 
 typedef struct {
@@ -170,11 +175,11 @@ typedef struct {
 } AwPtpPropValueEnum;
 
 typedef struct {
-    AwPtpPropValueEnum* values;
+    struct { size_t size; size_t capacity; AwPtpPropValueEnum* data; } values;
 } AwPtpPropValueEnums;
 
 typedef struct {
-    AwPtpPropValueEnum* values;
+    struct { size_t size; size_t capacity; AwPtpPropValueEnum* data; } values;
     size_t size;
     b32 owned;
 } AwPtpPropValueEnumArray;
@@ -214,7 +219,7 @@ typedef struct {
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    AwFocusFrame* frames;
+    struct { size_t size; size_t capacity; AwFocusFrame* data; } frames;
 } AwFocusFrames;
 
 typedef struct {
@@ -231,7 +236,7 @@ typedef struct {
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    AwFocusFrameFace* frames;
+    struct { size_t size; size_t capacity; AwFocusFrameFace* data; } frames;
 } AwFaceFrames;
 
 typedef struct {
@@ -247,7 +252,7 @@ typedef struct {
 typedef struct {
     u32 xDenominator;
     u32 yDenominator;
-    AwFocusFrameTracking* frames;
+    struct { size_t size; size_t capacity; AwFocusFrameTracking* data; } frames;
 } AwTrackingFrames;
 
 typedef struct {

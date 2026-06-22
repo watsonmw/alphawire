@@ -91,8 +91,10 @@ typedef enum MSockInterfaceEnumFlags {
                                        // if neither ipv4 or ipv6 is specified then return both
 } MSockInterfaceEnumFlags;
 
+typedef MArray(MSockInterface) MArraySockInterface;
+
 // Enumerate interfaces and address
-int MSockGetInterfaces(MAllocator* allocator, MSockInterface** outAddr, int flags);
+int MSockGetInterfaces(MAllocator* allocator, MArraySockInterface* outAddr, int flags);
 
 // Internals
 int M_SockClose(MSock s);

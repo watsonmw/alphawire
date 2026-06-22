@@ -306,9 +306,7 @@ AwResult AwIokitDeviceList_Open(AwIokitDeviceList* self) {
 AwResult AwIokitDeviceList_Close(AwIokitDeviceList* self) {
     AW_TRACE("AwIokitDeviceList_Close");
     AwIokitDeviceList_ReleaseList(self);
-    if (self->openDevices) {
-        MArrayFree(self->allocator, self->openDevices);
-    }
+    MArrayFree(self->allocator, self->openDevices);
     // Remove notifications
     if (self->deviceRemovedIter) {
         IOObjectRelease(self->deviceRemovedIter);
@@ -356,7 +354,7 @@ static MStr CFStringToMStr(MAllocator* alloc, CFStringRef str) {
     return r;
 }
 
-AwResult AwIokitDeviceList_RefreshList(AwIokitDeviceList* self, AwDeviceInfo** devices) {
+AwResult AwIokitDeviceList_RefreshList(AwIokitDeviceList* self, AwDeviceInfoArray* devices) {
     AW_TRACE("AwIokitDeviceList_RefreshList");
 
     // Setup matching dictionary for USB devices
@@ -464,14 +462,13 @@ b32 AwIokitDeviceList_NeedsRefresh(AwIokitDeviceList* self) {
 AwResult AwIokitDeviceList_ReleaseList(AwIokitDeviceList* self) {
     AW_TRACE("AwIokitDeviceList_ReleaseList");
 
-    if (self->devices) {
-        for (int i = 0; i < MArraySize(self->devices); i++) {
-            IOKitDeviceInfo* deviceInfo = self->devices + i;
-            IOObjectRelease(deviceInfo->deviceId);
-            deviceInfo->deviceId = 0;
-        }
-        MArrayFree(self->allocator, self->devices);
+    for (int i = 0; i < MArraySize(self->devices); i++) {
+        IOKitDeviceInfo* deviceInfo = self->devices.data + i;
+        IOObjectRelease(deviceInfo->deviceId);
+        deviceInfo->deviceId = 0;
     }
+    MArrayFree(self->allocator, self->devices);
+
     return (AwResult){.code=AW_RESULT_OK};
 }
 
@@ -696,7 +693,7 @@ static void HandleInterruptResponse(void *refcon, IOReturn result, void *arg0) {
 }
 
 static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc,
-                                         AwPtpEvent** outEvents) {
+                                         AwPtpEventArray* outEvents) {
     AwDeviceIOKit* dev = self->device;
 
     if (outEvents == NULL) {
@@ -708,7 +705,7 @@ static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds
     if (MArraySize(dev->eventList) > 0) {
         for (int i = 0; i < MArraySize(dev->eventList); i++) {
             AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
-            *event = dev->eventList[i];
+            *event = dev->eventList.data[i];
         }
         // Clear the stored events
         MArrayClear(dev->eventList);
@@ -905,7 +902,6 @@ AwResult AwIokitDeviceList_OpenDevice(AwIokitDeviceList* self, AwDeviceInfo* dev
             ioKitDevice->timeoutMilliseconds = self->timeoutMilliseconds;
             ioKitDevice->logger = self->logger;
             ioKitDevice->allocator = self->allocator;
-            ioKitDevice->eventList = NULL;
 
             (*deviceOut)->transport.reallocBuffer = AwDeviceIokit_ReallocBuffer;
             (*deviceOut)->transport.freeBuffer = AwDeviceIokit_FreeBuffer;
@@ -974,10 +970,7 @@ AwResult AwIokitDeviceList_CloseDevice(AwIokitDeviceList* self, AwDevice* device
     MMemFree(&deviceIokit->eventMem);
 
     // Clean up event list
-    if (deviceIokit->eventList) {
-        MArrayFree(deviceIokit->allocator, deviceIokit->eventList);
-        deviceIokit->eventList = NULL;
-    }
+    MArrayFree(deviceIokit->allocator, deviceIokit->eventList);
 
     pthread_mutex_destroy(&deviceIokit->eventLock);
 
@@ -998,7 +991,7 @@ AwResult AwIokitDeviceList_Close_(AwBackend* backend) {
     return r;
 }
 
-AwResult AwIokitDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+AwResult AwIokitDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfoArray* deviceList) {
     AwIokitDeviceList* self = backend->self;
     return AwIokitDeviceList_RefreshList(self, deviceList);
 }

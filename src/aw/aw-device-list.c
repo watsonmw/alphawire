@@ -122,19 +122,17 @@ AwBackend* AwDeviceList_GetBackend(AwDeviceList* self, AwBackendType backendType
 
 void AwDeviceList_ReleaseList(AwDeviceList* self, b32 free) {
     AW_TRACE("AwDeviceList_ReleaseList");
-    if (self->devices) {
-        for (int i = 0; i < MArraySize(self->devices); i++) {
-            AwDeviceInfo* deviceInfo = self->devices + i;
-            MStrFree(self->allocator, deviceInfo->manufacturer);
-            MStrFree(self->allocator, deviceInfo->product);
-            MStrFree(self->allocator, deviceInfo->serial);
-            MStrFree(self->allocator, deviceInfo->ipAddress);
-        }
-        if (free) {
-            MArrayFree(self->allocator, self->devices);
-        } else {
-            MArrayClear(self->devices);
-        }
+    for (int i = 0; i < MArraySize(self->devices); i++) {
+        AwDeviceInfo* deviceInfo = self->devices.data + i;
+        MStrFree(self->allocator, deviceInfo->manufacturer);
+        MStrFree(self->allocator, deviceInfo->product);
+        MStrFree(self->allocator, deviceInfo->serial);
+        MStrFree(self->allocator, deviceInfo->ipAddress);
+    }
+    if (free) {
+        MArrayFree(self->allocator, self->devices);
+    } else {
+        MArrayClear(self->devices);
     }
 
     MArrayEachPtr(self->backends, backend) {

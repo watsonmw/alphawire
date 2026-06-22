@@ -16,7 +16,7 @@ typedef AwResult (*AwDevice_SendAndRecv_Func)(struct AwDevice* device, AwPtpRequ
     size_t dataInSize, AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize, size_t* actualDataOutSize);
 typedef b32 (*AwDevice_Reset_Func)(struct AwDevice* device);
 typedef AwResult (*AwDevice_ReadEvents_Func)(struct AwDevice* device, int timeoutMilliseconds, MAllocator* alloc,
-                                             AwPtpEvent** outEventList);
+                                             AwPtpEventArray* outEventList);
 
 // Device transport for communicating with a device
 typedef struct {
@@ -50,6 +50,8 @@ typedef struct AwDeviceInfo {
     void* device; // concrete backend device info - this is used to uniquely identify a connected device
 } AwDeviceInfo;
 
+typedef MArray(AwDeviceInfo) AwDeviceInfoArray;
+
 // Generic device and transport for sending commands to
 typedef struct AwDevice {
     AwDeviceTransport transport;
@@ -60,6 +62,8 @@ typedef struct AwDevice {
     AwDeviceInfo* deviceInfo;
 } AwDevice;
 
+typedef MArray(AwDevice) AwDeviceArray;
+
 typedef struct MBackendConfig {
     b32 disallowSpawnEventThread;
 } AwBackendConfig;
@@ -68,9 +72,9 @@ struct AwBackend;
 
 typedef AwResult (*AwBackend_Close_Func)(struct AwBackend* backend);
 typedef b32 (*AwBackend_NeedsRefresh_Func)(struct AwBackend* backend);
-typedef AwResult (*AwBackend_RefreshList_Func)(struct AwBackend* backend, AwDeviceInfo** deviceList);
+typedef AwResult (*AwBackend_RefreshList_Func)(struct AwBackend* backend, AwDeviceInfoArray* deviceList);
 typedef b32 (*AwBackend_IsRefreshingList_Func)(struct AwBackend* backend);
-typedef b32 (*AwBackend_PollListUpdates_Func)(struct AwBackend* backend, AwDeviceInfo** deviceList);
+typedef b32 (*AwBackend_PollListUpdates_Func)(struct AwBackend* backend, AwDeviceInfoArray* deviceList);
 typedef AwResult (*AwBackend_ReleaseList_Func)(struct AwBackend* backend);
 typedef AwResult (*AwBackend_OpenDevice_Func)(struct AwBackend* backend, AwDeviceInfo* deviceInfo, AwDevice** deviceOut);
 typedef AwResult (*AwBackend_CloseDevice_Func)(struct AwBackend* backend, AwDevice* device);

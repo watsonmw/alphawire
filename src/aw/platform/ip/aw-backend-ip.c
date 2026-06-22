@@ -82,10 +82,10 @@ typedef struct {
 } AwSdpRecvBuf;
 
 typedef struct {
-    AwDeviceInfo* deviceList;
-    AwIpDevice* openDevices;
+    MArray(AwDeviceInfo) deviceList;
+    MArray(AwIpDevice) openDevices;
     MSock discoverySock;
-    AwSdpRecvBuf* sdpRecvBuf;
+    MArray(AwSdpRecvBuf) sdpRecvBuf;
     u64 discoveryStartTime;
     b32 isDiscoveryInProgress;
     u32 timeoutMilliseconds;
@@ -112,9 +112,7 @@ static AwResult AwIp_Close(AwPtpIpBackend* backend) {
     AW_TRACE("AwIp_Close");
     AwIp_ReleaseList(backend);
     AwIp_ClearSdpRecvBufs(backend);
-    if (backend->openDevices) {
-        MArrayFree(backend->allocator, backend->openDevices);
-    }
+    MArrayFree(backend->allocator, backend->openDevices);
     MSockDeinit();
     return (AwResult){.code=AW_RESULT_OK};
 }
@@ -372,7 +370,7 @@ exitWithError:
 }
 
 // TODO fix PtpResult it's really two things AW error + PTP error code
-static AwResult AwDeviceIp_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents) {
+static AwResult AwDeviceIp_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEventArray* outEvents) {
     if (!outEvents) {
         return (AwResult){.code=AW_RESULT_UNSUPPORTED};
     }
@@ -674,7 +672,7 @@ static AwResult AwIp_CloseDevice(AwPtpIpBackend* backend, AwDevice* device) {
     return (AwResult){.code=AW_RESULT_OK};
 }
 
-static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfo** deviceList) {
+static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfoArray* deviceList) {
     AW_TRACE("AwIp_RefreshList");
 
     self->isDiscoveryInProgress = TRUE;
@@ -705,7 +703,7 @@ static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfo** deviceList
     addr.sin_addr.s_addr = htonl(SSDP_MULTICAST_ADDR);
 
     // Get all local IPv4 addresses and send M-SEARCH on each interface
-    MSockInterface* interfaces = NULL;
+    MArraySockInterface interfaces = {0};
     if (MSockGetInterfaces(self->allocator, &interfaces, MSockIfAddrFlag_IPV4)) {
         MArrayEachPtr(interfaces, it) {
             MSockInterface* iface = it.p;
@@ -831,9 +829,9 @@ static AwSdpRecvBuf* AwIp_GetSdpRecvBuf(AwPtpIpBackend* self, const struct socka
 
 static AwSdpRecvBuf* AwIp_FindFreeRecvBuf(AwPtpIpBackend* self) {
     for (int i = MArraySize(self->sdpRecvBuf) - 1; i >= 0; --i) {
-        struct sockaddr_in* s = &self->sdpRecvBuf[i].from;
+        struct sockaddr_in* s = &self->sdpRecvBuf.data[i].from;
         if (s->sin_addr.s_addr == 0 && s->sin_family == 0 && s->sin_port == 0) {
-            return self->sdpRecvBuf + i;
+            return self->sdpRecvBuf.data + i;
         }
     }
 
@@ -847,7 +845,7 @@ static void AwIp_FreeSdpRecvBuf(AwPtpIpBackend* self, AwSdpRecvBuf* recvBuf) {
     MArrayRemovePtr(self->sdpRecvBuf, recvBuf);
 }
 
-static b32 AddDeviceFromDiscoveryUrl(AwPtpIpBackend *self, AwDeviceInfo **deviceList, MStrView url) {
+static b32 AddDeviceFromDiscoveryUrl(AwPtpIpBackend *self, AwDeviceInfoArray *deviceList, MStrView url) {
     // TODO: may want to add additional call to see if ssl is required
     b32 foundDevice = FALSE;
     HttpResponse resp;
@@ -903,7 +901,7 @@ static b32 AddDeviceFromDiscoveryUrl(AwPtpIpBackend *self, AwDeviceInfo **device
     return foundDevice;
 }
 
-static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfo** deviceList) {
+static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfoArray* deviceList) {
     struct sockaddr_in from = {};
     int n = 0;
     b32 foundDevice = FALSE;
@@ -973,7 +971,7 @@ static AwResult AwIp_Close_(AwBackend* backend) {
     return r;
 }
 
-static AwResult AwIp_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+static AwResult AwIp_RefreshList_(AwBackend* backend, AwDeviceInfoArray* deviceList) {
     AwPtpIpBackend* self = backend->self;
     return AwIp_RefreshList(self, deviceList);
 }
@@ -988,7 +986,7 @@ static b32 AwIp_IsRefreshingList_(AwBackend* backend) {
     return self->isDiscoveryInProgress;
 }
 
-static b32 AwIp_PollListUpdates_(AwBackend* backend, AwDeviceInfo** deviceList) {
+static b32 AwIp_PollListUpdates_(AwBackend* backend, AwDeviceInfoArray* deviceList) {
     AwPtpIpBackend* self = backend->self;
     return AwIp_PollListUpdates(self, deviceList);
 }

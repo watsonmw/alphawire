@@ -15,19 +15,17 @@ extern "C" {
 typedef struct MArenaBlock {
     size_t size;
     size_t usedBytes;
-    struct MArenaBlock *prev; // Prev allocated block
-    struct MArenaBlock *next; // Next allocated block
+    struct MArenaBlock* prev; // Prev allocated block
+    struct MArenaBlock* next; // Next allocated block
 } MArenaBlock;
 
 typedef struct MArenaBlockCheckpoint {
-    u8 *pos;
+    u8* pos;
 #ifdef M_MEM_DEBUG
-    // Debug info for checkpoints
-    // Since we do allocation tracking
-    MMemAllocInfo* allocSlots;
-    u32* freeSlots;
+    MArrayMemAllocInfo allocSlots;
+    MArrayU32 freeSlots;
 #ifdef M_STACKTRACE
-    MStacktrace* stacktraces;
+    MArrayStacktrace stacktraces;
 #endif
 #endif
 } MArenaBlockCheckpoint;

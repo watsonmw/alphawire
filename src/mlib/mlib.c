@@ -78,48 +78,22 @@ void MAllocatorMakeClibHeap(MAllocator* allocator) {
 #define M_SENTINEL_BEFORE 0x1000
 #define M_SENTINEL_AFTER 0x1000
 
-MINLINE void* MMemDebug_ArrayMaybeGrow(MAllocator* allocator, void* a, size_t elementSize) {
-    size_t minNeeded;
-    u32 capacity;
-    size_t oldSize;
-    MArrayHeader* p;
-    if (a) {
-        p = M_ArrayHeader(a);
-        minNeeded = p->size + 1;
-        if (p->capacity >= minNeeded) {
-            return a;
-        }
-        capacity = p->capacity;
-        oldSize = elementSize * capacity + sizeof(MArrayHeader);
-    } else {
-        p = NULL;
-        minNeeded = 1;
-        capacity = 0;
-        oldSize = 0;
+MINLINE void* MMemDebug_ArrayMaybeGrow(MAllocator* allocator, void* data, size_t* size, size_t* capacity, size_t elementSize) {
+    if (*capacity > *size) {
+        return data;
     }
-
-    u32 newCapacity = (capacity > 4) ? (2 * capacity) : 8; // allocate for at least 8 elements
-    if (minNeeded > newCapacity) {
-        newCapacity = minNeeded;
-    }
-
-    size_t newSize = elementSize * newCapacity + sizeof(MArrayHeader);
-    void* mem = allocator->reallocFunc(allocator, p, oldSize, newSize);
-    if (mem == NULL)  {
-        MBreakpointf("MMemDebug_ArrayMaybeGrow realloc failed for %p", a);
+    size_t oldCapacity = *capacity;
+    size_t newCapacity = (oldCapacity > 4) ? (2 * oldCapacity) : 8;
+    void* mem = allocator->reallocFunc(allocator, data, elementSize * oldCapacity, elementSize * newCapacity);
+    if (mem == NULL) {
+        MBreakpointf("MMemDebug_ArrayMaybeGrow realloc failed for %p", data);
         return NULL;
     }
-
-    MArrayHeader* c = mem;
-    void* b = (u8*)mem + sizeof(MArrayHeader);
-    if (a == NULL) {
-        c->size = 0;
-    }
-    c->capacity = newCapacity;
-    return b;
+    *capacity = newCapacity;
+    return mem;
 }
 
-#define MMemDebugArrayAddPtr(allocator, a) ((a) = MMemDebug_ArrayMaybeGrow(allocator, M_ArrayUnpack(a)), ((a) + M_ArrayHeader(a)->size++))
+#define MMemDebugArrayAddPtr(allocator, a) ((a).data = MMemDebug_ArrayMaybeGrow(allocator, M_ArrayUnpack(a)), ((a).data + (a).size++))
 
 #ifdef M_STACKTRACE
 static void MMemDebug_AddStacktrace(MAllocator* alloc, MMemAllocInfo* memAlloc, int skipFrames) {
@@ -163,8 +137,12 @@ static MStacktrace* MMemDebug_LogAllocStacktrace(MAllocator* alloc, MMemAllocInf
 
 void MMemDebugInit(MAllocator* allocator) {
     if (!allocator->debug.initialized) {
-        allocator->debug.allocSlots = NULL;
-        allocator->debug.freeSlots = NULL;
+        allocator->debug.allocSlots.data = NULL;
+        allocator->debug.allocSlots.size = 0;
+        allocator->debug.allocSlots.capacity = 0;
+        allocator->debug.freeSlots.data = NULL;
+        allocator->debug.freeSlots.size = 0;
+        allocator->debug.freeSlots.capacity = 0;
         allocator->debug.initialized = 1;
         allocator->debug.enableLeakTracking = 1;
         allocator->debug.enableSentinelCheck = 1;
@@ -228,23 +206,29 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
         }
     }
 
-    if (alloc->debug.allocSlots) {
-        alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.allocSlots),
-            M_ArrayHeader(alloc->debug.allocSlots)->capacity * sizeof(MMemAllocInfo));
-        alloc->debug.allocSlots = NULL;
+    if (alloc->debug.allocSlots.data) {
+        alloc->freeFunc(alloc, alloc->debug.allocSlots.data,
+            alloc->debug.allocSlots.capacity * sizeof(MMemAllocInfo));
+        alloc->debug.allocSlots.data = NULL;
+        alloc->debug.allocSlots.size = 0;
+        alloc->debug.allocSlots.capacity = 0;
     }
 
-    if (alloc->debug.freeSlots) {
-        alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.freeSlots),
-            M_ArrayHeader(alloc->debug.freeSlots)->capacity * sizeof(u32));
-        alloc->debug.freeSlots = NULL;
+    if (alloc->debug.freeSlots.data) {
+        alloc->freeFunc(alloc, alloc->debug.freeSlots.data,
+            alloc->debug.freeSlots.capacity * sizeof(u32));
+        alloc->debug.freeSlots.data = NULL;
+        alloc->debug.freeSlots.size = 0;
+        alloc->debug.freeSlots.capacity = 0;
     }
 
 #ifdef M_STACKTRACE
-    if (alloc->debug.stacktraces) {
-        alloc->freeFunc(alloc, M_ArrayHeader(alloc->debug.stacktraces),
-            M_ArrayHeader(alloc->debug.stacktraces)->capacity * sizeof(u32));
-        alloc->debug.stacktraces = NULL;
+    if (alloc->debug.stacktraces.data) {
+        alloc->freeFunc(alloc, alloc->debug.stacktraces.data,
+            alloc->debug.stacktraces.capacity * sizeof(MStacktrace));
+        alloc->debug.stacktraces.data = NULL;
+        alloc->debug.stacktraces.size = 0;
+        alloc->debug.stacktraces.capacity = 0;
     }
 #endif
 
@@ -460,7 +444,7 @@ void MMemDebugFreePtrsInRange(MAllocator* alloc, const u8* startAddress, const u
             memAlloc->size = 0;
         } else {
             // compact as we go
-            alloc->debug.allocSlots[compactedSize] = *memAlloc;
+            alloc->debug.allocSlots.data[compactedSize] = *memAlloc;
             compactedSize++;
         }
     }
@@ -493,7 +477,7 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
     int pos = 0;
     if (MArraySize(alloc->debug.freeSlots)) {
         pos = MArrayPop(alloc->debug.freeSlots);
-        memAlloc = alloc->debug.allocSlots + pos;
+        memAlloc = alloc->debug.allocSlots.data + pos;
     } else {
         memAlloc = MMemDebugArrayAddPtr(alloc, alloc->debug.allocSlots);
         if (memAlloc == NULL) {
@@ -735,8 +719,8 @@ void* M_Realloc(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t oldSize,
     return r;
 #else
 #ifdef M_LOG_ALLOCATIONS
-    MLogf("realloc(0x%p, %d, %d)", p, oldSize, newSize);
-    void* mem = smem->reallocFunc(alloc, p, oldSize, newSize);
+    MLogf("realloc(0x%p, %d, %d)", p, (int)oldSize, (int)newSize);
+    void* mem = alloc->reallocFunc(alloc, p, oldSize, newSize);
     MLogf("-> 0x%p (resized)", mem);
     return mem;
 #else
@@ -773,73 +757,52 @@ void MLogBytes(const u8* mem, u32 len) {
 /////////////////////////////////////////////////////////
 // Dynamic Array
 
-void* M_ArrayInit(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, size_t elementSize, size_t minNeeded) {
-    if (a) {
-        MArrayHeader* p = M_ArrayHeader(a);
-        p->size = 0;
-        return M_ArrayGrow(MDEBUG_SOURCE_PASS alloc, a, p, elementSize, minNeeded);
-    } else {
-        u32 capacity = 8; // allocate for at least 8 elements
-        if (capacity < minNeeded) {
-            capacity = minNeeded;
+void* M_ArrayInit(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity, size_t elementSize, size_t minNeeded) {
+    *size = 0;
+    if (data != NULL) {
+        if (*capacity < minNeeded) {
+            return M_ArrayGrow(MDEBUG_SOURCE_PASS alloc, data, size, capacity, elementSize, minNeeded);
+        } else {
+            return data;
         }
-        size_t newSize =  elementSize * capacity + sizeof(MArrayHeader);
-        void* mem = M_Malloc(MDEBUG_SOURCE_PASS alloc, newSize);
-        if (mem == NULL)  {
+    } else {
+        size_t initCapacity = 8;
+        if (initCapacity < minNeeded) {
+            initCapacity = minNeeded;
+        }
+        void* mem = M_Malloc(MDEBUG_SOURCE_PASS alloc, elementSize * initCapacity);
+        if (mem == NULL) {
             MLogf("M_ArrayInit malloc returned NULL");
             return NULL;
         }
-
-        MArrayHeader* p = mem;
-        void* b = (u8*)mem + sizeof(MArrayHeader);
-        if (a == NULL) {
-            p->size = 0;
-        }
-        p->capacity = capacity;
-        return b;
+        *capacity = initCapacity;
+        return mem;
     }
 }
 
-void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, MArrayHeader* p, size_t elementSize, size_t minNeeded) {
-    u32 capacity;
-    size_t oldSize;
-    if (p) {
-        capacity = p->capacity;
-        oldSize = elementSize * capacity + sizeof(MArrayHeader);
-    } else {
-        capacity = 0;
-        oldSize = 0;
+void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity, size_t elementSize, size_t minNeeded) {
+    if (*capacity >= minNeeded) {
+        return data;
     }
-
-    if (a && minNeeded <= capacity) {
-        return a;
-    }
-
-    // allocate for at least 8 elements
-    u32 newCapacity = (capacity > 4) ? (2 * capacity) : 8;
+    size_t newCapacity = (*capacity > 4) ? (2 * *capacity) : 8;
     if (minNeeded > newCapacity) {
         newCapacity = minNeeded;
     }
-
-    size_t newSize =  elementSize * newCapacity + sizeof(MArrayHeader);
-    void* mem = M_Realloc(MDEBUG_SOURCE_PASS alloc, p, oldSize, newSize);
-    if (mem == NULL)  {
-        MLogf("M_ArrayGrow realloc failed for %p", a);
+    void* mem = M_Realloc(MDEBUG_SOURCE_PASS alloc, data, elementSize * *capacity, elementSize * newCapacity);
+    if (mem == NULL) {
+        MLogf("M_ArrayGrow realloc failed for %p", data);
         return NULL;
     }
-
-    MArrayHeader* c = mem;
-    void* b = (u8*)mem + sizeof(MArrayHeader);
-    if (a == NULL) {
-        c->size = 0;
-    }
-    c->capacity = newCapacity;
-    return b;
+    *capacity = newCapacity;
+    return mem;
 }
 
-void M_ArrayFree(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* a, size_t itemSize) {
-    MArrayHeader* p = M_ArrayHeader(a);
-    M_Free(MDEBUG_SOURCE_PASS alloc, p, itemSize * p->capacity + sizeof(MArrayHeader));
+void M_ArrayFree(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity, size_t elementSize) {
+    if (data) {
+        M_Free(MDEBUG_SOURCE_PASS alloc, data, elementSize * *capacity);
+    }
+    *size = 0;
+    *capacity = 0;
 }
 
 /////////////////////////////////////////////////////////

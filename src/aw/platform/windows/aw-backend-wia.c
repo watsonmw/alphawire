@@ -244,14 +244,12 @@ AwResult AwWiaDeviceList_Open(AwWiaDeviceList* self) {
 }
 
 AwResult AwWiaDeviceList_ReleaseList(AwWiaDeviceList* self) {
-    if (self->devices) {
-        MArrayEachPtr(self->devices, it) {
-            if (it.p->deviceId) {
-                SysFreeString(it.p->deviceId); it.p->deviceId = NULL;
-            }
+    MArrayEachPtr(self->devices, it) {
+        if (it.p->deviceId) {
+            SysFreeString(it.p->deviceId); it.p->deviceId = NULL;
         }
-        MArrayInit(self->allocator, self->devices, 0);
     }
+    MArrayInit(self->allocator, self->devices, 0);
     return (AwResult){.code=AW_RESULT_OK};
 }
 
@@ -261,19 +259,15 @@ AwResult AwWiaDeviceList_Close(AwWiaDeviceList* self) {
         self->deviceMgr->lpVtbl->Release(self->deviceMgr);
         self->deviceMgr = NULL;
     }
-    if (self->eventListeners) {
-        MArrayEachPtr(self->eventListeners, it) {
-            IUnknown* eventObject = *it.p;
-            eventObject->lpVtbl->Release(eventObject);
-        }
-        MArrayFree(self->allocator, self->eventListeners);
+
+    MArrayEachPtr(self->eventListeners, it) {
+        IUnknown* eventObject = *it.p;
+        eventObject->lpVtbl->Release(eventObject);
     }
-    if (self->devices) {
-        MArrayFree(self->allocator, self->devices);
-    }
-    if (self->openDevices) {
-        MArrayFree(self->allocator, self->openDevices);
-    }
+    MArrayFree(self->allocator, self->eventListeners);
+    MArrayFree(self->allocator, self->devices);
+    MArrayFree(self->allocator, self->openDevices);
+
     if (self->comInitialized) {
         CoUninitialize();
         self->comInitialized = FALSE;
@@ -286,7 +280,7 @@ b32 AwWiaDeviceList_NeedsRefresh(AwWiaDeviceList* self) {
     return (self->deviceListUpToDate == FALSE);
 }
 
-AwResult AwWiaDeviceList_RefreshList(AwWiaDeviceList* self, AwDeviceInfo** deviceList) {
+AwResult AwWiaDeviceList_RefreshList(AwWiaDeviceList* self, AwDeviceInfoArray* deviceList) {
     AwWiaDeviceList_ReleaseList(self);
 
     IEnumWIA_DEV_INFO* pEnum = NULL;
@@ -551,7 +545,7 @@ static AwResult AwWiaDeviceList_Close_(AwBackend* backend) {
     return r;
 }
 
-static AwResult AwWiaDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+static AwResult AwWiaDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfoArray* deviceList) {
     AwWiaDeviceList* self = backend->self;
     return AwWiaDeviceList_RefreshList(self, deviceList);
 }

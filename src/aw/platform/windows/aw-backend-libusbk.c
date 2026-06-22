@@ -29,9 +29,7 @@ AwResult AwUsbkDeviceList_Open(AwUsbkBackend* self) {
 AwResult AwUsbkDeviceList_Close(AwUsbkBackend* self) {
     AW_TRACE("AwUsbkDeviceList_Close");
     AwUsbkDeviceList_ReleaseList(self);
-    if (self->openDevices) {
-        MArrayFree(self->allocator, self->openDevices);
-    }
+    MArrayFree(self->allocator, self->openDevices);
     return (AwResult){.code=AW_RESULT_OK};
 }
 
@@ -249,7 +247,7 @@ static DWORD WINAPI EventThreadProc(LPVOID lpParameter) {
     return 0;
 }
 
-static AwResult AwDeviceUsbk_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEvent** outEvents) {
+static AwResult AwDeviceUsbk_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEventArray* outEvents) {
     PTPUsbkDeviceUsbk* dev = self->device;
 
     if (outEvents == NULL) {
@@ -261,10 +259,10 @@ static AwResult AwDeviceUsbk_ReadEvents(AwDevice* self, int timeoutMilliseconds,
         AcquireSRWLockExclusive(&dev->eventLock);
 
         // Copy all events to output
-        if (dev->eventList && MArraySize(dev->eventList) > 0) {
+        if (dev->eventList.data && MArraySize(dev->eventList) > 0) {
             for (int i = 0; i < MArraySize(dev->eventList); i++) {
                 AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
-                *event = dev->eventList[i];
+                *event = dev->eventList.data[i];
             }
             // Clear the stored events
             MArrayClear(dev->eventList);
@@ -327,7 +325,7 @@ b32 AwUsbkDeviceList_NeedsRefresh(AwUsbkBackend* self) {
     return FALSE;
 }
 
-AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfo** devices) {
+AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* devices) {
     AW_TRACE("AwUsbkDeviceList_RefreshList");
 
     // Print libusbk version number
@@ -431,13 +429,12 @@ AwResult AwUsbkDeviceList_ReleaseList(AwUsbkBackend* self) {
         self->deviceListHandle = NULL;
     }
 
-    if (self->deviceList) {
-        for (int i = 0; i < MArraySize(self->deviceList); i++) {
-            UsbkDeviceInfo* deviceInfo = self->deviceList + i;
-            deviceInfo->deviceId = NULL;
-        }
-        MArrayFree(self->allocator, self->deviceList);
+    for (int i = 0; i < MArraySize(self->deviceList); i++) {
+        UsbkDeviceInfo* deviceInfo = self->deviceList.data + i;
+        deviceInfo->deviceId = NULL;
     }
+    MArrayFree(self->allocator, self->deviceList);
+
     return (AwResult){.code=AW_RESULT_OK};
 }
 
@@ -791,7 +788,6 @@ AwResult AwUsbkDeviceList_OpenDevice(AwUsbkBackend* self, AwDeviceInfo* deviceIn
         usbkDevice->allocator = self->allocator;
         usbkDevice->eventThread = NULL;
         usbkDevice->eventThreadStopEvent = NULL;
-        usbkDevice->eventList = NULL;
 
         (*deviceOut)->transport.reallocBuffer = AwDeviceUsbk_ReallocBuffer;
         (*deviceOut)->transport.freeBuffer = AwDeviceUsbk_FreeBuffer;
@@ -857,10 +853,8 @@ AwResult AwUsbkDeviceList_CloseDevice(AwUsbkBackend* self, AwDevice* device) {
         deviceUsbk->eventThreadStopEvent = NULL;
 
         // Clean up event list
-        if (deviceUsbk->eventList) {
-            MArrayFree(deviceUsbk->allocator, deviceUsbk->eventList);
-            deviceUsbk->eventList = NULL;
-        }
+        MArrayFree(deviceUsbk->allocator, deviceUsbk->eventList);
+        deviceUsbk->eventList.data = NULL;
     }
 
     if (deviceUsbk->eventsEvent) {

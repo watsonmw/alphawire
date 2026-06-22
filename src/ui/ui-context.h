@@ -106,7 +106,7 @@ struct PropTable {
     void rebuild(AwControl& ptp) {
         items.clear();
         for (size_t i = 0; i < MArraySize(ptp.properties); i++) {
-            AwPtpProperty *property = ptp.properties + i;
+            AwPtpProperty *property = ptp.properties.data + i;
 
             UiPtpProperty uiPtpProperty{};
             snprintf(uiPtpProperty.propCode,  sizeof(uiPtpProperty.propCode), "0x%04x", property->propCode);
@@ -270,7 +270,7 @@ struct AppContext {
 
     void Connect() {
         if (selectedDeviceIndex != -1 && MArraySize(deviceList.devices) > selectedDeviceIndex) {
-            AwDeviceInfo* deviceInfo = deviceList.devices + selectedDeviceIndex;
+            AwDeviceInfo* deviceInfo = deviceList.devices.data + selectedDeviceIndex;
             DisconnectDevice();
             AwResult r = AwDeviceList_OpenDevice(&deviceList, deviceInfo, &device);
             if (r.code == AW_RESULT_OK) {

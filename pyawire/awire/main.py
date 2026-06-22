@@ -190,7 +190,7 @@ class AwPtpProperty:
         lib.Aw_StrFree(self._allocator, out_str)
         return result
 
-    def get_value(self)
+    def get_value(self):
         result = self.get_value_as_str()
         return result
 
@@ -394,7 +394,7 @@ class AwDeviceList:
             raise IndexError("Device list is not open")
         if index < 0 or index >= len(self):
             raise IndexError("Device index out of range")
-        return AwDeviceInfo(self._devlist[0].devices[index])
+        return AwDeviceInfo(self._devlist[0].devices.data[index])
 
     def __iter__(self):
         self._iter_index = 0
