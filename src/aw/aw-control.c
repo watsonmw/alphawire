@@ -1391,6 +1391,7 @@ static EnumValueU8 sProp_RawFileType[] = {
     {0x04, "Lossless S"},
     {0x05, "No Compression"},
     {0x06, "Lossless"},
+    {0x07, "Compressed (HQ)"},
 };
 
 static EnumValueU8 sProp_CompressedImageFileFormat[] = {
@@ -4895,6 +4896,8 @@ b32 AwControl_GetEnumsForProperty(AwControl* self, AwPtpProperty* property, MAll
     }
     PTPPropertyMetadata* meta = property->meta;
     if (!meta) {
+        // TODO : build enums list with just fixed values
+        // return BuildEnumsFromGetFunc(self, allocator, property, meta, outEnums);
         return FALSE;
     }
 
