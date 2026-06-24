@@ -84,7 +84,7 @@ if(WIN32)
 
     # Configure libUSBK
     target_include_directories(alphawire PRIVATE libs/libusbk)
-    list(APPEND ALPHAWIRE_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib ws2_32 Iphlpapi)
+    list(APPEND ALPHAWIRE_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib)
 
     # Socket libs
     list(APPEND ALPHAWIRE_LIBS ws2_32 Iphlpapi)

@@ -303,7 +303,9 @@ void Aw_StrFree(MAllocator* allocator, MStr* str);
 void Aw_MemIOFree(MMemIO* memIO);
 """)
 
-src_dir = os.path.join(_project_root, "src")
+def root(path: str) -> str:
+    return os.path.join(_project_root, path)
+
 common_sources = [
     "src/mlib/mlib.c",
     "src/mlib/mlib-file-stdlib.c",
@@ -324,6 +326,12 @@ ip_sources = [
     "src/aw/platform/ip/aw-backend-ip.c",
 ]
 
+platform_sources = []
+platform_defines = []
+extra_link_args = []
+extra_compile_args = []
+include_dirs = [root("src")]
+
 if sys.platform == "darwin":
     platform_sources = ["src/aw/platform/osx/aw-backend-iokit.c"] + ip_sources
     platform_defines = [
@@ -332,6 +340,7 @@ if sys.platform == "darwin":
         ("M_PTHREADS", None),
     ]
     extra_link_args = ["-framework", "IOKit", "-framework", "CoreFoundation"]
+    extra_compile_args = ["-fvisibility=hidden"]
 elif sys.platform.startswith("linux"):
     platform_sources = ["src/aw/platform/libusb/aw-backend-libusb.c"] + ip_sources
     platform_defines = [
@@ -340,10 +349,11 @@ elif sys.platform.startswith("linux"):
         ("M_PTHREADS", None),
     ]
     extra_link_args = ["-lusb-1.0"]
+    extra_compile_args = ["-fvisibility=hidden"]
 elif sys.platform.startswith("win32"):
     platform_sources = [
         "src/aw/platform/windows/aw-backend-libusbk.c",
-        "src/aw/platform/windows/aw-backend-wia.c"
+        "src/aw/platform/windows/aw-backend-wia.c",
         "src/aw/platform/windows/win-utils.c"
     ] + ip_sources
     platform_defines = [
@@ -353,10 +363,9 @@ elif sys.platform.startswith("win32"):
         ("AW_ENABLE_WIA", None),
         ("AW_ENABLE_IP", None),
     ]
-else:
-    platform_sources = []
-    platform_defines = []
-    extra_link_args = []
+    include_dirs.append(root("libs\\libusbk"))
+    extra_link_args = [root('libs\\libusbk\\amd64\\libusbK.lib'), 'ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
+                       'ole32.lib', 'wiaguid.lib', 'shell32.lib', 'Oleaut32.lib']
 
 all_sources = [os.path.relpath(os.path.join(_project_root, src), _script_dir)
                for src in common_sources + platform_sources]
@@ -374,10 +383,10 @@ ffi_builder.set_source(
 #include "aw/aw-util.h"
 """,
     sources=all_sources,
-    include_dirs=[src_dir],
+    include_dirs=include_dirs,
     define_macros=define_macros,
     extra_link_args=extra_link_args,
-    extra_compile_args=["-fvisibility=hidden"],
+    extra_compile_args=extra_compile_args,
     py_limited_api=True,
 )
 
