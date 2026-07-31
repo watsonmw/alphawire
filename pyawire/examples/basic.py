@@ -43,7 +43,6 @@ def basic_example():
             property = control.get_property_at_index(i)
             prop_label = property.get_label()
             if prop_label is not None:
-                #property_value = property.get_value_as_str()
                 property_value = property.get_value()
                 print(f"            '{prop_label}': {property_value}")
 
@@ -79,10 +78,6 @@ def basic_example():
         control.cleanup()
 
 
-
 if __name__ == '__main__':
     basic_example()
     print("Done.")
-
-
-

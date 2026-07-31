@@ -210,15 +210,29 @@ AW_EXPORT AwPtpProperty* AwControl_GetPropertyById(AwControl* self, const char* 
 
 /**
  * Build a list of enums for property if enums are available.
- * Converts values to strings for display.
+ * Always converts values to strings for display.
  * You must free memory allocated by this function by calling AwControl_FreePropValueEnums / PTP_FreePropValueEnums.
- * @param property
  * @param allocator allocator to use for outEnums, when set to null to uses the default AwControl allocator
+ * @param property
  * @param outEnums
  * @page allocator Optional allocator to use (when NULL use AwControl allocator).
  * @return TRUE if enums are available, false if no enums available for this property
  */
-AW_EXPORT b32 AwControl_GetEnumsForProperty(AwControl* self, AwPtpProperty* property, MAllocator* allocator, AwPtpPropValueEnums* outEnums);
+AW_EXPORT b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+   AwPtpPropValueEnums* outEnums);
+
+/**
+ * Build a list of enums for property if enums are available.
+ * Converts values to strings for display when there is a known mapping.
+ * You must free memory allocated by this function by calling AwControl_FreePropValueEnums / PTP_FreePropValueEnums.
+ * @param allocator allocator to use for outEnums, when set to null to uses the default AwControl allocator
+ * @param property
+ * @param outEnums
+ * @page allocator Optional allocator to use (when NULL use AwControl allocator).
+ * @return TRUE if enums are available, false if no enums available for this property
+ */
+AW_EXPORT b32 AwControl_GetEnumsForPropertyKnown(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+   AwPtpPropValueEnums* outEnums);
 
 /**
  * Free output enum returned by AwControl_GetEnumsForProperty()
@@ -236,15 +250,29 @@ AW_EXPORT void AwPtp_FreePropValueEnums(MAllocator* self, AwPtpPropValueEnums* o
  * For str types directly return the string.
  * For properties that have a known str representation e.g. 'focal distance' = '0.3m' return it.
  * Other types return a null str
- * @param property The property to convert.
  * @param allocator Allocator to use for the output string.
+ * @param property The property to convert.
  * @param outStr Output string containing the property value.
- * @return TRUE on success, FALSE on failure.
+ * @return TRUE on successful conversion, FALSE on failure.
  */
-AW_EXPORT b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MAllocator* allocator, MStr* outStr);
+AW_EXPORT b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+    MStr* outStr);
 
 /**
- *
+ * Get the property value as a human-readable string.
+ * For enums will lookup from list of known strings.
+ * For str types directly return the string.
+ * For properties that have a known str representation e.g. 'focal distance' = '0.3m' return it.
+ * Otherwise convert property value integer to string
+ * @param allocator Allocator to use for the output string.
+ * @param property The property to convert.
+ * @param outStr Output string containing the property value.
+ * @return TRUE on successful conversion, FALSE on failure.
+ */
+AW_EXPORT b32 AwControl_GetPropertyValueAsKnownStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+    MStr* outStr);
+
+/**
  * @param property
  * @param outValue
  * @return AW_RESULT_OK on success, or an appropriate error code on failure.
@@ -554,13 +582,26 @@ AW_EXPORT char* AwGetEventLabel(u16 eventCode);
 AW_EXPORT char* AwGetPropertyLabel(u16 propCode);
 AW_EXPORT char* AwGetObjectFormatStr(u16 objectFormatCode);
 
-AW_EXPORT char* AwPtpGetDataTypeStr(PtpDataType dataType);
-AW_EXPORT char* AwPtpGetFormFlagStr(PtpFormFlag formFlag);
-AW_EXPORT char* AwPtpGetPropIsEnabledStr(u8 propIsEnabled);
+AW_EXPORT char* AwGetDataTypeStr(PtpDataType dataType);
+AW_EXPORT char* AwGetFormFlagStr(PtpFormFlag formFlag);
+AW_EXPORT char* AwGetPropIsEnabledStr(u8 propIsEnabled);
 
-AW_EXPORT void AwPtpGetPropValueStr(PtpDataType dataType, AwPtpPropValue value, char* outBuffer, size_t bufferLen);
-AW_EXPORT b32 AwPtpPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue value2);
-AW_EXPORT b32 AwPtpPropEquals(AwPtpProperty* property, AwPtpPropValue value);
+// Convert property value to string, placing it in input buffer
+AW_EXPORT void AwGetPropValueCStr(PtpDataType dataType, AwPtpPropValue value, char* outBuffer, size_t bufferLen);
+
+// Same as AwGetPropValueCStr but in addition fill out hex values for integer types
+// e.g. 10 ->  '10 (0x0a)'
+AW_EXPORT void AwGetPropValueCStrEx(PtpDataType dataType, AwPtpPropValue value, char* outBuffer, size_t bufferLen);
+
+// Convert property value to string, writing it to a new MStr
+AW_EXPORT MStr AwGetPropValueStr(MAllocator* allocator, PtpDataType dataType, AwPtpPropValue value);
+
+// Same as AwGetPropValueStr but in addition fill out hex values for integer types
+// e.g. 10 ->  '10 (0x0a)'
+AW_EXPORT MStr AwGetPropValueStrEx(MAllocator* allocator, PtpDataType dataType, AwPtpPropValue value);
+
+AW_EXPORT b32 AwPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue value2);
+AW_EXPORT b32 AwPropEquals(AwPtpProperty* property, AwPtpPropValue value);
 
 #ifdef __cplusplus
 } // extern "C"

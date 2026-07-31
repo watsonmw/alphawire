@@ -65,6 +65,18 @@ typedef double f64;
 // internal, if appropriate, without having to add 'inline')
 #define MINLINE static inline
 
+// MMAYBE_USED macro to avoid unused function warnings
+#if defined(__GNUC__) || defined(__clang__)
+// GCC and Clang use __attribute__((unused))
+#define MMAYBE_USED __attribute__((unused))
+#elif defined(_MSC_VER)
+// MSVC uses a compiler pragma injection to suppress warning C4505
+#define MMAYBE_USED __pragma(warning(suppress: 4505))
+#else
+// Fallback for other compilers
+#define MMAYBE_USED
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -126,8 +138,37 @@ typedef struct {
 #endif
 
 /////////////////////////////////////////////////////////
-// Dynamic Array - struct with size, capacity and data pointer
-// Defined early so it can be used in MMemDebugContext below
+// MArray - C Dynamic Array
+//
+// MArrays are stored as a struct with current size, capacity and a data pointer of type T, which points to the
+// array data elements.
+//
+// The struct can be defined using MArray(T), or use one of existing types (MArrayU32, MArrayI64, MArrayF64, etc.).
+// When using MArray(T) make sure to typedef it, so you can reference it from multiple places, e.g.
+//
+//   typedef MArray(i8) MArrayI8;
+//
+// Important:
+// - Initialize with zeros for an empty array, or use MArrayInit() or MArrayInitZ() to reserve space.
+// - An MAllocator is required for functions that allocate or free memory.
+// - For any given array the same MAllocator must be used each time.
+// - Data pointer may change on growth (MArrayAdd, etc.), invalidating existing pointers to elements.
+//
+// Example:
+//   typedef MArray(i32) MyArray;
+//   MyArray arr = {0};
+//
+//   MArrayAdd(alloc, arr, 123);           // Add items
+//   MArrayAdd(alloc, arr, 456);
+//   MArrayEach(arr, i) {                  // Iterate
+//       printf("%d\n", arr.data[i]);      // -> 123\n456
+//   }
+//   MArrayEachPtr(arr, it) {              // Iterate with pointer each element and index
+//       printf("%d: %d\n", it.i, *it.p);  // -> 0: 123\n1: 456\n
+//   }
+//   MArrayRemoveIndex(arr, 0);            // Remove item
+//   MArrayFree(alloc, arr);               // Free memory & clear array to zero
+//
 
 #define MArray(T) struct { \
     size_t size;           \
@@ -160,7 +201,7 @@ typedef struct {
 #endif
 } MMemAllocInfo;
 
-// Named typedefs for MMemDebug array types (needed for cross-TU use in e.g. marena.h)
+// Named typedefs for MMemDebug array types
 typedef MArray(MMemAllocInfo) MArrayMemAllocInfo;
 #ifdef M_STACKTRACE
 typedef MArray(MStacktrace) MArrayStacktrace;
@@ -207,7 +248,6 @@ void MAllocatorMakeClibHeap(MAllocator* alloc);
 
 //////////////////////////////////////////////////////////
 // Memory allocation tracking & debugging
-// GCC has good compile time options for similar checks, if you want to stick to using GCC & its clib(s)
 
 #ifdef M_MEM_DEBUG
 // Memory debug mode is on
@@ -556,15 +596,17 @@ MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
 #define MStaticArraySize(arr) (sizeof(arr) / sizeof(arr[0]))
 
 /////////////////////////////////////////////////////////
-// Dynamic Array
+// MArray interface
 
-#define MArrayInit(m, a, s) do { \
-    (a).data = M_ArrayInit(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (s)); \
+// Initialize an array with given capacity and size zero
+#define MArrayInit(m, a, c) do { \
+    (a).data = M_ArrayInit(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (c)); \
 } while (0)
 
-#define MArrayInitZ(m, a, s) do { \
-    (a).data = M_ArrayInit(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (s)); \
-    memset((a).data, 0, (a).size * sizeof((a).data[0])); \
+// Initialize an array with given capacity and size zero, initialize backing memory to zero
+#define MArrayInitZ(m, a, c) do { \
+    (a).data = M_ArrayInit(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (c)); \
+    memset((a).data, 0, (a).capacity * sizeof((a).data[0])); \
 } while (0)
 
 // Free the memory allocated for the array
@@ -577,29 +619,29 @@ MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
 
 // Add value to the end of the array
 #define MArrayAdd(m, a, v) ( \
-    (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), \
+    (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), \
     (a).data[(a).size++] = (v))
 
 // Add space for item to the end of the array and return ptr to it
 #define MArrayAddPtr(m, a) ( \
-    (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), \
+    (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), \
     ((a).data + (a).size++))
 
 // Add space for item to the end of the array, zero its memory and return ptr to it
 #define MArrayAddPtrZ(m, a) ( \
-    (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), \
+    (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), 1), \
     memset((a).data + (a).size, 0, sizeof(*(a).data)), \
     ((a).data + (a).size++))
 
 // Add space for n items to the end of the array and return pointer to the first new item
 #define MArrayAddN(m, a, n) ( \
-    (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (size_t)(n)), \
+    (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (size_t)(n)), \
     (a).size += (size_t)(n), \
     (a).data + ((a).size - (size_t)(n)))
 
 // Add space for n items to the end of the array, zero them, and return pointer to the first new item
 #define MArrayAddNZ(m, a, n) ( \
-    (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (size_t)(n)), \
+    (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (size_t)(n)), \
     memset((a).data + (a).size, 0, sizeof(*(a).data) * (size_t)(n)), \
     (a).size += (size_t)(n), \
     (a).data + ((a).size - (size_t)(n)))
@@ -608,14 +650,14 @@ MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
 #define MArrayResize(m, a, s) do { \
     size_t s_ = (size_t)(s); \
     if ((a).size < s_) { \
-        (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s_ - (a).size); \
+        (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), s_ - (a).size); \
     } \
     (a).size = s_; \
 } while (0)
 
 // Ensure the array capacity can hold at least s additional elements beyond current size
 #define MArrayGrow(m, a, s) do { \
-    (a).data = M_ArrayMaybeGrow(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (s)); \
+    (a).data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (s)); \
 } while (0)
 
 // Ensure array capacity is at least s total elements
@@ -634,17 +676,15 @@ MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
 
 // Set value in the array, resize if necessary, gaps are initialized to zero.
 #define MArraySet(m, a, i, v) do { \
-    (a).data = M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i) + 1); \
+    (a).data = M_ArrayGrowIfNeededZ(MDEBUG_SOURCE_MACRO (m), M_ArrayUnpack(a), (i) + 1); \
     (a).data[(i)] = (v); \
 } while (0)
 
-// Get Size
+// Size & Capacity
 #define MArraySize(a) ((a).size)
 #define MArrayLen(a) (MArraySize(a))
 #define MArrayIsEmpty(a) ((a).size == 0)
-#define MArrayByteSize(a) ((a).size * sizeof(*(a).data))
-
-// Get Capacity
+#define MArraySizeBytes(a) ((a).size * sizeof(*(a).data))
 #define MArrayCapacity(a) ((a).capacity)
 #define MArrayCapacityBytes(a) ((a).capacity * sizeof(*(a).data))
 
@@ -684,8 +724,8 @@ void* M_ArrayInit(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* si
 void* M_ArrayGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity, size_t elementSize, size_t minNeeded);
 void M_ArrayFree(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity, size_t elementSize);
 
-MINLINE void* M_ArrayMaybeGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity,
-                               size_t elementSize, size_t numAdd) {
+MINLINE void* M_ArrayGrowIfNeeded(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity,
+                                  size_t elementSize, size_t numAdd) {
     size_t needed = *size + numAdd;
     if (*capacity >= needed) {
         return data;
@@ -696,7 +736,7 @@ MINLINE void* M_ArrayMaybeGrow(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* dat
 MINLINE void* M_ArrayCopy(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* srcData, size_t srcSize, size_t srcElementSize,
                           void* destData, size_t* destSize, size_t* destCapacity, size_t destElementSize) {
     if (srcData && srcSize > 0) {
-        destData = M_ArrayMaybeGrow(MDEBUG_SOURCE_PASS alloc, destData, destSize, destCapacity, destElementSize,
+        destData = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_PASS alloc, destData, destSize, destCapacity, destElementSize,
             srcSize);
         *destSize = srcSize;
         memcpy(destData, srcData, srcElementSize * srcSize);
@@ -706,8 +746,8 @@ MINLINE void* M_ArrayCopy(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* srcData,
     return destData;
 }
 
-MINLINE void* M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size,
-                                          size_t* capacity, size_t elementSize, size_t newSize) {
+MINLINE void* M_ArrayGrowIfNeededZ(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size,
+                                   size_t* capacity, size_t elementSize, size_t newSize) {
     if (*size >= newSize) {
         return data;
     }
@@ -725,7 +765,7 @@ MINLINE void* M_ArrayGrowAndClearIfNeeded(MDEBUG_SOURCE_DEFINE MAllocator* alloc
 
 MINLINE void* M_ArrayInsertSpace(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* data, size_t* size, size_t* capacity,
                                  size_t elementSize, size_t i) {
-    data = M_ArrayMaybeGrow(MDEBUG_SOURCE_PASS alloc, data, size, capacity, elementSize, 1);
+    data = M_ArrayGrowIfNeeded(MDEBUG_SOURCE_PASS alloc, data, size, capacity, elementSize, 1);
     if (*size != i) {
         u8* src = (u8*)data + elementSize * i;
         memmove(src + elementSize, src, (*size - i) * elementSize);
@@ -911,12 +951,6 @@ MINLINE MStr MStrMakeCopyLenNul(MAllocator* alloc, const char* c, u32 len) {
     return r;
 }
 
-// Make a MStr copy from a C string - includes nul-terminator
-// Strings made this way keep the nul-terminator
-MINLINE MStr MStrMakeCopyCStrNul(MAllocator* alloc, const char* c) {
-    return MStrMakeCopyLenNul(alloc, c, MCStrLen(c));
-}
-
 // Make a MStr copy from a string of given length - no nul-terminator
 MINLINE MStr MStrMakeCopyLen(MAllocator* alloc, const char* c, u32 len) {
     MStr r = MStrInit(alloc, len);
@@ -940,6 +974,12 @@ MINLINE MStr MStrMakeCopyStr(MAllocator* alloc, MStr str) {
 // Make a MStr copy from a string of given length - no nul terminator
 MINLINE MStr MStrMakeCopyCStr(MAllocator* alloc, const char* c) {
     return MStrMakeCopyLen(alloc, c, MCStrLen(c));
+}
+
+// Make a MStr copy from a C string - includes nul-terminator
+// Strings made this way keep the nul-terminator
+MINLINE MStr MStrMakeCopyCStrNul(MAllocator* alloc, const char* c) {
+    return MStrMakeCopyLenNul(alloc, c, MCStrLen(c));
 }
 
 // Make a MStr from a static C string
@@ -976,11 +1016,11 @@ MINLINE MStrView MStrViewMakeP(const char* str, u32 size) {
 
 MINLINE i32 MStrViewFindC(MStrView str, char* substring) {
     i32 substringLen = (i32)MCStrLen(substring);
-    if (substringLen > str.size) {
+    if (substringLen > (i32)str.size) {
         return -1;
     }
     i32 j = 0;
-    for (i32 i = 0; i < str.size; i++) {
+    for (i32 i = 0; i < (i32)str.size; i++) {
         char c1 = str.str[i];
         char c2 = substring[j];
         if (c1 == c2) {
@@ -990,7 +1030,7 @@ MINLINE i32 MStrViewFindC(MStrView str, char* substring) {
             }
             continue;
         }
-        if (i + substringLen >= str.size) {
+        if (i + substringLen >= (i32)str.size) {
             return -1;
         }
         if (j > 0) {
@@ -1010,7 +1050,7 @@ MINLINE i32 MStrViewFind(MStrView str, MStrView substring) {
         return -1;
     }
     i32 j = 0;
-    for (i32 i = 0; i < str.size; i++) {
+    for (i32 i = 0; i < (i32)str.size; i++) {
         char c1 = str.str[i];
         char c2 = substring.str[j];
         if (c1 == c2) {
@@ -1020,7 +1060,7 @@ MINLINE i32 MStrViewFind(MStrView str, MStrView substring) {
             }
             continue;
         }
-        if (i + substringLen >= str.size) {
+        if (i + substringLen >= (i32)str.size) {
             return -1;
         }
         if (j > 0) {
@@ -1035,7 +1075,7 @@ MINLINE i32 MStrViewFind(MStrView str, MStrView substring) {
 }
 
 static i32 MStrViewFindIgnoreCaseC(MStrView haystack, const char* needle) {
-    i32 needleLen = (i32)MCStrLen(needle);
+    size_t needleLen = MCStrLen(needle);
     if (needleLen == 0) {
         return 0;
     }
@@ -1043,7 +1083,7 @@ static i32 MStrViewFindIgnoreCaseC(MStrView haystack, const char* needle) {
         return -1;
     }
 
-    for (i32 i = 0; i <= haystack.size - needleLen; ++i) {
+    for (u32 i = 0; i <= haystack.size - needleLen; ++i) {
         b32 found = TRUE;
         for (u32 j = 0; j < needleLen; ++j) {
             if (MCharToLowerAscii(haystack.str[i + j]) != MCharToLowerAscii(needle[j])) {
@@ -1059,7 +1099,7 @@ static i32 MStrViewFindIgnoreCaseC(MStrView haystack, const char* needle) {
 }
 
 MINLINE i32 MStrViewFindChar(MStrView str, char c) {
-    for (i32 i = 0; i < str.size; i++) {
+    for (u32 i = 0; i < str.size; i++) {
         if (str.str[i] == c) {
             return i;
         }

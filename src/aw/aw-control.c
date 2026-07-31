@@ -4,7 +4,6 @@
 
 #include "mlib/utf8.h"
 #include "aw/aw-control.h"
-#include "aw/aw-control.h"
 #include "aw/aw-util.h"
 
 typedef struct {
@@ -1344,6 +1343,7 @@ static EnumValueU8 sProp_ImageQuality[] = {
 };
 
 static EnumValueU8 sProp_ImageFileFormat[] = {
+    {0x00, "N/A"},
     {0x01, "RAW"},
     {0x02, "RAW & JPEG"},
     {0x03, "JPEG"},
@@ -2853,7 +2853,7 @@ char* AwGetOperationLabel(u16 operationCode) {
     return NULL;
 }
 
-char* AwPtpGetDataTypeStr(PtpDataType dataType) {
+char* AwGetDataTypeStr(PtpDataType dataType) {
     switch (dataType) {
         case PTP_DT_UNDEF:
             return "undef";
@@ -2903,7 +2903,7 @@ char* AwPtpGetDataTypeStr(PtpDataType dataType) {
     return NULL;
 }
 
-char* AwPtpGetFormFlagStr(PtpFormFlag formFlag) {
+char* AwGetFormFlagStr(PtpFormFlag formFlag) {
     switch (formFlag) {
         case PTP_FORM_FLAG_NONE:
             return "";
@@ -2915,7 +2915,7 @@ char* AwPtpGetFormFlagStr(PtpFormFlag formFlag) {
     return NULL;
 }
 
-char* AwPtpGetPropIsEnabledStr(u8 propIsEnabled) {
+char* AwGetPropIsEnabledStr(u8 propIsEnabled) {
     switch (propIsEnabled) {
         case 0x0:
             return "N/A";
@@ -2927,31 +2927,31 @@ char* AwPtpGetPropIsEnabledStr(u8 propIsEnabled) {
     return NULL;
 }
 
-void AwPtpGetPropValueStr(PtpDataType dataType, AwPtpPropValue value, char* buffer, size_t bufferLen) {
+void AwGetPropValueCStrEx(PtpDataType dataType, AwPtpPropValue value, char* buffer, size_t bufferLen) {
     switch (dataType) {
         case PTP_DT_INT8:
-            snprintf(buffer, bufferLen, "%hhd (%02hhx)",  value.i8, value.i8);
+            snprintf(buffer, bufferLen, "%hhd (0x%02hhx)",  value.i8, value.i8);
             break;
         case PTP_DT_UINT8:
-            snprintf(buffer, bufferLen, "%hhu (%02hhx)",  value.u8, value.u8);
+            snprintf(buffer, bufferLen, "%hhu (0x%02hhx)",  value.u8, value.u8);
             break;
         case PTP_DT_INT16:
-            snprintf(buffer, bufferLen, "%hd (%04hx)", value.i16, value.i16);
+            snprintf(buffer, bufferLen, "%hd (0x%04hx)", value.i16, value.i16);
             break;
         case PTP_DT_UINT16:
-            snprintf(buffer, bufferLen, "%hu (%04hx)", value.u16, value.u16);
+            snprintf(buffer, bufferLen, "%hu (0x%04hx)", value.u16, value.u16);
             break;
         case PTP_DT_INT32:
-            snprintf(buffer, bufferLen, "%d (%08x)", value.i32, value.i32);
+            snprintf(buffer, bufferLen, "%d (0x%08x)", value.i32, value.i32);
             break;
         case PTP_DT_UINT32:
-            snprintf(buffer, bufferLen, "%u (%08x)", value.u32, value.u32);
+            snprintf(buffer, bufferLen, "%u (0x%08x)", value.u32, value.u32);
             break;
         case PTP_DT_INT64:
-            snprintf(buffer, bufferLen, "%lld (%016llx)", value.i64, value.i64);
+            snprintf(buffer, bufferLen, "%lld (0x%016llx)", value.i64, value.i64);
            break;
         case PTP_DT_UINT64:
-            snprintf(buffer, bufferLen, "%llu (%016llx)", value.u64, value.u64);
+            snprintf(buffer, bufferLen, "%llu (0x%016llx)", value.u64, value.u64);
             break;
         case PTP_DT_INT128:
             break;
@@ -2991,7 +2991,83 @@ void AwPtpGetPropValueStr(PtpDataType dataType, AwPtpPropValue value, char* buff
     }
 }
 
-b32 AwPtpPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue value2) {
+void AwGetPropValueCStr(PtpDataType dataType, AwPtpPropValue value, char* buffer, size_t bufferLen) {
+    switch (dataType) {
+        case PTP_DT_INT8:
+            snprintf(buffer, bufferLen, "%hhd",  value.i8);
+            break;
+        case PTP_DT_UINT8:
+            snprintf(buffer, bufferLen, "%hhu",  value.u8);
+            break;
+        case PTP_DT_INT16:
+            snprintf(buffer, bufferLen, "%hd", value.i16);
+            break;
+        case PTP_DT_UINT16:
+            snprintf(buffer, bufferLen, "%hu", value.u16);
+            break;
+        case PTP_DT_INT32:
+            snprintf(buffer, bufferLen, "%d", value.i32);
+            break;
+        case PTP_DT_UINT32:
+            snprintf(buffer, bufferLen, "%u", value.u32);
+            break;
+        case PTP_DT_INT64:
+            snprintf(buffer, bufferLen, "%lld", value.i64);
+            break;
+        case PTP_DT_UINT64:
+            snprintf(buffer, bufferLen, "%llu", value.u64);
+            break;
+        case PTP_DT_INT128:
+            break;
+        case PTP_DT_UINT128:
+            break;
+        case PTP_DT_AINT8:
+            break;
+        case PTP_DT_AUINT8:
+            break;
+        case PTP_DT_AINT16:
+            break;
+        case PTP_DT_AUINT16:
+            break;
+        case PTP_DT_AINT32:
+            break;
+        case PTP_DT_AUINT32:
+            break;
+        case PTP_DT_AINT64:
+            break;
+        case PTP_DT_AUINT64:
+            break;
+        case PTP_DT_AINT128:
+            break;
+        case PTP_DT_AUINT128:
+            break;
+        case PTP_DT_STR:
+            if (value.str.size > 0) {
+                size_t copySize = value.str.size + 1 > bufferLen ? bufferLen - 1 : value.str.size;
+                memcpy(buffer, value.str.str, copySize);
+                buffer[copySize] = '\0';
+            } else if (bufferLen > 0) {
+                buffer[0] = '\0';
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+MStr AwGetPropValueStr(MAllocator* allocator, PtpDataType dataType, AwPtpPropValue value) {
+    char text[64];
+    AwGetPropValueCStr(dataType, value, text, sizeof(text));
+    return MStrMakeCopyCStrNul(allocator, text);
+}
+
+MStr AwGetPropValueStrEx(MAllocator* allocator, PtpDataType dataType, AwPtpPropValue value) {
+    char text[128];
+    AwGetPropValueCStrEx(dataType, value, text, sizeof(text));
+    return MStrMakeCopyCStrNul(allocator, text);
+}
+
+b32 AwPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue value2) {
     switch (dataType) {
         case PTP_DT_INT8:
             return value1.i8 == value2.i8;
@@ -3041,8 +3117,8 @@ b32 AwPtpPropValueEq(PtpDataType dataType, AwPtpPropValue value1, AwPtpPropValue
     return FALSE;
 }
 
-b32 AwPtpPropEquals(AwPtpProperty* property, AwPtpPropValue value) {
-    return AwPtpPropValueEq((PtpDataType)property->dataType, property->value, value);
+b32 AwPropEquals(AwPtpProperty* property, AwPtpPropValue value) {
+    return AwPropValueEq((PtpDataType)property->dataType, property->value, value);
 }
 
 size_t Ptp_PropValueSize(PtpDataType dataType, AwPtpPropValue value) {
@@ -3328,6 +3404,7 @@ static void PrintPropertyValue(u16 dataType, AwPtpPropValue* value) {
     }
 }
 
+MMAYBE_USED
 static void PrintProperties(AwControl* self) {
     size_t numProperties = MArraySize(self->properties);
     for (int i = 0; i < numProperties; i++) {
@@ -3849,6 +3926,7 @@ static AwResult SDIO_ControlDevice(AwControl* self, u16 propCode, u16 dataType, 
     return r.result;
 }
 
+MMAYBE_USED
 static AwResult SDIO_GetDisplayStringList(AwControl* self, AwStringDisplayList displayList) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetDisplayStringList,
@@ -3892,6 +3970,7 @@ static AwResult SDIO_GetDisplayStringList(AwControl* self, AwStringDisplayList d
     return r.result;
 }
 
+MMAYBE_USED
 static AwResult SDIO_GetLensInformation(AwControl* self, AwFocusUnits focusUnits) {
     PTPResponse r = DoRequest(self,
                               PTP_OC_SDIO_GetLensInformation,
@@ -4696,14 +4775,22 @@ static char* EnumValue8_Lookup(EnumValueU8* enumValues, size_t numEnumValues, u8
 }
 
 static b32 BuildEnumsFromListU8(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
-        EnumValueU8* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
+        EnumValueU8* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums, b32 bAlwaysStringify) {
     MArrayEachPtr(property->form.enums.getSet, it) {
         u8 lookupValue = it.p->u8;
-        char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
-        AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
+        AwPtpPropValueEnum *propEnum = MArrayAddPtrZ(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue.u8 = lookupValue;
-        propEnum->str = MStrMakeStaticCStr(str);
+        char* str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
+        if (str) {
+            propEnum->str = MStrMakeStaticCStr(str);
+        } else {
+            if (bAlwaysStringify) {
+                propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+            } else {
+                propEnum->str = (MStr){0};
+            }
+        }
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -4725,11 +4812,19 @@ static b32 BuildEnumsFromListU8(AwControl* self, MAllocator* allocator, AwPtpPro
             if (prop) {
                 prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
-                char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
                 AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue.u8 = lookupValue;
-                propEnum->str = MStrMakeStaticCStr(str);
+                char *str = EnumValue8_Lookup(enumValues, numEnumValues, lookupValue);
+                if (str) {
+                    propEnum->str = MStrMakeStaticCStr(str);
+                } else {
+                    if (bAlwaysStringify) {
+                        propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+                    } else {
+                        propEnum->str = (MStr){0};
+                    }
+                }
             }
         }
     }
@@ -4748,14 +4843,22 @@ static char* EnumValue16_Lookup(EnumValueU16* enumValues, size_t numEnumValues, 
 }
 
 static b32 BuildEnumsFromListU16(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
-        EnumValueU16* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
+        EnumValueU16* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums, b32 bAlwaysStringify) {
     MArrayEachPtr(property->form.enums.getSet, it) {
         u16 lookupValue = it.p->u16;
-        char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
         AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue.u16 = lookupValue;
-        propEnum->str = MStrMakeStaticCStr(str);
+        char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
+        if (str) {
+            propEnum->str = MStrMakeStaticCStr(str);
+        } else {
+            if (bAlwaysStringify) {
+                propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+            } else {
+                propEnum->str = (MStr){0};
+            }
+        }
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -4777,11 +4880,19 @@ static b32 BuildEnumsFromListU16(AwControl* self, MAllocator* allocator, AwPtpPr
             if (prop) {
                 prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
-                char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
                 AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue.u16 = lookupValue;
-                propEnum->str = MStrMakeStaticCStr(str);
+                char *str = EnumValue16_Lookup(enumValues, numEnumValues, lookupValue);
+                if (str) {
+                    propEnum->str = MStrMakeStaticCStr(str);
+                } else {
+                    if (bAlwaysStringify) {
+                        propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+                    } else {
+                        propEnum->str = (MStr){0};
+                    }
+                }
             }
         }
     }
@@ -4800,14 +4911,23 @@ static char* EnumValue32_Lookup(EnumValueU32* enumValues, size_t numEnumValues, 
 }
 
 static b32 BuildEnumsFromListU32(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
-                                 EnumValueU32* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums) {
+                                 EnumValueU32* enumValues, size_t numEnumValues, AwPtpPropValueEnums* outEnums,
+                                 b32 bAlwaysStringify) {
     MArrayEachPtr(property->form.enums.getSet, it) {
         u32 lookupValue = it.p->u32;
-        char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
         AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue.u32 = lookupValue;
-        propEnum->str = MStrMakeStaticCStr(str);
+        char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
+        if (str) {
+            propEnum->str = MStrMakeStaticCStr(str);
+        } else {
+            if (bAlwaysStringify) {
+                propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+            } else {
+                propEnum->str = (MStr){0};
+            }
+        }
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -4829,11 +4949,19 @@ static b32 BuildEnumsFromListU32(AwControl* self, MAllocator* allocator, AwPtpPr
             if (prop) {
                 prop->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
-                char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
                 AwPtpPropValueEnum *propEnum = MArrayAddPtr(allocator, outEnums->values);
                 propEnum->flags = AW_ENUM_VALUE_STR_CONST | AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue.u32 = lookupValue;
-                propEnum->str = MStrMakeStaticCStr(str);
+                char *str = EnumValue32_Lookup(enumValues, numEnumValues, lookupValue);
+                if (str) {
+                    propEnum->str = MStrMakeStaticCStr(str);
+                } else {
+                    if (bAlwaysStringify) {
+                        propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+                    } else {
+                        propEnum->str = (MStr){0};
+                    }
+                }
             }
         }
     }
@@ -4867,7 +4995,7 @@ b32 BuildEnumsFromGetFunc(AwControl* self, MAllocator* allocator, AwPtpProperty*
             AwPtpPropValueEnum* prop = NULL;
             for (int j = 0; j < getSetItems; j++) {
                 AwPtpPropValue enumValue = outEnums->values.data[j].propValue;
-                if (AwPtpPropValueEq(property->dataType, lookupValue, enumValue)) {
+                if (AwPropValueEq(property->dataType, lookupValue, enumValue)) {
                     prop = outEnums->values.data + j;
                     break;
                 }
@@ -4890,25 +5018,29 @@ b32 BuildEnumsFromGetFunc(AwControl* self, MAllocator* allocator, AwPtpProperty*
     return TRUE;
 }
 
-b32 AwControl_GetEnumsForProperty(AwControl* self, AwPtpProperty* property, MAllocator* allocator, AwPtpPropValueEnums* outEnums) {
+b32 AwControl_GetEnumsForPropertyKnown(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums) {
     if (!property || property->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
     PTPPropertyMetadata* meta = property->meta;
     if (!meta) {
-        // TODO : build enums list with just fixed values
-        // return BuildEnumsFromGetFunc(self, allocator, property, meta, outEnums);
         return FALSE;
     }
 
     if (meta->fixedEnumsSize) {
         switch (meta->type) {
             case PTP_DT_UINT8:
-                return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8, meta->fixedEnumsSize, outEnums);
+                return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8,
+                    meta->fixedEnumsSize, outEnums, FALSE);
             case PTP_DT_UINT16:
-                return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16, meta->fixedEnumsSize, outEnums);
+                return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16,
+                    meta->fixedEnumsSize, outEnums, FALSE);
             case PTP_DT_UINT32:
-                return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32, meta->fixedEnumsSize, outEnums);
+                return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32,
+                    meta->fixedEnumsSize, outEnums, FALSE);
+            default:
+                AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
+                break;
         }
     } else if (meta->buildEnumsFunc) {
         return meta->buildEnumsFunc(self, allocator, property, outEnums);
@@ -4918,11 +5050,72 @@ b32 AwControl_GetEnumsForProperty(AwControl* self, AwPtpProperty* property, MAll
     return FALSE;
 }
 
-b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MAllocator* allocator, MStr* strOut) {
+b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums) {
+    if (!property || property->formFlag != PTP_FORM_FLAG_ENUM) {
+        return FALSE;
+    }
+    PTPPropertyMetadata* meta = property->meta;
+    if (meta) {
+        if (meta->fixedEnumsSize) {
+            switch (meta->type) {
+                case PTP_DT_UINT8:
+                    return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8,
+                        meta->fixedEnumsSize, outEnums, TRUE);
+                case PTP_DT_UINT16:
+                    return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16,
+                        meta->fixedEnumsSize, outEnums, TRUE);
+                case PTP_DT_UINT32:
+                    return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32,
+                        meta->fixedEnumsSize, outEnums, TRUE);
+                default:
+                    AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
+                    break;
+            }
+        } else if (meta->buildEnumsFunc) {
+            return meta->buildEnumsFunc(self, allocator, property, outEnums);
+        } else if (meta->valueAsStringFunc) {
+            return BuildEnumsFromGetFunc(self, allocator, property, meta, outEnums);
+        }
+    }
+
+    MArrayEachPtr(property->form.enums.getSet, it) {
+        AwPtpPropValueEnum* propEnum = MArrayAddPtr(allocator, outEnums->values);
+        propEnum->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
+        propEnum->propValue = *it.p;
+        propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+    }
+
+    if (MArraySize(property->form.enums.set)) {
+        size_t getSetItems = MArraySize(outEnums->values);
+        MArrayEach(outEnums->values, j) {
+            AwPtpPropValueEnum* prop = outEnums->values.data + j;
+            prop->flags = AW_ENUM_VALUE_READ;
+        }
+        MArrayEachPtr(property->form.enums.set, it) {
+            AwPtpPropValueEnum* prop = NULL;
+            for (int j = 0; j < getSetItems; j++) {
+                if (AwPropValueEq((PtpDataType)property->dataType, *it.p, outEnums->values.data[j].propValue)) {
+                    prop = outEnums->values.data + j;
+                    break;
+                }
+            }
+            if (prop) {
+                prop->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
+            } else {
+                AwPtpPropValueEnum* propEnum = MArrayAddPtr(allocator, outEnums->values);
+                propEnum->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
+                propEnum->propValue = *it.p;
+                propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+            }
+        }
+    }
+    return MArraySize(outEnums->values) > 0;
+}
+
+b32 AwControl_GetPropertyValueAsKnownStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr* strOut) {
     if (property == NULL) {
         return FALSE;
     }
-    char* str = NULL;
     PTPPropertyMetadata* meta = property->meta;
     if (!meta) {
         // No metadata / unrecognised property  but its a string - just return
@@ -4939,6 +5132,7 @@ b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MA
     }
 
     if (meta->fixedEnumsSize) {
+        char* str = NULL;
         switch (meta->type) {
             case PTP_DT_UINT8:
                 str = EnumValue8_Lookup(meta->fixedEnums.u8, meta->fixedEnumsSize, property->value.u8);
@@ -4949,63 +5143,91 @@ b32 AwControl_GetPropertyValueAsStr(AwControl* self, AwPtpProperty* property, MA
             case PTP_DT_UINT32:
                 str = EnumValue32_Lookup(meta->fixedEnums.u32, meta->fixedEnumsSize, property->value.u32);
                 break;
+            default:
+                AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
+                break;
+        }
+        if (str) {
+            strOut->str = str;
+            strOut->size = MCStrLen(str);
+            strOut->capacity = 0;
+            return TRUE;
         }
     } else if (meta->valueAsStringFunc) {
         *strOut = meta->valueAsStringFunc(self, allocator, property, property->value);
     } else {
-        // Metadata / recognised property - but no string value func - use the default
-        char buffer[32] = {};
-        int len = 0;
-        switch (property->dataType) {
-            case PTP_DT_STR: {
-                if (MStrIsEmpty(property->value.str)) {
-                    *strOut = MStrMakeEmpty();
-                } else {
-                    *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
-                }
-                return TRUE;
+        if (property->dataType == PTP_DT_STR) {
+            if (MStrIsEmpty(property->value.str)) {
+                *strOut = MStrMakeEmpty();
+            } else {
+                *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
             }
-            case PTP_DT_INT8:
-                len = snprintf(buffer, sizeof(buffer), "%hhd",  property->value.i8);
-                break;
-            case PTP_DT_UINT8:
-                len = snprintf(buffer, sizeof(buffer), "%hhu",  property->value.u8);
-                break;
-            case PTP_DT_INT16:
-                len = snprintf(buffer, sizeof(buffer), "%hd", property->value.i16);
-                break;
-            case PTP_DT_UINT16:
-                len = snprintf(buffer, sizeof(buffer), "%hu", property->value.u16);
-                break;
-            case PTP_DT_INT32:
-                len = snprintf(buffer, sizeof(buffer), "%d", property->value.i32);
-                break;
-            case PTP_DT_UINT32:
-                len = snprintf(buffer, sizeof(buffer), "%u", property->value.u32);
-                break;
-            case PTP_DT_INT64:
-                len = snprintf(buffer, sizeof(buffer), "%lld", property->value.i64);
-                break;
-            case PTP_DT_UINT64:
-                len = snprintf(buffer, sizeof(buffer), "%llu", property->value.u64);
-                break;
-            default:
-                return FALSE;
-        }
-        if (len > 0) {
-            *strOut = MStrMakeCopyLenNul(allocator, buffer, len);
+            return TRUE;
         } else {
-            *strOut = MStrMakeEmpty();
+            return FALSE;
         }
+    }
+
+    return strOut->str != NULL;
+}
+
+b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr* strOut) {
+    if (property == NULL) {
+        return FALSE;
+    }
+    PTPPropertyMetadata* meta = property->meta;
+    if (!meta) {
+        // No metadata / unrecognised property  but its a string - just return
+        if (property->dataType == PTP_DT_STR) {
+            if (MStrIsEmpty(property->value.str)) {
+                *strOut = MStrMakeEmpty();
+            } else {
+                *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
+            }
+            return TRUE;
+        }
+
+        *strOut = AwGetPropValueStr(allocator, (PtpDataType) property->dataType, property->value);
         return TRUE;
     }
 
-    if (!strOut->str) {
-        strOut->str = str;
-        strOut->size = MCStrLen(str);
-        strOut->capacity = 0;
+    if (meta->fixedEnumsSize) {
+        char* str = NULL;
+        switch (meta->type) {
+            case PTP_DT_UINT8:
+                str = EnumValue8_Lookup(meta->fixedEnums.u8, meta->fixedEnumsSize, property->value.u8);
+                break;
+            case PTP_DT_UINT16:
+                str = EnumValue16_Lookup(meta->fixedEnums.u16, meta->fixedEnumsSize, property->value.u16);
+                break;
+            case PTP_DT_UINT32:
+                str = EnumValue32_Lookup(meta->fixedEnums.u32, meta->fixedEnumsSize, property->value.u32);
+                break;
+            default:
+                AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
+                break;
+        }
+        if (str) {
+            strOut->str = str;
+            strOut->size = MCStrLen(str);
+            strOut->capacity = 0;
+            return TRUE;
+        }
+    } else if (meta->valueAsStringFunc) {
+        *strOut = meta->valueAsStringFunc(self, allocator, property, property->value);
+        return strOut->str != NULL;
+    } else {
+        if (property->dataType == PTP_DT_STR) {
+            if (MStrIsEmpty(property->value.str)) {
+                *strOut = MStrMakeEmpty();
+            } else {
+                *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
+            }
+            return TRUE;
+        }
     }
 
+    *strOut = AwGetPropValueStr(allocator, (PtpDataType) property->dataType, property->value);
     return strOut->str != NULL;
 }
 
@@ -5041,7 +5263,7 @@ AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr
     }
     if (property->formFlag == PTP_FORM_FLAG_ENUM) {
         AwPtpPropValueEnums enums;
-        if (AwControl_GetEnumsForProperty(self, property, self->allocator, &enums)) {
+        if (AwControl_GetEnumsForProperty(self, self->allocator, property, &enums)) {
             for (int i = 0; i < MArraySize(enums.values); i++) {
                 AwPtpPropValueEnum* enumValue = enums.values.data + i;
                 if (MStrCmp(enumValue->str, value)) {

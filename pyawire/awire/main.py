@@ -161,6 +161,31 @@ def _usb_bcd_version_as_string(usb_version) -> str:
     return f"{(usb_version >> 8) & 0xFF}.{usb_version & 0xFF:02d}"
 
 
+class PtpDataType(enum.IntEnum):
+    UNDEF = 0x0000
+    INT8 = 0x0001
+    UINT8 = 0x0002
+    INT16 = 0x0003
+    UINT16 = 0x0004
+    INT32 = 0x0005
+    UINT32 = 0x0006
+    INT64 = 0x0007
+    UINT64 = 0x0008
+    INT128 = 0x0009
+    UINT128 = 0x000A
+    AINT8 = 0x4001
+    AUINT8 = 0x4002
+    AINT16 = 0x4003
+    AUINT16 = 0x4004
+    AINT32 = 0x4005
+    AUINT32 = 0x4006
+    AINT64 = 0x4007
+    AUINT64 = 0x4008
+    AINT128 = 0x4009
+    AUINT128 = 0x400A
+    STR = 0xFFFF
+
+
 class AwDeviceInfo:
     def __init__(self, ffi_device):
         self.manufacturer = _convert_m_str(ffi_device.manufacturer)
@@ -182,8 +207,7 @@ class AwPtpProperty:
 
     def get_value_as_str(self) -> typing.Optional[str]:
         out_str = ffi.new("MStr[1]")
-        ok = lib.AwControl_GetPropertyValueAsStr(self._ffi_control, self._ffi_property,
-                                                 self._allocator, out_str)
+        ok = lib.AwControl_GetPropertyValueAsStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
         if not ok:
             return None
         result = _convert_m_str(out_str[0])
@@ -191,8 +215,25 @@ class AwPtpProperty:
         return result
 
     def get_value(self):
-        result = self.get_value_as_str()
-        return result
+        out_str = ffi.new("MStr[1]")
+        ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
+        if ok:
+            result = _convert_m_str(out_str[0])
+            lib.Aw_StrFree(self._allocator, out_str)
+            return result
+
+        # Return integer if string conversion not available
+        dt = self._ffi_property.dataType
+        v = self._ffi_property.value
+        if dt == PtpDataType.INT8: return v.i8
+        if dt == PtpDataType.UINT8: return v.u8
+        if dt == PtpDataType.INT16: return v.i16
+        if dt == PtpDataType.UINT16: return v.u16
+        if dt == PtpDataType.INT32: return v.i32
+        if dt == PtpDataType.UINT32: return v.u32
+        if dt == PtpDataType.INT64: return v.i64
+        if dt == PtpDataType.UINT64: return v.u64
+        return None
 
     def get_label(self) -> str:
         return _convert_c_str(lib.AwGetPropertyLabel(self.code))

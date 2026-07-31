@@ -12,7 +12,7 @@ b32 Http_ParseUrl(MAllocator* allocator, MStrView url, HttpUrl* outUrl) {
 
     // Scheme
     i32 schemeEnd = MStrViewFindC(parse, "://");
-    if (schemeEnd) {
+    if (schemeEnd >= 0) {
         outUrl->scheme = MStrViewLeft(parse, schemeEnd);
         MStrViewAdvance(&parse, schemeEnd + 3);
     } else {
@@ -27,9 +27,7 @@ b32 Http_ParseUrl(MAllocator* allocator, MStrView url, HttpUrl* outUrl) {
     if (portStart >= 0 && portStart < hostEnd) {
         outUrl->host = MStrViewLeft(parse, portStart);
         MParseResult r = MParseI32(parse.str + portStart + 1, parse.str + hostEnd, &outUrl->port);
-        if (r.end) {
-            MStrViewAdvance(&parse, (i32)(r.end - parse.str));
-        }
+        // Do not advance parse yet, path depends on pathStart
     } else {
         outUrl->host = MStrViewLeft(parse, hostEnd);
         if (MStrViewCmpC(outUrl->scheme, "https") == 0) {
@@ -40,18 +38,11 @@ b32 Http_ParseUrl(MAllocator* allocator, MStrView url, HttpUrl* outUrl) {
     }
 
     // Path
-    if (pathStart) {
-        i32 newline = -1;
-        for (i32 i = 0; i < parse.size; i++) {
-            if (MCharIsNewLine(parse.str[i])) {
-                newline = i;
-            }
-        }
-
-        if (newline >= 0) {
-            outUrl->host = MStrViewLeft(parse, newline);
-        } else {
-            outUrl->path = parse;
+    if (pathStart >= 0) {
+        outUrl->path = MStrViewSub(parse, pathStart, (i32)parse.size - pathStart);
+        // Strip any trailing newlines from path if they exist (though they shouldn't in a clean URL)
+        while (outUrl->path.size > 0 && MCharIsNewLine(outUrl->path.str[outUrl->path.size - 1])) {
+            outUrl->path.size--;
         }
     } else {
         outUrl->path = MStrViewMakeP("/", 1);
@@ -64,6 +55,7 @@ void Http_FreeUrl(MAllocator* allocator, HttpUrl* url) {
 }
 
 void Http_FreeResponse(MAllocator* allocator, HttpResponse* response) {
+    MArrayFree(allocator, response->headers);
     MMemFree(&response->response);
 }
 
@@ -71,7 +63,7 @@ static b32 Http_ParseStatusLine(HttpResponse* response) {
     MMemIO r = response->response;
     MStrView v = {(char*)r.mem, r.size};
     const char* versionStrStart = "HTTP/";
-    
+
     enum {
         State_VersionStart,
         State_Version1,
@@ -83,7 +75,7 @@ static b32 Http_ParseStatusLine(HttpResponse* response) {
         State_StatusText,
         State_End
     } state = State_VersionStart;
-    
+
     char* secondSpace = NULL;
     char* lineEnd = NULL;
     i32 statusCode = 0;
@@ -91,12 +83,12 @@ static b32 Http_ParseStatusLine(HttpResponse* response) {
 
     for (i32 i = 0; i < v.size; i++) {
         const char c = v.str[i];
-        
+
         if (c == '\r') {
             if (i + 1 < v.size && v.str[i+1] == '\n') {
                 lineEnd = v.str + i;
                 state = State_End;
-                if (secondSpace >= 0) {
+                if (secondSpace != NULL) {
                     response->statusText = MStrViewMakeP(secondSpace + 1, (i32)(lineEnd - (secondSpace + 1)));
                 } else {
                     return FALSE;
@@ -161,26 +153,52 @@ static b32 Http_ParseStatusLine(HttpResponse* response) {
     return TRUE;
 }
 
-static b32 Http_ParseResponseHeaders(HttpResponse* response) {
+static b32 Http_ParseResponseHeaders(HttpResponse* response, MAllocator* allocator) {
     if (!Http_ParseStatusLine(response)) {
         return FALSE;
     }
 
     MMemIO r = response->response;
-    MStrView responseView = {(char*)r.mem, r.size};
-    MStrViewAdvance(&responseView, response->statusText.size + 2);
-    
+    MStrView responseView = {(char*)r.mem, (u32)r.size};
+
+    // Advance past status line
+    i32 statusLineEnd = MStrViewFindC(responseView, "\r\n");
+    if (statusLineEnd < 0) return FALSE;
+    MStrViewAdvance(&responseView, statusLineEnd + 2);
+
     MStrView headerEndStr = {"\r\n\r\n", 4};
     i32 headersEnd = MStrViewFind(responseView, headerEndStr);
     if (headersEnd < 0) {
         return FALSE;
     }
 
-    response->headersText.str = (char*)response->response.mem;
-    response->headersText.size = headersEnd;
+    response->headersText = MStrViewLeft(responseView, headersEnd);
 
-    i32 bodyStart = headersEnd + 4;
-    if (response->response.size < bodyStart) {
+    // Parse individual headers
+    MStrView headersToParse = response->headersText;
+    while (headersToParse.size > 0) {
+        i32 lineEnd = MStrViewFindC(headersToParse, "\r\n");
+        MStrView line;
+        if (lineEnd >= 0) {
+            line = MStrViewLeft(headersToParse, lineEnd);
+            MStrViewAdvance(&headersToParse, lineEnd + 2);
+        } else {
+            line = headersToParse;
+            headersToParse.size = 0;
+        }
+
+        i32 colon = MStrViewFindChar(line, ':');
+        if (colon > 0) {
+            HttpHeader header;
+            header.key = MStrViewTrimAnyWhitespace(MStrViewLeft(line, colon));
+            header.value = MStrViewTrimAnyWhitespace(MStrViewSub(line, colon + 1, (i32)line.size - (colon + 1)));
+
+            MArrayAdd(allocator, response->headers, header);
+        }
+    }
+
+    i32 bodyStart = (i32)(responseView.str - (char*)r.mem) + headersEnd + 4;
+    if ((i32)response->response.size < bodyStart) {
         return FALSE;
     }
 
@@ -235,8 +253,8 @@ b32 Http_Get(MAllocator* allocator, MStrView url, HttpResponse* outResponse) {
         return FALSE;
     }
 
-    if (!Http_ParseResponseHeaders(outResponse)) {
-        MMemFree(&outResponse->response);
+    if (!Http_ParseResponseHeaders(outResponse, allocator)) {
+        Http_FreeResponse(allocator, outResponse);
         return FALSE;
     }
 

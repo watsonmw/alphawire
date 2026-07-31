@@ -31,13 +31,12 @@ Build
 ===
 
 - Meson build system
+- consider alphawirelib as static only / mainly
 
 Python
 ===
 
 - Python bindings are broken 
-  - consider switching to building alphawirelib statically
-  - consider alphawirelib as static only
 
 Documentation
 ===

@@ -6,7 +6,6 @@
 #include <IOKit/usb/USBSpec.h>
 #include <mach/mach_error.h>
 
-#include <stdlib.h>
 #include <pthread.h>
 
 #include "mlib/mlib.h"
@@ -671,7 +670,7 @@ static void NextInterruptRequest(AwDeviceIOKit* dev) {
 
 static void HandleInterruptResponse(void *refcon, IOReturn result, void *arg0) {
     AwDeviceIOKit* dev = (AwDeviceIOKit*)refcon;
-    UInt32 transferred = (UInt32)arg0;
+    UInt32 transferred = (UInt32)(uintptr_t)arg0;
 
     // Add event to event list
     if (result == kIOReturnSuccess && transferred > 0) {
@@ -714,6 +713,7 @@ static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds
     return (AwResult){.code=AW_RESULT_OK};
 }
 
+__attribute__((unused))
 static char* USBTransferTypeAsStr(u8 transferType) {
     switch (transferType) {
         case kUSBControl:
@@ -729,6 +729,7 @@ static char* USBTransferTypeAsStr(u8 transferType) {
     }
 }
 
+__attribute__((unused))
 static char* USBDirectionAsStr(u8 direction) {
     switch (direction) {
         case kUSBIn:
@@ -749,6 +750,7 @@ AwResult AwIokitDeviceList_OpenDevice(AwIokitDeviceList* self, AwDeviceInfo* dev
     SInt32 score = 0;
     IOReturn kr = 0;
     HRESULT hr = 0;
+    io_iterator_t interfaceIter = 0;
 
     kr = IOCreatePlugInInterfaceForService(
         device->deviceId,
@@ -797,7 +799,6 @@ AwResult AwIokitDeviceList_OpenDevice(AwIokitDeviceList* self, AwDeviceInfo* dev
     request.bInterfaceProtocol = USB_PROTOCOL_PTP;
     request.bAlternateSetting = kIOUSBFindInterfaceDontCare;
 
-    io_iterator_t interfaceIter = 0;
     kr = (*ioUsbDev)->CreateInterfaceIterator(ioUsbDev, &request, &interfaceIter);
     if (kr != kIOReturnSuccess) {
         AW_ERROR_F("Failed to connect to device: Unable to open IOKit USB Interface Iter: %s (%08x)",

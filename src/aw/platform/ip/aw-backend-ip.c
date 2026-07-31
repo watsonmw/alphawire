@@ -921,10 +921,10 @@ static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfoArray* deviceL
             u8* dst = MMemAddBytes(&recvBuf->data, (u32)n);
             memcpy(dst, buf->data.mem, (u32)n);
             buf = recvBuf;
-            view = (MStrView){buf->data.mem + recvBuf->parsedBytes,
+            view = (MStrView){(char*)buf->data.mem + recvBuf->parsedBytes,
                 recvBuf->data.size - recvBuf->parsedBytes};
         } else {
-            view = (MStrView) {buf->data.mem, (u32)n};
+            view = (MStrView) {(char*)buf->data.mem, (u32)n};
         }
 
         u32 parsedSize = 0;
