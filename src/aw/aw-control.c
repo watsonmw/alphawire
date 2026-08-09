@@ -2182,10 +2182,10 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD15F, "Recording Media - Image"},
     {0xD160, "Recording Media - Movie"},
     {0xD161, "Auto Switch Media"},
-    {0xD162, "Continuous Shooting Speed in Electric Shutter(Hi+)"},
-    {0xD163, "Continuous Shooting Speed in Electric Shutter(Hi)"},
-    {0xD164, "Continuous Shooting Speed in Electric Shutter(Mid)"},
-    {0xD165, "Continuous Shooting Speed in Electric Shutter(Lo)"},
+    {0xD162, "Electronic Shutter Continuous Shooting Limit Hi+"},
+    {0xD163, "Electronic Shutter Continuous Shooting Limit Hi"},
+    {0xD164, "Electronic Shutter Continuous Shooting Limit Mid"},
+    {0xD165, "Electronic Shutter Continuous Shooting Limit Lo"},
     {0xD194, "Camera Shake Status"},
     {0xD195, "Update Body Status"},
     {0xD197, "Media Slot 1 Writing State"},
@@ -5247,7 +5247,7 @@ AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, Aw
         return RESULT_CODE(AW_RESULT_PARAM_ERROR);
     }
     AwResult r = SDIO_SetExtDevicePropValue(self, property->propCode, property->dataType, value);
-    if (!IS_OK(r)) {
+    if (IS_OK(r)) {
         if (property->dataType == PTP_DT_STR) {
             UpdateStr(self->allocator, &value.str, &property->value.str);
         } else {
@@ -5258,16 +5258,17 @@ AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, Aw
 }
 
 AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value) {
-    if (property->dataType != PTP_DT_STR) {
+    if (property->dataType == PTP_DT_STR) {
         return AwControl_SetPropertyValue(self, property, (AwPtpPropValue) { .str = value });
     }
     if (property->formFlag == PTP_FORM_FLAG_ENUM) {
-        AwPtpPropValueEnums enums;
+        AwPtpPropValueEnums enums = {0};
         if (AwControl_GetEnumsForProperty(self, self->allocator, property, &enums)) {
             for (int i = 0; i < MArraySize(enums.values); i++) {
                 AwPtpPropValueEnum* enumValue = enums.values.data + i;
-                if (MStrCmp(enumValue->str, value)) {
+                if (MStrCmp(enumValue->str, value) == 0) {
                     AwControl_SetPropertyValue(self, property, enumValue->propValue);
+                    AwControl_FreePropValueEnums(self, &enums);
                     return RESULT_CODE(AW_RESULT_OK);
                 }
             }
@@ -5278,9 +5279,12 @@ AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr
                 if (valueI32 < MArraySize(enums.values)) {
                     AwPtpPropValueEnum* enumValue = enums.values.data + valueI32;
                     AwControl_SetPropertyValue(self, property, enumValue->propValue);
+                    AwControl_FreePropValueEnums(self, &enums);
                     return RESULT_CODE(AW_RESULT_OK);
                 }
             }
+
+            AwControl_FreePropValueEnums(self, &enums);
         }
     }
 
