@@ -257,6 +257,8 @@ struct AppContext {
     // Events
     double eventRefreshTime = 0.;
 
+    bool shutterReleasePressed = false;
+    i64 shutterReleaseTimeMillisStart = 0;
     bool shutterHalfPress = false;
     bool autoFocusButton = false;
 

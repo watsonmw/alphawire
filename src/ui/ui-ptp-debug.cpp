@@ -1,7 +1,6 @@
 #include <string>
 #include <time.h>
 #include <SDL3/SDL_time.h>
-#include <SDL3/SDL_timer.h>
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
@@ -863,10 +862,21 @@ void ShowCameraControlsWindow(AppContext& c) {
     ImGui::Checkbox("Inspect Controls", &c.showWindowDeviceDebug);
 
     if (ImGui::Button("Shutter")) {
+        // Button is released
+        c.shutterReleasePressed = false;
         AwControl_SetControlToggle(&c.aw, DPC_SHUTTER, false);
+        u64 now = MGetTimeMilliseconds();
+        if (now > c.shutterReleaseTimeMillisStart) {
+            AW_LOG_INFO_F(&c.aw.logger, "Shutter button released - held for %lld ms",
+                now - c.shutterReleaseTimeMillisStart);
+        }
+        c.shutterReleaseTimeMillisStart = 0;
     }
     if (ImGui::IsItemHovered()) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            // Button is pressed
+            c.shutterReleasePressed = true;
+            c.shutterReleaseTimeMillisStart = MGetTimeMilliseconds();
             AwControl_SetControlToggle(&c.aw, DPC_SHUTTER, true);
         }
     }
