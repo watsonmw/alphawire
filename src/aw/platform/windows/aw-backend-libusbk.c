@@ -839,6 +839,7 @@ AwResult AwUsbkDeviceList_CloseDevice(AwUsbkBackend* self, AwDevice* device) {
     if (deviceUsbk->eventThread) {
         // Signal thread to stop
         SetEvent(deviceUsbk->eventThreadStopEvent);
+        AW_DEBUG("Closing event thread...");
 
         // Wait for thread to exit (with timeout)
         DWORD waitResult = WaitForSingleObject(deviceUsbk->eventThread, 10000);
@@ -851,6 +852,8 @@ AwResult AwUsbkDeviceList_CloseDevice(AwUsbkBackend* self, AwDevice* device) {
         CloseHandle(deviceUsbk->eventThreadStopEvent);
         deviceUsbk->eventThread = NULL;
         deviceUsbk->eventThreadStopEvent = NULL;
+
+        AW_DEBUG("Closed event thread.");
 
         // Clean up event list
         MArrayFree(deviceUsbk->allocator, deviceUsbk->eventList);
@@ -884,7 +887,7 @@ static AwResult AwUsbkDeviceList_Close_(AwBackend* backend) {
     return r;
 }
 
-static AwResult AwUsbkDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfo** deviceList) {
+static AwResult AwUsbkDeviceList_RefreshList_(AwBackend* backend, AwDeviceInfoArray* deviceList) {
     AwUsbkBackend* self = backend->self;
     return AwUsbkDeviceList_RefreshList(self, deviceList);
 }
