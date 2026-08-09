@@ -1,9 +1,10 @@
 UI
 ===
 
-- Connect multiple cameras
+- Connect multiple cameras at the same time (maybe with seperate UI)
 - Detect transport errors and disconnect
-- Button list and control 
+- Button list and control tab
+  - Make tab list for camera settings
   - Add buttons UI
 
 API
@@ -33,10 +34,11 @@ Build
 - Meson build system
 - consider alphawirelib as static only / mainly
 
-Python
+Python Bindings
 ===
 
-- Python bindings are broken 
+- Extend tester to test more of the API
+  - Maybe with expected features per camera model
 
 Documentation
 ===

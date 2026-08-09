@@ -25,6 +25,8 @@ extern "C" {
  */
 typedef struct {
     AwDevice* device;
+    MAllocator* allocator;
+    AwLog logger;
 
     u16 protocolVersion;
     MStr manufacturer;
@@ -61,9 +63,6 @@ typedef struct {
     AwPtpResponseHeader ptpResponse;
 
     AwPtpEventArray eventQueue;  // Array of queued events
-
-    MAllocator* allocator;
-    AwLog logger;
 } AwControl;
 
 //////////////////////////////////////////////////////////////////////////////////////////////

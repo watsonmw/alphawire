@@ -36,5 +36,3 @@ class CustomBuildHook(BuildHookInterface):
 
         else:
             ffi_builder.emit_c_code('awire/_binding.c')
-
-#
