@@ -143,6 +143,9 @@ void AwDeviceList_ReleaseList(AwDeviceList* self, b32 free) {
 b32 AwDeviceList_Close(AwDeviceList* self) {
     AW_TRACE("AwDeviceList_Close");
     AwDeviceList_ReleaseList(self, TRUE);
+    MArrayEachPtr(self->openDevices, it) {
+        AwDeviceList_CloseDevice(self, it.p);
+    }
     MArrayEachPtr(self->backends, backend) {
         backend.p->close(backend.p);
     }
@@ -220,8 +223,8 @@ AwResult AwDeviceList_OpenDevice(AwDeviceList* self, AwDeviceInfo* deviceInfo, A
 
 AwResult AwDeviceList_CloseDevice(AwDeviceList* self, AwDevice* device) {
     AW_TRACE_F("AwDeviceList_CloseDevice: %p", device->device);
-    AwBackend* backend = AwDeviceList_GetBackend(self, device->backendType);
 
+    // Remove from list of open devices
     MArrayEachPtr(self->openDevices, it) {
         if (it.p == device) {
             MArrayRemoveIndex(self->openDevices, it.i);
@@ -229,5 +232,10 @@ AwResult AwDeviceList_CloseDevice(AwDeviceList* self, AwDevice* device) {
         }
     }
 
+    // Tell the backend to close the device
+    AwBackend* backend = AwDeviceList_GetBackend(self, device->backendType);
+    if (backend == NULL) {
+        return (AwResult){ .code = AW_RESULT_BACKEND_NOT_FOUND };
+    }
     return backend->closeDevice(backend, device);
 }
