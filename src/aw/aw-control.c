@@ -4746,8 +4746,8 @@ AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index) {
     return self->properties.data + index;
 }
 
-AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh) {
-    AW_TRACE("AwControl_UpdateProperties");
+AwResult AwControl_RefreshProperties(AwControl* self, b32 fullRefresh) {
+    AW_TRACE("AwControl_RefreshProperties");
     return SDIO_GetAllExtDevicePropInfo(self, FALSE, !fullRefresh, TRUE);
 }
 

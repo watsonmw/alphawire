@@ -309,7 +309,7 @@ enum AwPropertyEnumFlags {
 AwResult AwControl_Init(AwControl* self, AwDevice* device, MAllocator* allocator);
 AwResult AwControl_Connect(AwControl* self, AwSonyProtocolVersion version);
 AwResult AwControl_Cleanup(AwControl* self);
-AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh);
+AwResult AwControl_RefreshProperties(AwControl* self, b32 fullRefresh);
 
 size_t AwControl_NumProperties(AwControl* self);
 AwPtpProperty* AwControl_GetPropertyByIndex(AwControl* self, u16 index);

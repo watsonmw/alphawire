@@ -52,13 +52,16 @@ def list_settings(show_all=False):
                 prop_id = property.get_id()
                 if prop_id is not None:
                     prop_line += f" ({prop_id})"
-                prop_val = property.get_value()
+                prop_val = property.get_raw_value()
 
                 prop_line += f": {prop_val}"
 
                 prop_val_as_str = property.get_value_as_str()
                 if prop_val_as_str is not None:
                     prop_line += f" \"{prop_val_as_str}\""
+
+                if not property.is_writable():
+                    prop_line += " RO"
 
                 awire.log_info(prop_line)
 

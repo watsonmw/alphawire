@@ -1,5 +1,5 @@
 #pragma once
 
-class AppContext;
+struct AppContext;
 
 void UiPtpLiveViewShow(AppContext& context);

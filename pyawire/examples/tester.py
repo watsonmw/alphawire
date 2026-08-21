@@ -82,8 +82,8 @@ def camera_tester():
                     awire.log_warn("Failed to set ISO")
 
             # Test Update Properties
-            awire.log_info("Testing UpdateProperties(full_refresh=False)")
-            control.update_properties(full_refresh=False)
+            awire.log_info("Testing RefreshProperties(full_refresh=False)")
+            control.refresh_properties(full_refresh=False)
 
             # Test Pending Files
             pending = control.get_pending_files()

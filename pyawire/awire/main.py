@@ -1096,26 +1096,7 @@ class AwPtpProperty:
             return AwLockState
         return None
 
-    def get_value_as_str(self) -> typing.Optional[str]:
-        """
-        Get the current value of the property as a human-readable string.
-
-        For enums, this looks up the known string representation. For string types,
-        it returns the string directly. For some numeric properties, it returns a
-        formatted string (e.g., '0.3m' for focal distance).
-
-        Returns:
-            The property value as a string, or None if it could not be retrieved.
-        """
-        out_str = ffi.new("MStr[1]")
-        ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
-        if not ok:
-            return None
-        result = _convert_m_str(out_str[0])
-        lib.Aw_StrFree(self._allocator, out_str)
-        return result
-
-    def _convert_value(self, dt, v):
+    def _as_raw_val(self, dt, v):
         raw_val = None
         if dt == PtpDataType.INT8:
             raw_val = v.i8
@@ -1135,14 +1116,21 @@ class AwPtpProperty:
             raw_val = v.u64
         elif dt == PtpDataType.STR:
             raw_val = _convert_m_str(v.str)
+        return raw_val
 
+    def _convert_value(self, dt, v):
+        raw_val = self._as_raw_val(dt, v)
         if self._enum_type is not None:
             try:
                 return self._enum_type(raw_val)
             except ValueError:
                 return raw_val
-
         return raw_val
+
+    def get_raw_value(self) -> typing.Any:
+        dt = self._ffi_property.dataType
+        v = self._ffi_property.value
+        return self._convert_value(dt, v)
 
     def get_value(self) -> typing.Any:
         """
@@ -1151,11 +1139,15 @@ class AwPtpProperty:
         Returns:
             The property value.
         """
-        # Check if we have a known enum for this property
         dt = self._ffi_property.dataType
         v = self._ffi_property.value
-        raw_val = self._convert_value(dt, v)
-        if raw_val is None:
+        raw_val = self._as_raw_val(dt, v)
+        if self._enum_type is not None:
+            try:
+                return self._enum_type(raw_val)
+            except ValueError:
+                return raw_val
+        else:
             out_str = ffi.new("MStr[1]")
             ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
             if ok:
@@ -1164,6 +1156,25 @@ class AwPtpProperty:
                 return result
 
         return raw_val
+
+    def get_value_as_str(self) -> typing.Optional[str]:
+        """
+        Get the current value of the property as a human-readable string.
+
+        For enums, this looks up the known string representation. For string types,
+        it returns the string directly. For some numeric properties, it returns a
+        formatted string (e.g., '0.3m' for focal distance).
+
+        Returns:
+            The property value as a string, or None if it could not be retrieved.
+        """
+        out_str = ffi.new("MStr[1]")
+        ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
+        if not ok:
+            return None
+        result = _convert_m_str(out_str[0])
+        lib.Aw_StrFree(self._allocator, out_str)
+        return result
 
     def get_label(self) -> typing.Optional[str]:
         """
@@ -1208,6 +1219,10 @@ class AwPtpProperty:
 
         lib.AwControl_FreePropValueEnums(self._ffi_control, enums)
         return result
+
+    def is_writable(self) -> bool:
+        r = lib.AwControl_IsPropertyWritable(self._ffi_control, self._ffi_property)
+        return True if r else False
 
     def set_value(self, value: typing.Union[str, int, AwIntEnum]) -> bool:
         """
@@ -1364,7 +1379,7 @@ class AwControl:
             lib.Aw_MemIOFree(self._live_view_mem)
             self._live_view_mem = None
 
-    def update_properties(self, full_refresh: bool = True) -> bool:
+    def refresh_properties(self, full_refresh: bool = True) -> bool:
         """
         Update the local cache of camera properties by pulling latest values from the device.
 
@@ -1377,8 +1392,7 @@ class AwControl:
         Returns:
             True if successful, False otherwise.
         """
-        log(AwLogLevel.DEBUG, f"Updating properties (full_refresh={full_refresh})")
-        result = lib.AwControl_UpdateProperties(self._ffi, full_refresh)
+        result = lib.AwControl_RefreshProperties(self._ffi, full_refresh)
         return result.code == lib.AW_RESULT_OK
 
     def get_num_properties(self) -> int:
@@ -1542,7 +1556,7 @@ class AwControl:
         Returns:
             The number of pending files.
         """
-        lib.AwControl_UpdateProperties(self._ffi, True)
+        lib.AwControl_RefreshProperties(self._ffi, True)
         return lib.AwControl_GetPendingFiles(self._ffi)
 
     def get_captured_image(self) -> typing.Optional[AwCapturedFile]:
@@ -1567,11 +1581,7 @@ class AwControl:
         lib.Aw_MemIOFree(mem_io)
         return None
 
-    def update_properties(self, full_refresh: bool = False) -> typing.Any:
-        log(AwLogLevel.DEBUG, f"Updating properties (full_refresh={full_refresh})")
-        return lib.AwControl_UpdateProperties(self._ffi, full_refresh)
-
-    def _wait_for_condition(self, condition_func: typing.Callable[[], typing.Any], 
+    def _wait_for_condition(self, condition_func: typing.Callable[[], typing.Any],
                             stage: AwCaptureStage, workflow: AwImageCaptureWorkflow, label: str) -> typing.Any:
         total_wait_time, sleep_time = workflow.get_wait_time(stage)
         log(AwLogLevel.TRACE, f"Starting wait for {label} (total_wait={total_wait_time}s)")
@@ -1623,7 +1633,7 @@ class AwControl:
                 }
 
                 def check_focus():
-                    self.update_properties()
+                    self.refresh_properties()
                     val = focus_state.get_value()
                     return val in focus_complete_states
 

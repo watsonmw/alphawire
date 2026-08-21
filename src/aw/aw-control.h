@@ -183,7 +183,7 @@ AW_EXPORT size_t AwControl_NumProperties(AwControl* self);
  *                    may not update when 'fullRefresh' is set to FALSE.
  * @return Returns AW_RESULT_OK on success, or an appropriate error code on failure.
  */
-AW_EXPORT AwResult AwControl_UpdateProperties(AwControl* self, b32 fullRefresh);
+AW_EXPORT AwResult AwControl_RefreshProperties(AwControl* self, b32 fullRefresh);
 
 /**
  * Get Property at index (no particular order, but order stays the same between refreshes)
@@ -419,7 +419,7 @@ AW_EXPORT b32 AwControl_GetEnumsForControl(AwControl* self, u16 controlCode, AwP
 /**
  * Get the number of image files queued for download on camera.
  *
- * Call AwControl_UpdateProperties(TRUE) before calling this function to ensure local properties are uptodate.
+ * Call AwControl_RefreshProperties(TRUE) before calling this function to ensure local properties are uptodate.
  * 'TRUE' is needed as a partial/incremental refresh of properties may not include the updated count for pending files
  * for some cameras.
  */

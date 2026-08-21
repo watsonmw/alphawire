@@ -71,7 +71,7 @@ bool ImGuiInputInt(const char* label, u16 dataType, AwPtpPropValue* value) {
         case PTP_DT_UINT32:
             return ImGuiIntInput1(label, &value->u32, "%u", false, 0, 0xffffffff);
         case PTP_DT_INT32:
-            return ImGuiIntInput1(label, &value->i32, "%d", true, -0x80000000, 0x7fffffff);
+            return ImGuiIntInput1(label, &value->i32, "%d", true, 0x80000000, 0x7fffffff);
     }
     return false;
 }
@@ -89,7 +89,7 @@ bool ImGuiInputHex(const char* label, u16 dataType, AwPtpPropValue* value) {
         case PTP_DT_UINT32:
             return ImGuiIntInput1(label, &value->u32, "%08x", false, 0, 0xffffffff);
         case PTP_DT_INT32:
-            return ImGuiIntInput1(label, &value->i32, "%08x", true, -0x80000000, 0x7fffffff);
+            return ImGuiIntInput1(label, &value->i32, "%08x", true, 0x80000000, 0x7fffffff);
     }
     return false;
 }
@@ -930,7 +930,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         ImGui::ColorEdit3("##Color", c.liveViewOverlayColor, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoInputs);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(150.0f);
-        ImGui::SliderFloat("##Size", &c.liveViewOverlayThickness, 0.1, 20.0, "%0.2f");
+        ImGui::SliderFloat("##Size", &c.liveViewOverlayThickness, 0.1f, 20.0f, "%0.2f");
         ImGui::PopID();
 
         bool touchEnabled = AwControl_PropertyEnabledByCode(&c.aw, DPC_REMOTE_TOUCH_ENABLED);
@@ -1157,7 +1157,7 @@ void ShowCameraControlsWindow(AppContext& c) {
                 ImGui::Spacing();
                 ImGui::Dummy(ImVec2(43.0f, 0)); // Horizontal padding
                 ImGui::SameLine();
-                int delta = 20.0 / magnifier.ratio.ratio;
+                int delta = (int) (20.0 / magnifier.ratio.ratio);
                 if (delta < 1) {
                     delta = 1;
                 }
@@ -1445,7 +1445,7 @@ static void RefreshProperties(AppContext& c, float currentTime) {
     }
 
     if (propRefresh) {
-        AwControl_UpdateProperties(&c.aw, fullRefresh);
+        AwControl_RefreshProperties(&c.aw, fullRefresh);
         c.propRefresh = false;
         c.propertyLastRefreshTime = currentTime;
         c.propTable.needsRebuild = true;
