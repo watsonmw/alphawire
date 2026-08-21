@@ -545,11 +545,11 @@ static EnumValueU16 sProp_ExposureMeteringMode[] = {
 };
 
 static EnumValueU16 sProp_FlashMode[] = {
-    {0x0001, "Auto flash"},
-    {0x0002, "Flash off"},
-    {0x0003, "Fill flash"},
-    {0x0004, "Red eye auto"},
-    {0x0005, "Red eye fill"},
+    {0x0001, "Auto Flash"},
+    {0x0002, "Flash Off"},
+    {0x0003, "Fill Flash"},
+    {0x0004, "Red Eye Auto"},
+    {0x0005, "Red Eye Fill"},
     {0x0006, "External Sync"},
     {0x8001, "Slow Sync"},
     {0x8003, "Rear Sync"},

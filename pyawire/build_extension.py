@@ -323,6 +323,7 @@ b32 AwControl_GetPropertyValueAsKnownStr(AwControl* self, MAllocator* alloc, AwP
 AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, AwPtpPropValue value);
 AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value);
 b32 AwControl_IsPropertyWritable(AwControl* self, AwPtpProperty* property);
+b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* idOut);
 
 size_t AwControl_NumControls(AwControl* self);
 AwPtpControl* AwControl_GetControlByIndex(AwControl* self, u16 index);
@@ -448,6 +449,8 @@ void Aw_MemIOFree(MMemIO* memIO);
     if build_args.only_if_changed:
         # Check if any source or header files have changed
         watch_files = all_sources[:]
+        # Add this build script itself
+        watch_files.append(__file__)
         # Add headers from src/ directory
         for r, d, f in os.walk(root("src")):
             for file in f:

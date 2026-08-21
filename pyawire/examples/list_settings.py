@@ -47,12 +47,20 @@ def list_settings(show_all=False):
                     prop_label = f'0x{property.code:04x}'
                 else:
                     prop_label = f'\'{prop_label}\''
+                prop_line = f"            {prop_label}"
+
+                prop_id = property.get_id()
+                if prop_id is not None:
+                    prop_line += f" ({prop_id})"
                 prop_val = property.get_value()
+
+                prop_line += f": {prop_val}"
+
                 prop_val_as_str = property.get_value_as_str()
-                if prop_val_as_str is None:
-                    awire.log_info(f"            {prop_label}: {prop_val}")
-                else:
-                    awire.log_info(f"            {prop_label}: {prop_val} \"{prop_val_as_str}\"")
+                if prop_val_as_str is not None:
+                    prop_line += f" \"{prop_val_as_str}\""
+
+                awire.log_info(prop_line)
 
                 enums = property.get_enums()
                 if enums:

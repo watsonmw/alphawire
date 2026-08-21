@@ -1165,7 +1165,7 @@ class AwPtpProperty:
 
         return raw_val
 
-    def get_label(self) -> str:
+    def get_label(self) -> typing.Optional[str]:
         """
         Get the human-readable label for this property.
 
@@ -1173,6 +1173,15 @@ class AwPtpProperty:
             The property label.
         """
         return _convert_c_str(lib.AwGetPropertyLabel(self.code))
+
+    def get_id(self) -> typing.Optional[str]:
+        out_str = ffi.new("MStr[1]")
+        ok = lib.AwControl_GetPropertyId(self._ffi_control, self._ffi_property, out_str)
+        if ok:
+            result = _convert_m_str(out_str[0])
+            lib.Aw_StrFree(self._allocator, out_str)
+            return result
+        return None
 
     def get_enums(self) -> typing.List[typing.Tuple[typing.Any, typing.Optional[str]]]:
         """
