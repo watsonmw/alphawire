@@ -10,6 +10,7 @@ This module provides a Python wrapper for the Alphawire C library, allowing cont
 Sony cameras via PTP over USB.
 """
 import enum
+import sys
 import time
 import typing
 import weakref
@@ -20,20 +21,25 @@ from ._binding import ffi, lib
 def _convert_c_str(c_str: typing.Any) -> typing.Optional[str]:
     if c_str == ffi.NULL:
         return None
-    return ffi.string(c_str).decode("utf-8")
+    return ffi.string(c_str).decode("utf-8", errors="surrogateescape")
 
 
 def _convert_m_str(m_str: typing.Any) -> str:
     if m_str.str == ffi.NULL or m_str.size == 0:
         return ""
-    return ffi.string(m_str.str, m_str.size).decode("utf-8")
+    return ffi.string(m_str.str, m_str.size).decode("utf-8", errors="surrogateescape")
 
 
 def _usb_bcd_version_as_string(usb_version: int) -> str:
     return f"{(usb_version >> 8) & 0xFF}.{usb_version & 0xFF:02d}"
 
 
-class PtpDataType(enum.IntEnum):
+class AwIntEnum(enum.IntEnum):
+    def __str__(self) -> str:
+        return self.name
+        
+
+class PtpDataType(AwIntEnum):
     """PTP Data Types."""
     UNDEF = 0x0000
     INT8 = 0x0001
@@ -58,19 +64,19 @@ class PtpDataType(enum.IntEnum):
     AUINT128 = 0x400A
     STR = 0xFFFF
 
-class AwSonyProtocolVersion(enum.IntEnum):
+class AwSonyProtocolVersion(AwIntEnum):
     """Sony PTP Protocol Versions."""
     V2 = 200
     V3 = 300
 
 
-class AwDialMode(enum.IntEnum):
+class AwDialMode(AwIntEnum):
     """Camera Dial Mode."""
     CAMERA = 0x00
     REMOTE = 0x01
 
 
-class AwExposureProgramMode(enum.IntEnum):
+class AwExposureProgramModeU16(AwIntEnum):
     """Exposure Program Modes."""
     MANUAL = 0x0001
     AUTOMATIC = 0x0002
@@ -103,7 +109,229 @@ class AwExposureProgramMode(enum.IntEnum):
     MOVIE_AUTO = 0x8054
 
 
-class AwCaptureMode(enum.IntEnum):
+class AwExposureProgramMode(AwIntEnum):
+    """Exposure Program Modes."""
+    MANUAL = 0x00000001
+    AUTOMATIC = 0x00010002
+    APERTURE_PRIORITY = 0x00020003
+    SHUTTER_PRIORITY = 0x00030004
+    PROGRAM_CREATIVE = 0x00000005
+    PROGRAM_ACTION = 0x00000006
+    PORTRAIT = 0x00000007
+    AUTO = 0x00048000
+    AUTO_PLUS = 0x00048001
+    P_A = 0x00008008
+    P_S = 0x00008009
+    SPORTS_ACTION = 0x00058011
+    SUNSET = 0x00058012
+    NIGHT_SCENE = 0x00058013
+    LANDSCAPE = 0x00058014
+    MACRO = 0x00058015
+    HAND_HELD_TWILIGHT = 0x00058016
+    NIGHT_PORTRAIT = 0x00058017
+    ANTI_MOTION_BLUR = 0x00058018
+    PET = 0x00058019
+    GOURMET = 0x0005801A
+    FIREWORKS = 0x0005801B
+    HIGH_SENSITIVITY = 0x0005801C
+    MEMORY_RECALL = 0x00008020
+    CONTINUOUS_PRIORITY_AE = 0x00008030
+    TELE_ZOOM_CONTINUOUS_PRIORITY_AE_8PICS = 0x00008031
+    TELE_ZOOM_CONTINUOUS_PRIORITY_AE_10PICS = 0x00008032
+    CONTINUOUS_PRIORITY_AE_12PICS = 0x00008033
+    PANORAMA_3D = 0x00068040
+    PANORAMA = 0x00068041
+    MOVIE_P = 0x00078050
+    MOVIE_A = 0x00078051
+    MOVIE_S = 0x00078052
+    MOVIE_M = 0x00078053
+    MOVIE_AUTO = 0x00078054
+    MOVIE_SQ_P = 0x00098059
+    MOVIE_SQ_A = 0x0009805A
+    MOVIE_SQ_S = 0x0009805B
+    MOVIE_SQ_M = 0x0009805C
+    MOVIE_SQ_AUTO = 0x0009805D
+    FLASH_OFF = 0x00008060
+    PICTURE_EFFECT = 0x00008070
+    HFR_P = 0x00088080
+    HFR_A = 0x00088081
+    HFR_S = 0x00088082
+    HFR_M = 0x00088083
+    SQ_P = 0x00008084
+    SQ_A = 0x00008085
+    SQ_S = 0x00008086
+    SQ_M = 0x00008087
+    MOVIE = 0x000A8088
+    STILL = 0x000A8089
+    F_MOVIE_OR_SQ = 0x000B808A
+    MOVIE_F_MODE = 0x00078090
+    SQ_F_MODE = 0x00098091
+    INTERVAL_REC_MOVIE_F_MODE = 0x000C8092
+    INTERVAL_REC_MOVIE_P = 0x000C8093
+    INTERVAL_REC_MOVIE_A = 0x000C8094
+    INTERVAL_REC_MOVIE_S = 0x000C8095
+    INTERVAL_REC_MOVIE_M = 0x000C8096
+    INTERVAL_REC_MOVIE_AUTO = 0x000C8097
+
+
+class AwCaptureMode(AwIntEnum):
+    """Capture (Drive) Modes."""
+    NORMAL = 0x00000001
+    CONTINUOUS_HI = 0x00010002
+    TIMELAPSE = 0x00020003
+    SELF_TIMER_5S = 0x00038003
+    SELF_TIMER_10S = 0x00038004
+    SELF_TIMER_2S = 0x00038005
+    SELF_PORTRAIT_1_PERSON = 0x00078006
+    SELF_PORTRAIT_2_PEOPLE = 0x00078007
+    CONTINUOUS_SELF_TIMER_3_IMG = 0x00088008
+    CONTINUOUS_SELF_TIMER_5_IMG = 0x00088009
+    REMOTE_COMMANDER = 0x0007800A
+    MIRROR_UP = 0x0007800B
+    CONTINUOUS_SELF_TIMER_3_IMG_5S = 0x0008800C
+    CONTINUOUS_SELF_TIMER_5_IMG_5S = 0x0008800D
+    CONTINUOUS_SELF_TIMER_3_IMG_2S = 0x0008800E
+    CONTINUOUS_SELF_TIMER_5_IMG_2S = 0x0008800F
+    CONTINUOUS_HI_PLUS = 0x00018010
+    CONTINUOUS_HI_LIVE = 0x00018011
+    CONTINUOUS_LO = 0x00018012
+    CONTINUOUS_SHOOTING = 0x00018013
+    CONTINUOUS_SHOOTING_SPEED_PRIORITY = 0x00018014
+    CONTINUOUS_MID = 0x00018015
+    CONTINUOUS_MID_LIVE = 0x00018016
+    CONTINUOUS_LO_LIVE = 0x00018017
+    WHITE_BALANCE_BRACKET_LO = 0x00068018
+    DRO_BRACKET_LO = 0x00078019
+    LPF_BRACKET = 0x0007801A
+    WHITE_BALANCE_BRACKET_HI = 0x00068028
+    DRO_BRACKET_HI = 0x00078029
+    SPOT_BURST_SHOOTING_LO = 0x00098030
+    SPOT_BURST_SHOOTING_MID = 0x00098031
+    SPOT_BURST_SHOOTING_HI = 0x00098032
+    FOCUS_BRACKET = 0x000A8040
+    CONTINUOUS_BRACKET_0_3_EV_3_IMG = 0x00048337
+    CONTINUOUS_BRACKET_0_5_EV_3_IMG = 0x00048357
+    CONTINUOUS_BRACKET_0_7_EV_3_IMG = 0x00048377
+    CONTINUOUS_BRACKET_1_0_EV_3_IMG = 0x00048311
+    CONTINUOUS_BRACKET_1_3_EV_3_IMG = 0x00048341
+    CONTINUOUS_BRACKET_1_5_EV_3_IMG = 0x00048361
+    CONTINUOUS_BRACKET_1_7_EV_3_IMG = 0x00048381
+    CONTINUOUS_BRACKET_2_0_EV_3_IMG = 0x00048321
+    CONTINUOUS_BRACKET_2_3_EV_3_IMG = 0x00048351
+    CONTINUOUS_BRACKET_2_5_EV_3_IMG = 0x00048371
+    CONTINUOUS_BRACKET_2_7_EV_3_IMG = 0x00048391
+    CONTINUOUS_BRACKET_3_0_EV_3_IMG = 0x00048331
+    CONTINUOUS_BRACKET_0_3_EV_5_IMG = 0x00048537
+    CONTINUOUS_BRACKET_0_5_EV_5_IMG = 0x00048557
+    CONTINUOUS_BRACKET_0_7_EV_5_IMG = 0x00048577
+    CONTINUOUS_BRACKET_1_0_EV_5_IMG = 0x00048511
+    CONTINUOUS_BRACKET_1_3_EV_5_IMG = 0x00048541
+    CONTINUOUS_BRACKET_1_5_EV_5_IMG = 0x00048561
+    CONTINUOUS_BRACKET_1_7_EV_5_IMG = 0x00048581
+    CONTINUOUS_BRACKET_2_0_EV_5_IMG = 0x00048521
+    CONTINUOUS_BRACKET_2_3_EV_5_IMG = 0x00048551
+    CONTINUOUS_BRACKET_2_5_EV_5_IMG = 0x00048571
+    CONTINUOUS_BRACKET_2_7_EV_5_IMG = 0x00048591
+    CONTINUOUS_BRACKET_3_0_EV_5_IMG = 0x00048531
+    CONTINUOUS_BRACKET_0_3_EV_7_IMG = 0x00048737
+    CONTINUOUS_BRACKET_0_5_EV_7_IMG = 0x00048757
+    CONTINUOUS_BRACKET_0_7_EV_7_IMG = 0x00048777
+    CONTINUOUS_BRACKET_1_0_EV_7_IMG = 0x00048711
+    CONTINUOUS_BRACKET_1_3_EV_7_IMG = 0x00048741
+    CONTINUOUS_BRACKET_1_5_EV_7_IMG = 0x00048761
+    CONTINUOUS_BRACKET_1_7_EV_7_IMG = 0x00048781
+    CONTINUOUS_BRACKET_2_0_EV_7_IMG = 0x00048721
+    CONTINUOUS_BRACKET_0_3_EV_9_IMG = 0x00048937
+    CONTINUOUS_BRACKET_0_5_EV_9_IMG = 0x00048957
+    CONTINUOUS_BRACKET_0_7_EV_9_IMG = 0x00048977
+    CONTINUOUS_BRACKET_1_0_EV_9_IMG = 0x00048911
+    CONTINUOUS_BRACKET_0_3_EV_2_IMG_PLUS = 0x0004C237
+    CONTINUOUS_BRACKET_0_5_EV_2_IMG_PLUS = 0x0004C257
+    CONTINUOUS_BRACKET_0_7_EV_2_IMG_PLUS = 0x0004C277
+    CONTINUOUS_BRACKET_1_0_EV_2_IMG_PLUS = 0x0004C211
+    CONTINUOUS_BRACKET_1_3_EV_2_IMG_PLUS = 0x0004C241
+    CONTINUOUS_BRACKET_1_5_EV_2_IMG_PLUS = 0x0004C261
+    CONTINUOUS_BRACKET_1_7_EV_2_IMG_PLUS = 0x0004C281
+    CONTINUOUS_BRACKET_2_0_EV_2_IMG_PLUS = 0x0004C221
+    CONTINUOUS_BRACKET_2_3_EV_2_IMG_PLUS = 0x0004C251
+    CONTINUOUS_BRACKET_2_5_EV_2_IMG_PLUS = 0x0004C271
+    CONTINUOUS_BRACKET_2_7_EV_2_IMG_PLUS = 0x0004C291
+    CONTINUOUS_BRACKET_3_0_EV_2_IMG_PLUS = 0x0004C231
+    CONTINUOUS_BRACKET_0_3_EV_2_IMG_MINUS = 0x0004C23F
+    CONTINUOUS_BRACKET_0_5_EV_2_IMG_MINUS = 0x0004C25F
+    CONTINUOUS_BRACKET_0_7_EV_2_IMG_MINUS = 0x0004C27F
+    CONTINUOUS_BRACKET_1_0_EV_2_IMG_MINUS = 0x0004C219
+    CONTINUOUS_BRACKET_1_3_EV_2_IMG_MINUS = 0x0004C249
+    CONTINUOUS_BRACKET_1_5_EV_2_IMG_MINUS = 0x0004C269
+    CONTINUOUS_BRACKET_1_7_EV_2_IMG_MINUS = 0x0004C289
+    CONTINUOUS_BRACKET_2_0_EV_2_IMG_MINUS = 0x0004C229
+    CONTINUOUS_BRACKET_2_3_EV_2_IMG_MINUS = 0x0004C259
+    CONTINUOUS_BRACKET_2_5_EV_2_IMG_MINUS = 0x0004C279
+    CONTINUOUS_BRACKET_2_7_EV_2_IMG_MINUS = 0x0004C299
+    CONTINUOUS_BRACKET_3_0_EV_2_IMG_MINUS = 0x0004C239
+    SINGLE_BRACKET_0_3_EV_3_IMG = 0x00058336
+    SINGLE_BRACKET_0_5_EV_3_IMG = 0x00058356
+    SINGLE_BRACKET_0_7_EV_3_IMG = 0x00058376
+    SINGLE_BRACKET_1_0_EV_3_IMG = 0x00058310
+    SINGLE_BRACKET_1_3_EV_3_IMG = 0x00058340
+    SINGLE_BRACKET_1_5_EV_3_IMG = 0x00058360
+    SINGLE_BRACKET_1_7_EV_3_IMG = 0x00058380
+    SINGLE_BRACKET_2_0_EV_3_IMG = 0x00058320
+    SINGLE_BRACKET_2_3_EV_3_IMG = 0x00058350
+    SINGLE_BRACKET_2_5_EV_3_IMG = 0x00058370
+    SINGLE_BRACKET_2_7_EV_3_IMG = 0x00058390
+    SINGLE_BRACKET_3_0_EV_3_IMG = 0x00058330
+    SINGLE_BRACKET_0_3_EV_5_IMG = 0x00058536
+    SINGLE_BRACKET_0_5_EV_5_IMG = 0x00058556
+    SINGLE_BRACKET_0_7_EV_5_IMG = 0x00058576
+    SINGLE_BRACKET_1_0_EV_5_IMG = 0x00058510
+    SINGLE_BRACKET_1_3_EV_5_IMG = 0x00058540
+    SINGLE_BRACKET_1_5_EV_5_IMG = 0x00058560
+    SINGLE_BRACKET_1_7_EV_5_IMG = 0x00058580
+    SINGLE_BRACKET_2_0_EV_5_IMG = 0x00058520
+    SINGLE_BRACKET_2_3_EV_5_IMG = 0x00058550
+    SINGLE_BRACKET_2_5_EV_5_IMG = 0x00058570
+    SINGLE_BRACKET_2_7_EV_5_IMG = 0x00058590
+    SINGLE_BRACKET_3_0_EV_5_IMG = 0x00058530
+    SINGLE_BRACKET_0_3_EV_7_IMG = 0x00058736
+    SINGLE_BRACKET_0_5_EV_7_IMG = 0x00058756
+    SINGLE_BRACKET_0_7_EV_7_IMG = 0x00058776
+    SINGLE_BRACKET_1_0_EV_7_IMG = 0x00058710
+    SINGLE_BRACKET_1_3_EV_7_IMG = 0x00058740
+    SINGLE_BRACKET_1_5_EV_7_IMG = 0x00058760
+    SINGLE_BRACKET_1_7_EV_7_IMG = 0x00058780
+    SINGLE_BRACKET_2_0_EV_7_IMG = 0x00058720
+    SINGLE_BRACKET_0_3_EV_9_IMG = 0x00058936
+    SINGLE_BRACKET_0_5_EV_9_IMG = 0x00058956
+    SINGLE_BRACKET_0_7_EV_9_IMG = 0x00058976
+    SINGLE_BRACKET_1_0_EV_9_IMG = 0x00058910
+    SINGLE_BRACKET_0_3_EV_2_IMG_PLUS = 0x0005C236
+    SINGLE_BRACKET_0_5_EV_2_IMG_PLUS = 0x0005C256
+    SINGLE_BRACKET_0_7_EV_2_IMG_PLUS = 0x0005C276
+    SINGLE_BRACKET_1_0_EV_2_IMG_PLUS = 0x0005C210
+    SINGLE_BRACKET_1_3_EV_2_IMG_PLUS = 0x0005C240
+    SINGLE_BRACKET_1_5_EV_2_IMG_PLUS = 0x0005C260
+    SINGLE_BRACKET_1_7_EV_2_IMG_PLUS = 0x0005C280
+    SINGLE_BRACKET_2_0_EV_2_IMG_PLUS = 0x0005C220
+    SINGLE_BRACKET_2_3_EV_2_IMG_PLUS = 0x0005C250
+    SINGLE_BRACKET_2_5_EV_2_IMG_PLUS = 0x0005C270
+    SINGLE_BRACKET_2_7_EV_2_IMG_PLUS = 0x0005C290
+    SINGLE_BRACKET_3_0_EV_2_IMG_PLUS = 0x0005C230
+    SINGLE_BRACKET_0_3_EV_2_IMG_MINUS = 0x0005C23E
+    SINGLE_BRACKET_0_5_EV_2_IMG_MINUS = 0x0005C25E
+    SINGLE_BRACKET_0_7_EV_2_IMG_MINUS = 0x0005C27E
+    SINGLE_BRACKET_1_0_EV_2_IMG_MINUS = 0x0005C218
+    SINGLE_BRACKET_1_3_EV_2_IMG_MINUS = 0x0005C248
+    SINGLE_BRACKET_1_5_EV_2_IMG_MINUS = 0x0005C268
+    SINGLE_BRACKET_1_7_EV_2_IMG_MINUS = 0x0005C288
+    SINGLE_BRACKET_2_0_EV_2_IMG_MINUS = 0x0005C228
+    SINGLE_BRACKET_2_3_EV_2_IMG_MINUS = 0x0005C258
+    SINGLE_BRACKET_2_5_EV_2_IMG_MINUS = 0x0005C278
+    SINGLE_BRACKET_2_7_EV_2_IMG_MINUS = 0x0005C298
+    SINGLE_BRACKET_3_0_EV_2_IMG_MINUS = 0x0005C238
+
+
+class AwCaptureModeU16(AwIntEnum):
     """Capture (Drive) Modes."""
     NORMAL = 0x0001
     CONTINUOUS_HI = 0x0002
@@ -111,12 +339,176 @@ class AwCaptureMode(enum.IntEnum):
     SELF_TIMER_5S = 0x8003
     SELF_TIMER_10S = 0x8004
     SELF_TIMER_2S = 0x8005
+    SELF_PORTRAIT_1_PERSON = 0x8006
+    SELF_PORTRAIT_2_PEOPLE = 0x8007
+    CONTINUOUS_SELF_TIMER_3_IMG = 0x8008
+    CONTINUOUS_SELF_TIMER_5_IMG = 0x8009
+    REMOTE_COMMANDER = 0x800A
+    MIRROR_UP = 0x800B
+    CONTINUOUS_SELF_TIMER_3_IMG_5S = 0x800C
+    CONTINUOUS_SELF_TIMER_5_IMG_5S = 0x800D
+    CONTINUOUS_SELF_TIMER_3_IMG_2S = 0x800E
+    CONTINUOUS_SELF_TIMER_5_IMG_2S = 0x800F
     CONTINUOUS_HI_PLUS = 0x8010
+    CONTINUOUS_HI_LIVE = 0x8011
     CONTINUOUS_LO = 0x8012
+    CONTINUOUS_SHOOTING = 0x8013
+    CONTINUOUS_SHOOTING_SPEED_PRIORITY = 0x8014
     CONTINUOUS_MID = 0x8015
+    CONTINUOUS_MID_LIVE = 0x8016
+    CONTINUOUS_LO_LIVE = 0x8017
+    WHITE_BALANCE_BRACKET_LO = 0x8018
+    DRO_BRACKET_LO = 0x8019
+    LPF_BRACKET = 0x801A
+    WHITE_BALANCE_BRACKET_HI = 0x8028
+    DRO_BRACKET_HI = 0x8029
+    SPOT_BURST_SHOOTING_LO = 0x8030
+    SPOT_BURST_SHOOTING_MID = 0x8031
+    SPOT_BURST_SHOOTING_HI = 0x8032
+    FOCUS_BRACKET = 0x8040
+    CONTINUOUS_BRACKET_0_3_EV_3_IMG = 0x8337
+    CONTINUOUS_BRACKET_0_5_EV_3_IMG = 0x8357
+    CONTINUOUS_BRACKET_0_7_EV_3_IMG = 0x8377
+    CONTINUOUS_BRACKET_1_0_EV_3_IMG = 0x8311
+    CONTINUOUS_BRACKET_1_3_EV_3_IMG = 0x8341
+    CONTINUOUS_BRACKET_1_5_EV_3_IMG = 0x8361
+    CONTINUOUS_BRACKET_1_7_EV_3_IMG = 0x8381
+    CONTINUOUS_BRACKET_2_0_EV_3_IMG = 0x8321
+    CONTINUOUS_BRACKET_2_3_EV_3_IMG = 0x8351
+    CONTINUOUS_BRACKET_2_5_EV_3_IMG = 0x8371
+    CONTINUOUS_BRACKET_2_7_EV_3_IMG = 0x8391
+    CONTINUOUS_BRACKET_3_0_EV_3_IMG = 0x8331
+    CONTINUOUS_BRACKET_0_3_EV_5_IMG = 0x8537
+    CONTINUOUS_BRACKET_0_5_EV_5_IMG = 0x8557
+    CONTINUOUS_BRACKET_0_7_EV_5_IMG = 0x8577
+    CONTINUOUS_BRACKET_1_0_EV_5_IMG = 0x8511
+    CONTINUOUS_BRACKET_1_3_EV_5_IMG = 0x8541
+    CONTINUOUS_BRACKET_1_5_EV_5_IMG = 0x8561
+    CONTINUOUS_BRACKET_1_7_EV_5_IMG = 0x8581
+    CONTINUOUS_BRACKET_2_0_EV_5_IMG = 0x8521
+    CONTINUOUS_BRACKET_2_3_EV_5_IMG = 0x8551
+    CONTINUOUS_BRACKET_2_5_EV_5_IMG = 0x8571
+    CONTINUOUS_BRACKET_2_7_EV_5_IMG = 0x8591
+    CONTINUOUS_BRACKET_3_0_EV_5_IMG = 0x8531
+    CONTINUOUS_BRACKET_0_3_EV_7_IMG = 0x8737
+    CONTINUOUS_BRACKET_0_5_EV_7_IMG = 0x8757
+    CONTINUOUS_BRACKET_0_7_EV_7_IMG = 0x8777
+    CONTINUOUS_BRACKET_1_0_EV_7_IMG = 0x8711
+    CONTINUOUS_BRACKET_1_3_EV_7_IMG = 0x8741
+    CONTINUOUS_BRACKET_1_5_EV_7_IMG = 0x8761
+    CONTINUOUS_BRACKET_1_7_EV_7_IMG = 0x8781
+    CONTINUOUS_BRACKET_2_0_EV_7_IMG = 0x8721
+    CONTINUOUS_BRACKET_0_3_EV_9_IMG = 0x8937
+    CONTINUOUS_BRACKET_0_5_EV_9_IMG = 0x8957
+    CONTINUOUS_BRACKET_0_7_EV_9_IMG = 0x8977
+    CONTINUOUS_BRACKET_1_0_EV_9_IMG = 0x8911
+    CONTINUOUS_BRACKET_0_3_EV_2_IMG_PLUS = 0xC237
+    CONTINUOUS_BRACKET_0_5_EV_2_IMG_PLUS = 0xC257
+    CONTINUOUS_BRACKET_0_7_EV_2_IMG_PLUS = 0xC277
+    CONTINUOUS_BRACKET_1_0_EV_2_IMG_PLUS = 0xC211
+    CONTINUOUS_BRACKET_1_3_EV_2_IMG_PLUS = 0xC241
+    CONTINUOUS_BRACKET_1_5_EV_2_IMG_PLUS = 0xC261
+    CONTINUOUS_BRACKET_1_7_EV_2_IMG_PLUS = 0xC281
+    CONTINUOUS_BRACKET_2_0_EV_2_IMG_PLUS = 0xC221
+    CONTINUOUS_BRACKET_2_3_EV_2_IMG_PLUS = 0xC251
+    CONTINUOUS_BRACKET_2_5_EV_2_IMG_PLUS = 0xC271
+    CONTINUOUS_BRACKET_2_7_EV_2_IMG_PLUS = 0xC291
+    CONTINUOUS_BRACKET_3_0_EV_2_IMG_PLUS = 0xC231
+    CONTINUOUS_BRACKET_0_3_EV_2_IMG_MINUS = 0xC23F
+    CONTINUOUS_BRACKET_0_5_EV_2_IMG_MINUS = 0xC25F
+    CONTINUOUS_BRACKET_0_7_EV_2_IMG_MINUS = 0xC27F
+    CONTINUOUS_BRACKET_1_0_EV_2_IMG_MINUS = 0xC219
+    CONTINUOUS_BRACKET_1_3_EV_2_IMG_MINUS = 0xC249
+    CONTINUOUS_BRACKET_1_5_EV_2_IMG_MINUS = 0xC269
+    CONTINUOUS_BRACKET_1_7_EV_2_IMG_MINUS = 0xC289
+    CONTINUOUS_BRACKET_2_0_EV_2_IMG_MINUS = 0xC229
+    CONTINUOUS_BRACKET_2_3_EV_2_IMG_MINUS = 0xC259
+    CONTINUOUS_BRACKET_2_5_EV_2_IMG_MINUS = 0xC279
+    CONTINUOUS_BRACKET_2_7_EV_2_IMG_MINUS = 0xC299
+    CONTINUOUS_BRACKET_3_0_EV_2_IMG_MINUS = 0xC239
+    SINGLE_BRACKET_0_3_EV_3_IMG = 0x8336
+    SINGLE_BRACKET_0_5_EV_3_IMG = 0x8356
+    SINGLE_BRACKET_0_7_EV_3_IMG = 0x8376
+    SINGLE_BRACKET_1_0_EV_3_IMG = 0x8310
+    SINGLE_BRACKET_1_3_EV_3_IMG = 0x8340
+    SINGLE_BRACKET_1_5_EV_3_IMG = 0x8360
+    SINGLE_BRACKET_1_7_EV_3_IMG = 0x8380
+    SINGLE_BRACKET_2_0_EV_3_IMG = 0x8320
+    SINGLE_BRACKET_2_3_EV_3_IMG = 0x8350
+    SINGLE_BRACKET_2_5_EV_3_IMG = 0x8370
+    SINGLE_BRACKET_2_7_EV_3_IMG = 0x8390
+    SINGLE_BRACKET_3_0_EV_3_IMG = 0x8330
+    SINGLE_BRACKET_0_3_EV_5_IMG = 0x8536
+    SINGLE_BRACKET_0_5_EV_5_IMG = 0x8556
+    SINGLE_BRACKET_0_7_EV_5_IMG = 0x8576
+    SINGLE_BRACKET_1_0_EV_5_IMG = 0x8510
+    SINGLE_BRACKET_1_3_EV_5_IMG = 0x8540
+    SINGLE_BRACKET_1_5_EV_5_IMG = 0x8560
+    SINGLE_BRACKET_1_7_EV_5_IMG = 0x8580
+    SINGLE_BRACKET_2_0_EV_5_IMG = 0x8520
+    SINGLE_BRACKET_2_3_EV_5_IMG = 0x8550
+    SINGLE_BRACKET_2_5_EV_5_IMG = 0x8570
+    SINGLE_BRACKET_2_7_EV_5_IMG = 0x8590
+    SINGLE_BRACKET_3_0_EV_5_IMG = 0x8530
+    SINGLE_BRACKET_0_3_EV_7_IMG = 0x8736
+    SINGLE_BRACKET_0_5_EV_7_IMG = 0x8756
+    SINGLE_BRACKET_0_7_EV_7_IMG = 0x8776
+    SINGLE_BRACKET_1_0_EV_7_IMG = 0x8710
+    SINGLE_BRACKET_1_3_EV_7_IMG = 0x8740
+    SINGLE_BRACKET_1_5_EV_7_IMG = 0x8760
+    SINGLE_BRACKET_1_7_EV_7_IMG = 0x8780
+    SINGLE_BRACKET_2_0_EV_7_IMG = 0x8720
+    SINGLE_BRACKET_0_3_EV_9_IMG = 0x8936
+    SINGLE_BRACKET_0_5_EV_9_IMG = 0x8956
+    SINGLE_BRACKET_0_7_EV_9_IMG = 0x8976
+    SINGLE_BRACKET_1_0_EV_9_IMG = 0x8910
+    SINGLE_BRACKET_0_3_EV_2_IMG_PLUS = 0xC236
+    SINGLE_BRACKET_0_5_EV_2_IMG_PLUS = 0xC256
+    SINGLE_BRACKET_0_7_EV_2_IMG_PLUS = 0xC276
+    SINGLE_BRACKET_1_0_EV_2_IMG_PLUS = 0xC210
+    SINGLE_BRACKET_1_3_EV_2_IMG_PLUS = 0xC240
+    SINGLE_BRACKET_1_5_EV_2_IMG_PLUS = 0xC260
+    SINGLE_BRACKET_1_7_EV_2_IMG_PLUS = 0xC280
+    SINGLE_BRACKET_2_0_EV_2_IMG_PLUS = 0xC220
+    SINGLE_BRACKET_2_3_EV_2_IMG_PLUS = 0xC250
+    SINGLE_BRACKET_2_5_EV_2_IMG_PLUS = 0xC270
+    SINGLE_BRACKET_2_7_EV_2_IMG_PLUS = 0xC290
+    SINGLE_BRACKET_3_0_EV_2_IMG_PLUS = 0xC230
+    SINGLE_BRACKET_0_3_EV_2_IMG_MINUS = 0xC23E
+    SINGLE_BRACKET_0_5_EV_2_IMG_MINUS = 0xC25E
+    SINGLE_BRACKET_0_7_EV_2_IMG_MINUS = 0xC27E
+    SINGLE_BRACKET_1_0_EV_2_IMG_MINUS = 0xC218
+    SINGLE_BRACKET_1_3_EV_2_IMG_MINUS = 0xC248
+    SINGLE_BRACKET_1_5_EV_2_IMG_MINUS = 0xC268
+    SINGLE_BRACKET_1_7_EV_2_IMG_MINUS = 0xC288
+    SINGLE_BRACKET_2_0_EV_2_IMG_MINUS = 0xC228
+    SINGLE_BRACKET_2_3_EV_2_IMG_MINUS = 0xC258
+    SINGLE_BRACKET_2_5_EV_2_IMG_MINUS = 0xC278
+    SINGLE_BRACKET_2_7_EV_2_IMG_MINUS = 0xC298
+    SINGLE_BRACKET_3_0_EV_2_IMG_MINUS = 0xC238
 
 
-class AwWhiteBalance(enum.IntEnum):
+class AwFlashMode(AwIntEnum):
+    """Flash Mode Settings."""
+    AUTO = 0x0001
+    OFF = 0x0002
+    FILL = 0x0003
+    RED_EYE_AUTO = 0x0004
+    RED_EYE_FILL = 0x0005
+    EXTERNAL_SYNC = 0x0006
+    SLOW_SYNC = 0x8001
+    REAR_SYNC = 0x8003
+    WIRELESS = 0x8004
+    HSS_AUTO = 0x8021
+    HSS_FILL = 0x8022
+    HSS_WL = 0x8024
+    SLOW_SYNC_RED_EYE_ON = 0x8031
+    SLOW_SYNC_RED_EYE_OFF = 0x8032
+    SLOW_SYNC_WIRELESS = 0x8041
+    REAR_SYNC_WIRELESS = 0x8042
+
+
+class AwWhiteBalance(AwIntEnum):
     """White Balance Settings."""
     MANUAL = 0x0001
     AWB = 0x0002
@@ -125,6 +517,10 @@ class AwWhiteBalance(enum.IntEnum):
     FLUORESCENT = 0x0005
     TUNGSTEN = 0x0006
     FLASH = 0x0007
+    FLUORESCENT_WARM_WHITE = 0x8001
+    FLUORESCENT_COOL_WHITE = 0x8002
+    FLUORESCENT_DAY_WHITE = 0x8003
+    FLUORESCENT_DAYLIGHT = 0x8004
     CLOUDY = 0x8010
     SHADE = 0x8011
     CUSTOM_TEMP = 0x8012
@@ -132,9 +528,10 @@ class AwWhiteBalance(enum.IntEnum):
     CUSTOM_2 = 0x8021
     CUSTOM_3 = 0x8022
     CUSTOM = 0x8023
+    UNDERWATER_AUTO = 0x8030
 
 
-class AwFocusMode(enum.IntEnum):
+class AwFocusMode(AwIntEnum):
     """Focus Modes."""
     MANUAL = 0x0001
     AF_S = 0x0002
@@ -143,7 +540,7 @@ class AwFocusMode(enum.IntEnum):
     DMF = 0x8006
 
 
-class AwFocusArea(enum.IntEnum):
+class AwFocusArea(AwIntEnum):
     """Focus Area Settings."""
     WIDE = 0x0001
     ZONE = 0x0002
@@ -152,6 +549,12 @@ class AwFocusArea(enum.IntEnum):
     FLEXIBLE_SPOT_M = 0x0102
     FLEXIBLE_SPOT_L = 0x0103
     EXPAND_FLEXIBLE_SPOT = 0x0104
+    FLEXIBLE_SPOT = 0x0105
+    FLEXIBLE_SPOT_XS = 0x0106
+    FLEXIBLE_SPOT_XL = 0x0107
+    FLEXIBLE_SPOT_FREE_1 = 0x1101
+    FLEXIBLE_SPOT_FREE_2 = 0x1102
+    FLEXIBLE_SPOT_FREE_3 = 0x1103
     TRACKING_WIDE = 0x0201
     TRACKING_ZONE = 0x0202
     TRACKING_CENTER = 0x0203
@@ -159,9 +562,15 @@ class AwFocusArea(enum.IntEnum):
     TRACKING_FLEXIBLE_SPOT_M = 0x0205
     TRACKING_FLEXIBLE_SPOT_L = 0x0206
     TRACKING_EXPAND_FLEXIBLE_SPOT = 0x0207
+    TRACKING_FLEXIBLE_SPOT = 0x0208
+    TRACKING_FLEXIBLE_SPOT_XS = 0x0209
+    TRACKING_FLEXIBLE_SPOT_XL = 0x020A
+    TRACKING_FLEXIBLE_SPOT_FREE_1 = 0x1201
+    TRACKING_FLEXIBLE_SPOT_FREE_2 = 0x1202
+    TRACKING_FLEXIBLE_SPOT_FREE_3 = 0x1203
 
 
-class AwAutoFocusStatus(enum.IntEnum):
+class AwAutoFocusStatus(AwIntEnum):
     """Auto Focus Status."""
     UNLOCK = 0x01
     AFS_LOCKED = 0x02
@@ -171,7 +580,7 @@ class AwAutoFocusStatus(enum.IntEnum):
     AFC_FAILED = 0x07
 
 
-class AwAspectRatio(enum.IntEnum):
+class AwAspectRatio(AwIntEnum):
     """Image Aspect Ratio."""
     RATIO_3_2 = 0x01
     RATIO_16_9 = 0x02
@@ -179,29 +588,143 @@ class AwAspectRatio(enum.IntEnum):
     RATIO_1_1 = 0x04
 
 
-class AwShutterType(enum.IntEnum):
+class AwShutterType(AwIntEnum):
     """Shutter Type (Mechanical/Electronic)."""
     AUTO = 0x01
     MECHANICAL = 0x02
     ELECTRONIC = 0x03
 
 
-class AwSilentMode(enum.IntEnum):
+class AwImageStabilization(AwIntEnum):
+    """Image Stabilization (Steady Shot)."""
+    OFF = 0x01
+    ON = 0x02
+
+
+class AwSilentMode(AwIntEnum):
     """Silent Mode Setting."""
     OFF = 0x01
     ON = 0x02
 
 
-class AwIso(enum.IntEnum):
+class AwImageFileFormat(AwIntEnum):
+    """Image File Format."""
+    NOT_APPLICABLE = 0x00
+    RAW = 0x01
+    RAW_AND_JPEG = 0x02
+    JPEG = 0x03
+    RAW_AND_HEIF = 0x04
+    HEIF = 0x05
+
+
+class AwRawFileType(AwIntEnum):
+    """RAW File Type."""
+    COMPRESSED = 0x01
+    LOSSLESS_L = 0x02
+    LOSSLESS_M = 0x03
+    LOSSLESS_S = 0x04
+    UNCOMPRESSED = 0x05
+    LOSSLESS = 0x06
+    COMPRESSED_HQ = 0x07
+
+
+class AwImageQuality(AwIntEnum):
+    """Image Compression Quality."""
+    EXTRA_FINE = 0x01
+    FINE = 0x02
+    STANDARD = 0x03
+    LIGHT = 0x04
+
+
+class AwCompressionSetting(AwIntEnum):
+    """Image Compression Settings."""
+    ECO_LIGHT = 0x01
+    STD = 0x02
+    FINE = 0x03
+    XFINE = 0x04
+    RAW = 0x10
+    RAW_AND_JPG_LIGHT = 0x11
+    RAW_AND_JPG_STD = 0x12
+    RAW_AND_JPG_FINE = 0x13
+    RAW_AND_JPG_XFINE = 0x14
+    RAW_COMPRESSED = 0x20
+    RAW_COMPRESSED_AND_JPG_FINE = 0x23
+    HEIF_ECO_LIGHT = 0x31
+    HEIF_STD = 0x32
+    HEIF_FINE = 0x33
+    HEIF_XFINE = 0x34
+    RAW_AND_HEIF_LIGHT = 0x41
+    RAW_AND_HEIF_STD = 0x42
+    RAW_AND_HEIF_FINE = 0x43
+    RAW_AND_HEIF_XFINE = 0x44
+
+
+class AwImageCompressedFileType(AwIntEnum):
+    """Compressed Image File Type."""
+    JPEG = 0x01
+    HEIF_422 = 0x02
+    HEIF_420 = 0x03
+
+
+class AwDroMode(AwIntEnum):
+    """DRO / HDR Mode."""
+    OFF = 0x01
+    DRO = 0x02
+    DRO_PLUS = 0x10
+    DRO_LVL1 = 0x11
+    DRO_LVL2 = 0x12
+    DRO_LVL3 = 0x13
+    DRO_LVL4 = 0x14
+    DRO_LVL5 = 0x15
+    DRO_AUTO = 0x1F
+    HDR_AUTO = 0x20
+    HDR_1_0EV = 0x21
+    HDR_2_0EV = 0x22
+    HDR_3_0EV = 0x23
+    HDR_4_0EV = 0x24
+    HDR_5_0EV = 0x25
+    HDR_6_0EV = 0x26
+
+
+class AwIso(AwIntEnum):
     """ISO Settings."""
     AUTO = 0x00ffffff
+
+
+class AwPcRemoteSaveDest(AwIntEnum):
+    """PC Remote Save Destination."""
+    PC = 0x0001
+    CARD = 0x0010
+    PC_AND_CARD = 0x0011
+
+
+class AwLiveViewSettingEffect(AwIntEnum):
+    """Live View Setting Effect."""
+    NA = 0x00
+    ON = 0x01
+    OFF = 0x02
+
+
+class AwPcSaveImage(AwIntEnum):
+    """PC Save Image Settings."""
+    RAW_AND_JPEG = 0x01
+    JPEG_ONLY = 0x02
+    RAW_ONLY = 0x03
+    RAW_AND_HEIF = 0x04
+    HEIF_ONLY = 0x05
+
+
+class AwLockState(AwIntEnum):
+    """Lock  State (e.g. for AE/AF Lock)."""
+    UNLOCKED = 0x01
+    LOCKED = 0x02
 
 
 ###################################
 # Logging
 ###################################
 
-class AwLogLevel(enum.IntEnum):
+class AwLogLevel(AwIntEnum):
     """Logging Levels."""
     TRACE = 4
     DEBUG = 3
@@ -211,7 +734,7 @@ class AwLogLevel(enum.IntEnum):
 
 @ffi.callback("void(struct AwLog*, AwLogLevel, const char*)")
 def _aw_log_callback(logger: typing.Any, level: int, message: typing.Any) -> None:
-    py_message = ffi.string(message).decode("utf-8")
+    py_message = ffi.string(message).decode("utf-8", errors="surrogateescape")
     # Route to the Python _log function, but we need to convert level
     # since we updated AwLogLevel to match C, it should be direct
     log(AwLogLevel(level), py_message)
@@ -219,7 +742,12 @@ def _aw_log_callback(logger: typing.Any, level: int, message: typing.Any) -> Non
 def _aw_log_func_default(level: AwLogLevel, message: str):
     level_name = level.name
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] [{level_name}] {message}")
+    try:
+        print(f"[{timestamp}] [{level_name}] {message}")
+    except UnicodeEncodeError:
+        # Fallback for environments with restricted encoding (like Windows cmd with cp1252)
+        safe_message = message.encode(sys.stdout.encoding or 'ascii', errors='replace').decode(sys.stdout.encoding or 'ascii')
+        print(f"[{timestamp}] [{level_name}] {safe_message}")
 
 _aw_log_level: AwLogLevel = AwLogLevel.WARNING
 _aw_log_func: typing.Callable[[AwLogLevel, str], None] = _aw_log_func_default
@@ -291,7 +819,7 @@ def log_set_func(log_func: typing.Callable[[AwLogLevel, str], None]):
 # Controls
 ###################################
 
-class AwControlCode(enum.IntEnum):
+class AwControlCode(AwIntEnum):
     """Camera Control Codes (OpCodes)."""
     SHUTTER_HALF_PRESS = 0xD2C1
     SHUTTER = 0xD2C2
@@ -351,7 +879,7 @@ class AwControlCode(enum.IntEnum):
     MOVIE_RECORD_TOGGLE = 0xF001
     FOCUS_POSITION_CANCEL = 0xF002
 
-class AwPropertyCode(enum.IntEnum):
+class AwPropertyCode(AwIntEnum):
     """Camera Property Codes (Device Property Codes)."""
     COMPRESSION_SETTING = 0x5004
     WHITE_BALANCE = 0x5005
@@ -516,6 +1044,57 @@ class AwPtpProperty:
         self._ffi_control = ffi_control
         self._ffi_property = ffi_property
         self.code: int = ffi_property.propCode
+        self._enum_type = self._get_enum_type()
+
+    def _get_enum_type(self) -> typing.Optional[typing.Type[AwIntEnum]]:
+        dt = self._ffi_property.dataType
+        if self.code == AwPropertyCode.DIAL_MODE:
+            return AwDialMode
+        if self.code == AwPropertyCode.EXPOSURE_PROGRAM_MODE:
+            return AwExposureProgramModeU16 if dt == PtpDataType.UINT16 else AwExposureProgramMode
+        if self.code == AwPropertyCode.CAPTURE_MODE:
+            return AwCaptureModeU16 if dt == PtpDataType.UINT16 else AwCaptureMode
+        if self.code == AwPropertyCode.WHITE_BALANCE:
+            return AwWhiteBalance
+        if self.code == AwPropertyCode.FLASH_MODE:
+            return AwFlashMode
+        if self.code == AwPropertyCode.FOCUS_MODE:
+            return AwFocusMode
+        if self.code == AwPropertyCode.FOCUS_AREA:
+            return AwFocusArea
+        if self.code == AwPropertyCode.AUTO_FOCUS_STATUS:
+            return AwAutoFocusStatus
+        if self.code == AwPropertyCode.ASPECT_RATIO:
+            return AwAspectRatio
+        if self.code == AwPropertyCode.SHUTTER_TYPE:
+            return AwShutterType
+        if self.code == AwPropertyCode.IMAGE_STABILIZATION:
+            return AwImageStabilization
+        if self.code == AwPropertyCode.SILENT_MODE:
+            return AwSilentMode
+        if self.code == AwPropertyCode.IMAGE_FILE_FORMAT:
+            return AwImageFileFormat
+        if self.code == AwPropertyCode.RAW_FILE_TYPE:
+            return AwRawFileType
+        if self.code == AwPropertyCode.IMAGE_QUALITY:
+            return AwImageQuality
+        if self.code == AwPropertyCode.COMPRESSION_SETTING:
+            return AwCompressionSetting
+        if self.code == AwPropertyCode.IMAGE_COMPRESSED_FILE_TYPE:
+            return AwImageCompressedFileType
+        if self.code == AwPropertyCode.DRO_HDR_MODE:
+            return AwDroMode
+        if self.code == AwPropertyCode.ISO:
+            return AwIso
+        if self.code == AwPropertyCode.IMAGE_SAVE_DESTINATION:
+            return AwPcRemoteSaveDest
+        if self.code == AwPropertyCode.LIVE_VIEW_SETTING_EFFECT:
+            return AwLiveViewSettingEffect
+        if self.code == AwPropertyCode.PC_SAVE_IMAGE:
+            return AwPcSaveImage
+        if self.code in (AwPropertyCode.AE_LOCK_STATUS, AwPropertyCode.AWB_LOCK_STATUS, AwPropertyCode.FEL_LOCK_STATUS):
+            return AwLockState
+        return None
 
     def get_value_as_str(self) -> typing.Optional[str]:
         """
@@ -529,12 +1108,41 @@ class AwPtpProperty:
             The property value as a string, or None if it could not be retrieved.
         """
         out_str = ffi.new("MStr[1]")
-        ok = lib.AwControl_GetPropertyValueAsStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
+        ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
         if not ok:
             return None
         result = _convert_m_str(out_str[0])
         lib.Aw_StrFree(self._allocator, out_str)
         return result
+
+    def _convert_value(self, dt, v):
+        raw_val = None
+        if dt == PtpDataType.INT8:
+            raw_val = v.i8
+        elif dt == PtpDataType.UINT8:
+            raw_val = v.u8
+        elif dt == PtpDataType.INT16:
+            raw_val = v.i16
+        elif dt == PtpDataType.UINT16:
+            raw_val = v.u16
+        elif dt == PtpDataType.INT32:
+            raw_val = v.i32
+        elif dt == PtpDataType.UINT32:
+            raw_val = v.u32
+        elif dt == PtpDataType.INT64:
+            raw_val = v.i64
+        elif dt == PtpDataType.UINT64:
+            raw_val = v.u64
+        elif dt == PtpDataType.STR:
+            raw_val = _convert_m_str(v.str)
+
+        if self._enum_type is not None:
+            try:
+                return self._enum_type(raw_val)
+            except ValueError:
+                return raw_val
+
+        return raw_val
 
     def get_value(self) -> typing.Any:
         """
@@ -546,34 +1154,14 @@ class AwPtpProperty:
         # Check if we have a known enum for this property
         dt = self._ffi_property.dataType
         v = self._ffi_property.value
-        raw_val = None
-        if dt == PtpDataType.INT8: raw_val = v.i8
-        elif dt == PtpDataType.UINT8: raw_val = v.u8
-        elif dt == PtpDataType.INT16: raw_val = v.i16
-        elif dt == PtpDataType.UINT16: raw_val = v.u16
-        elif dt == PtpDataType.INT32: raw_val = v.i32
-        elif dt == PtpDataType.UINT32: raw_val = v.u32
-        elif dt == PtpDataType.INT64: raw_val = v.i64
-        elif dt == PtpDataType.UINT64: raw_val = v.u64
-
-        if self.code == AwPropertyCode.DIAL_MODE: return AwDialMode(raw_val)
-        if self.code == AwPropertyCode.EXPOSURE_PROGRAM_MODE: return AwExposureProgramMode(raw_val)
-        if self.code == AwPropertyCode.CAPTURE_MODE: return AwCaptureMode(raw_val)
-        if self.code == AwPropertyCode.WHITE_BALANCE: return AwWhiteBalance(raw_val)
-        if self.code == AwPropertyCode.FOCUS_MODE: return AwFocusMode(raw_val)
-        if self.code == AwPropertyCode.FOCUS_AREA: return AwFocusArea(raw_val)
-        if self.code == AwPropertyCode.AUTO_FOCUS_STATUS: return AwAutoFocusStatus(raw_val)
-        if self.code == AwPropertyCode.ASPECT_RATIO: return AwAspectRatio(raw_val)
-        if self.code == AwPropertyCode.SHUTTER_TYPE: return AwShutterType(raw_val)
-        if self.code == AwPropertyCode.SILENT_MODE: return AwSilentMode(raw_val)
-        if self.code == AwPropertyCode.ISO and raw_val == AwIso.AUTO: return AwIso.AUTO
-
-        out_str = ffi.new("MStr[1]")
-        ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
-        if ok:
-            result = _convert_m_str(out_str[0])
-            lib.Aw_StrFree(self._allocator, out_str)
-            return result
+        raw_val = self._convert_value(dt, v)
+        if raw_val is None:
+            out_str = ffi.new("MStr[1]")
+            ok = lib.AwControl_GetPropertyValueAsKnownStr(self._ffi_control,  self._allocator, self._ffi_property, out_str)
+            if ok:
+                result = _convert_m_str(out_str[0])
+                lib.Aw_StrFree(self._allocator, out_str)
+                return result
 
         return raw_val
 
@@ -586,7 +1174,7 @@ class AwPtpProperty:
         """
         return _convert_c_str(lib.AwGetPropertyLabel(self.code))
 
-    def get_enums(self) -> typing.List[typing.Tuple[typing.Any, str]]:
+    def get_enums(self) -> typing.List[typing.Tuple[typing.Any, typing.Optional[str]]]:
         """
         Get the list of allowed values (enums) for this property.
 
@@ -594,7 +1182,7 @@ class AwPtpProperty:
             A list of tuples (value, label).
         """
         enums = ffi.new("AwPtpPropValueEnums*")
-        ok = lib.AwControl_GetEnumsForProperty(self._ffi_control, self._allocator, self._ffi_property, enums)
+        ok = lib.AwControl_GetEnumsForProperty(self._ffi_control, self._allocator, self._ffi_property, 0, enums)
         if not ok:
             return []
 
@@ -602,47 +1190,59 @@ class AwPtpProperty:
         dt = self._ffi_property.dataType
         for i in range(enums.values.size):
             e = enums.values.data[i]
-            val = None
-            if dt == PtpDataType.INT8: val = e.propValue.i8
-            elif dt == PtpDataType.UINT8: val = e.propValue.u8
-            elif dt == PtpDataType.INT16: val = e.propValue.i16
-            elif dt == PtpDataType.UINT16: val = e.propValue.u16
-            elif dt == PtpDataType.INT32: val = e.propValue.i32
-            elif dt == PtpDataType.UINT32: val = e.propValue.u32
-            elif dt == PtpDataType.INT64: val = e.propValue.i64
-            elif dt == PtpDataType.UINT64: val = e.propValue.u64
-            elif dt == PtpDataType.STR: val = _convert_m_str(e.propValue.str)
-
-            label = _convert_m_str(e.str)
-            result.append((val, label))
+            val = self._convert_value(dt, e.propValue)
+            if e.str.size > 0:
+                val_as_str = _convert_m_str(e.str)
+                result.append((val, val_as_str))
+            else:
+                result.append((val, None))
 
         lib.AwControl_FreePropValueEnums(self._ffi_control, enums)
         return result
 
-    def set_value(self, value: typing.Union[str, int]) -> bool:
+    def set_value(self, value: typing.Union[str, int, AwIntEnum]) -> bool:
         """
         Set the value of the property.
 
         Args:
-            value: The new value (either an integer or a string).
+            value: The new value (either an integer, a string, or an AwIntEnum subclass specific to the property)).
 
         Returns:
             True if the property was set successfully, False otherwise.
         """
         if isinstance(value, str):
-            res = self._control.set_property_str(self._ffi_property, value)
-            return res.code == lib.AW_RESULT_OK
-        elif isinstance(value, int):
+            # If we have an enum type, try to see if the string matches any enum name or value
+            if self._enum_type is not None:
+                try:
+                    # Try to match by name
+                    value = self._enum_type[value]
+                except KeyError:
+                    # If not a name, maybe it's a value represented as string? 
+                    # set_property_str below will handle it if it's a known string value for the property.
+                    pass
+
+            if isinstance(value, str):
+                res = self._control.set_property_str(self._ffi_property, value)
+                return res.code == lib.AW_RESULT_OK
+
+        if isinstance(value, AwIntEnum) and self._enum_type is not None:
+            # Validate that the enum value is of the correct type for this property
+            if type(value) != self._enum_type:
+                return False
+
+        if isinstance(value, (int, AwIntEnum)):
+            int_value = int(value)
+            
             prop_value = ffi.new("AwPtpPropValue*")
             dt = self._ffi_property.dataType
-            if dt == PtpDataType.INT8: prop_value.i8 = value
-            elif dt == PtpDataType.UINT8: prop_value.u8 = value
-            elif dt == PtpDataType.INT16: prop_value.i16 = value
-            elif dt == PtpDataType.UINT16: prop_value.u16 = value
-            elif dt == PtpDataType.INT32: prop_value.i32 = value
-            elif dt == PtpDataType.UINT32: prop_value.u32 = value
-            elif dt == PtpDataType.INT64: prop_value.i64 = value
-            elif dt == PtpDataType.UINT64: prop_value.u64 = value
+            if dt == PtpDataType.INT8: prop_value.i8 = int_value
+            elif dt == PtpDataType.UINT8: prop_value.u8 = int_value
+            elif dt == PtpDataType.INT16: prop_value.i16 = int_value
+            elif dt == PtpDataType.UINT16: prop_value.u16 = int_value
+            elif dt == PtpDataType.INT32: prop_value.i32 = int_value
+            elif dt == PtpDataType.UINT32: prop_value.u32 = int_value
+            elif dt == PtpDataType.INT64: prop_value.i64 = int_value
+            elif dt == PtpDataType.UINT64: prop_value.u64 = int_value
             else:
                 return False
             res = lib.AwControl_SetPropertyValue(self._ffi_control, self._ffi_property, prop_value[0])
@@ -798,6 +1398,20 @@ class AwControl:
         if prop == ffi.NULL:
             return None
         return AwPtpProperty(self, self._ffi, self._allocator, prop)
+
+    def get_property(self, locater: typing.Union[str, AwPropertyCode, int]) -> typing.Optional[AwPtpProperty]:
+        if isinstance(locater, str):
+            prop = self.get_property_by_id(locater)
+            if prop is not None:
+                return prop
+            try:
+                prop_code = AwPropertyCode[locater.upper()]
+                return self.get_property_by_code(prop_code)
+            except KeyError:
+                return None
+        if isinstance(locater, (AwPropertyCode, int)):
+            return self.get_property_by_code(locater)
+        return None
 
     def get_property_by_code(self, code: int) -> typing.Optional[AwPtpProperty]:
         """

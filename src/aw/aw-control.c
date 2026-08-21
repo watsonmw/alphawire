@@ -2259,7 +2259,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {0xD1FF, "Gamma Display Assist Type"},
     {DPC_FLASH_COMPENSATION, "Flash Compensation"},
     {DPC_DRO_HDR_MODE, "Dynamic Range Optimizer"},
-    {0xD203, "Image Size"},
+    {DPC_IMAGE_SIZE, "Image Size"},
     {0xD204, "Total Battery Remaining"},
     {0xD205, "Total Battery Level Indicator"},
     {DPC_OSD_IMAGE_MODE, "OSD Image Mode"},
@@ -2275,7 +2275,7 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {DPC_ASPECT_RATIO, "Aspect Ratio"},
     {DPC_AUTO_FOCUS_STATUS, "Focus Indication"},
     {DPC_PREDICTED_MAX_FILE_SIZE, "Predicted Maximum File Size"},
-    {0xD215, "Shooting File Info"},
+    {DPC_PENDING_FILES, "Shooting File Info"},
     {0xD216, "Auto FTP Transfer Target (Still)"},
     {DPC_PENDING_FILES, "Files Pending"},
     {DPC_AE_LOCK_STATUS, "AELock Indication"},
@@ -2287,37 +2287,25 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {DPC_FEL_LOCK_STATUS, "FELock Indication"},
     {0xD220, "Audio Signals (Start/End)"},
     {DPC_LIVE_VIEW_STATUS, "Live View Status"},
-    {0xD222, "Still Image Save Destination"},
-    {0xD223, "Date/Time Setting"},
+    {DPC_IMAGE_SAVE_DESTINATION, "Image Save Destination"},
+    {DPC_DATE_TIME_SET, "Date/Time Setting"},
     {0xD225, "Protect Image in FTP Transfer"},
     {0xD229, "Auto Recognition Target Candidates"},
-    {DPC_IMAGE_SAVE_DESTINATION, "Image Save Destination"},
-    {DPC_DATE_TIME_SET, "Date/Time Set"},
     {DPC_FOCUS_AREA, "Focus Area"},
     {DPC_FOCUS_MAGNIFY_SCALE, "Focus Magnify Scale"},
     {DPC_FOCUS_MAGNIFY_POS, "Focus Magnify Position"},
     {DPC_LIVE_VIEW_SETTING_EFFECT, "Live View Display Effect"},
     {0xD234, "Auto Recognition Target Setting"},
-    {0xD235, "Near/Far Enable Status"},
     {0xD237, "Exposure Step"},
     {DPC_FOCUS_AREA_POS_OLD, "Focus Area Position"},
     {DPC_MANUAL_FOCUS_ADJUST_ENABLED, "Manual Focus Adjust Enabled"},
-    {0xD239, "Pixel Shift Shooting Mode"},
-    {0xD23A, "Pixel Shift Shooting Number"},
-    {0xD23B, "Pixel Shift Shooting Interval"},
-    {0xD23C, "Pixel Shift Shooting Status"},
-    {0xD23D, "Progress Number of Pixel Shift Shooting"},
-    {0xD23F, "Picture Profile"},
-    {0xD240, "Creative Style"},
-    {0xD241, "File Format (Movie)"},
-    {0xD242, "Recording Setting (Movie)"},
+    {DPC_PICTURE_PROFILE, "Picture Profile"},
+    {DPC_CREATIVE_STYLE, "Creative Style"},
     {DPC_PIXEL_SHIFT_SHOOTING_MODE, "Pixel Shift Shooting Mode"},
     {DPC_PIXEL_SHIFT_SHOOTING_NUMBER, "Pixel Shift Shooting Shot Num"},
     {DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, "Pixel Shift Shooting Interval"},
     {DPC_PIXEL_SHIFT_SHOOTING_STATUS, "Pixel Shift Shooting Status"},
     {DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, "Pixel Shift Shooting Progress"},
-    {DPC_PICTURE_PROFILE, "Picture Profile"},
-    {DPC_CREATIVE_STYLE, "Creative Style"},
     {DPC_MOVIE_FILE_FORMAT, "Movie File Format"},
     {DPC_MOVIE_QUALITY, "Movie Recording Setting"},
     {DPC_MEDIA_SLOT1_STATUS, "Media Slot 1 Status"},
@@ -2331,7 +2319,6 @@ static PtpPropNames sPtpPropertyLabels[] = {
     {DPC_IMAGE_QUALITY, "Image Quality"},
     {DPC_IMAGE_FILE_FORMAT, "Image File Format"},
     {DPC_FOCUS_MAGNIFY, "Focus Magnifier"},
-    {0xD255, "AF Tracking Sensitivity (Image)"},
     {DPC_INTERVAL_RECORD_MODE, "Interval Record Mode"},
     {DPC_INTERVAL_RECORD_STATUS, "Interval Record Status"},
     {DPC_DEVICE_OVERHEATING_STATE, "Device Overheating State"},
@@ -5018,39 +5005,9 @@ b32 BuildEnumsFromGetFunc(AwControl* self, MAllocator* allocator, AwPtpProperty*
     return TRUE;
 }
 
-b32 AwControl_GetEnumsForPropertyKnown(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums) {
-    if (!property || property->formFlag != PTP_FORM_FLAG_ENUM) {
-        return FALSE;
-    }
-    PTPPropertyMetadata* meta = property->meta;
-    if (!meta) {
-        return FALSE;
-    }
+b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpProperty* property, i32 flags,
+    AwPtpPropValueEnums* outEnums) {
 
-    if (meta->fixedEnumsSize) {
-        switch (meta->type) {
-            case PTP_DT_UINT8:
-                return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8,
-                    meta->fixedEnumsSize, outEnums, FALSE);
-            case PTP_DT_UINT16:
-                return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16,
-                    meta->fixedEnumsSize, outEnums, FALSE);
-            case PTP_DT_UINT32:
-                return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32,
-                    meta->fixedEnumsSize, outEnums, FALSE);
-            default:
-                AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
-                break;
-        }
-    } else if (meta->buildEnumsFunc) {
-        return meta->buildEnumsFunc(self, allocator, property, outEnums);
-    } else if (meta->valueAsStringFunc) {
-        return BuildEnumsFromGetFunc(self, allocator, property, meta, outEnums);
-    }
-    return FALSE;
-}
-
-b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums) {
     if (!property || property->formFlag != PTP_FORM_FLAG_ENUM) {
         return FALSE;
     }
@@ -5060,13 +5017,13 @@ b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpP
             switch (meta->type) {
                 case PTP_DT_UINT8:
                     return BuildEnumsFromListU8(self, allocator, property, meta->fixedEnums.u8,
-                        meta->fixedEnumsSize, outEnums, TRUE);
+                        meta->fixedEnumsSize, outEnums, flags & AwPropertyEnumFlags_ALWAYS_STRINGIFY);
                 case PTP_DT_UINT16:
                     return BuildEnumsFromListU16(self, allocator, property, meta->fixedEnums.u16,
-                        meta->fixedEnumsSize, outEnums, TRUE);
+                        meta->fixedEnumsSize, outEnums, flags & AwPropertyEnumFlags_ALWAYS_STRINGIFY);
                 case PTP_DT_UINT32:
                     return BuildEnumsFromListU32(self, allocator, property, meta->fixedEnums.u32,
-                        meta->fixedEnumsSize, outEnums, TRUE);
+                        meta->fixedEnumsSize, outEnums, flags & AwPropertyEnumFlags_ALWAYS_STRINGIFY);
                 default:
                     AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
                     break;
@@ -5078,11 +5035,17 @@ b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpP
         }
     }
 
+    if (flags & AwPropertyEnumFlags_KNOWN_ONLY) {
+        return FALSE;
+    }
+
     MArrayEachPtr(property->form.enums.getSet, it) {
-        AwPtpPropValueEnum* propEnum = MArrayAddPtr(allocator, outEnums->values);
+        AwPtpPropValueEnum* propEnum = MArrayAddPtrZ(allocator, outEnums->values);
         propEnum->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
         propEnum->propValue = *it.p;
-        propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+        if (flags & AwPropertyEnumFlags_ALWAYS_STRINGIFY) {
+            propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+        }
     }
 
     if (MArraySize(property->form.enums.set)) {
@@ -5102,10 +5065,12 @@ b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpP
             if (prop) {
                 prop->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
             } else {
-                AwPtpPropValueEnum* propEnum = MArrayAddPtr(allocator, outEnums->values);
+                AwPtpPropValueEnum* propEnum = MArrayAddPtrZ(allocator, outEnums->values);
                 propEnum->flags = AW_ENUM_VALUE_READ | AW_ENUM_VALUE_WRITE;
                 propEnum->propValue = *it.p;
-                propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+                if (flags & AwPropertyEnumFlags_ALWAYS_STRINGIFY) {
+                    propEnum->str = AwGetPropValueStr(allocator, (PtpDataType)property->dataType, *it.p);
+                }
             }
         }
     }
@@ -5263,7 +5228,7 @@ AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr
     }
     if (property->formFlag == PTP_FORM_FLAG_ENUM) {
         AwPtpPropValueEnums enums = {0};
-        if (AwControl_GetEnumsForProperty(self, self->allocator, property, &enums)) {
+        if (AwControl_GetEnumsForProperty(self, self->allocator, property, 0, &enums)) {
             for (int i = 0; i < MArraySize(enums.values); i++) {
                 AwPtpPropValueEnum* enumValue = enums.values.data + i;
                 if (MStrCmp(enumValue->str, value) == 0) {

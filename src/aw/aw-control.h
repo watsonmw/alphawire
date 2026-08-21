@@ -207,31 +207,34 @@ AW_EXPORT AwPtpProperty* AwControl_GetPropertyByCode(AwControl* self, u16 proper
  */
 AW_EXPORT AwPtpProperty* AwControl_GetPropertyById(AwControl* self, const char* id);
 
+enum AwPropertyEnumFlags {
+    // Enum only known properties (ignore)
+    AwPropertyEnumFlags_KNOWN_ONLY = 1 << 0,
+    // Always stringify even if we don't have a known text representation for the enum value.
+    // For integer value will format the integer as string, for string values will copy the string.
+    // Enums can be auto converted to string in a numbr of ways:
+    // - enum has hardcoded list of strings e.g. focusmode, focusarea
+    // - some values can be converted to a meaningful string e.g. e.g. iso, shutter speed, f-stop even if we don't have
+    //   a hardcoded string
+    // The following are only converted to a string when AwPropertyEnumFlags_ALWAYS_STRINGIFY is specified.
+    // - enum has hardcoded list of strings, but we are missing a lookup for a particular value
+    // - we do have any pre-existing metadata about the property
+    AwPropertyEnumFlags_ALWAYS_STRINGIFY = 1 << 1,
+};
+
 /**
  * Build a list of enums for property if enums are available.
  * Always converts values to strings for display.
  * You must free memory allocated by this function by calling AwControl_FreePropValueEnums / PTP_FreePropValueEnums.
  * @param allocator allocator to use for outEnums, when set to null to uses the default AwControl allocator
  * @param property
+ * @param flags
  * @param outEnums
  * @page allocator Optional allocator to use (when NULL use AwControl allocator).
  * @return TRUE if enums are available, false if no enums available for this property
  */
 AW_EXPORT b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
-   AwPtpPropValueEnums* outEnums);
-
-/**
- * Build a list of enums for property if enums are available.
- * Converts values to strings for display when there is a known mapping.
- * You must free memory allocated by this function by calling AwControl_FreePropValueEnums / PTP_FreePropValueEnums.
- * @param allocator allocator to use for outEnums, when set to null to uses the default AwControl allocator
- * @param property
- * @param outEnums
- * @page allocator Optional allocator to use (when NULL use AwControl allocator).
- * @return TRUE if enums are available, false if no enums available for this property
- */
-AW_EXPORT b32 AwControl_GetEnumsForPropertyKnown(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
-   AwPtpPropValueEnums* outEnums);
+    i32 flags, AwPtpPropValueEnums* outEnums);
 
 /**
  * Free output enum returned by AwControl_GetEnumsForProperty()

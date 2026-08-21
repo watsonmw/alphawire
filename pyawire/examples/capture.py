@@ -2,13 +2,11 @@ import os
 from datetime import datetime
 
 import awire
-from awire import AwPropertyCode, AwFocusMode, AwDialMode
 
 
 # Capture workflow script
-# - Find a device
-# - Adjust some settings
-# - Shoot Image and download
+# - Search devices
+# - For each device, shoot image and download
 def capture_workflow():
     awire.log_info(f"Searching for Alpha cameras...")
 
@@ -37,27 +35,6 @@ def capture_workflow():
         if device is not None:
             control = device.open_control()
             control.connect()
-
-            # Override the dial mode while connected
-            dial_mode = control.get_property_by_code(AwPropertyCode.DIAL_MODE)
-            if dial_mode is not None:
-                dial_mode.set_value(AwDialMode.REMOTE)
-
-            # Change the exposure program to manual so we can change capture settings
-            exp_program = control.get_property_by_code(AwPropertyCode.EXPOSURE_PROGRAM_MODE)
-            if exp_program is not None:
-                exp_program.set_value(AwFocusMode.MANUAL)
-
-            # Adjust iso, shutter speed and f-stop
-            iso = control.get_property_by_code(AwPropertyCode.ISO)
-            if iso is not None:
-                iso.set_value(100)
-            shutter_speed = control.get_property_by_code(AwPropertyCode.SHUTTER_SPEED)
-            if shutter_speed is not None:
-                shutter_speed.set_value("1/10")
-            f_number = control.get_property_by_code(AwPropertyCode.F_NUMBER)
-            if f_number is not None:
-                f_number.set_value("4.0")
 
             # Capture and download image
             image = control.capture_and_download()

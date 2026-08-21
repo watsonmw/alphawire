@@ -5,6 +5,11 @@ import awire
 from awire.main import AwPropertyCode
 
 
+# On cameras that support it, set the following:
+# - Sync current time from PC
+# - Photographer
+# - Copyright
+
 def set_metadata(photographer_str: str, copyright_str: str):
     awire.log_info(f"Searching for Alpha cameras...")
 
@@ -34,17 +39,17 @@ def set_metadata(photographer_str: str, copyright_str: str):
             control = device.open_control()
             control.connect()
 
-            photographer = control.get_property_by_code(AwPropertyCode.PHOTOGRAPHER)
+            photographer = control.get_property(AwPropertyCode.PHOTOGRAPHER)
             if photographer is not None:
-                print(f"Setting photographer to '{photographer_str}'")
+                awire.log_info(f"Setting photographer to '{photographer_str}'")
                 photographer.set_value(photographer_str)
 
-            copyright = control.get_property_by_code(AwPropertyCode.COPYRIGHT)
+            copyright = control.get_property(AwPropertyCode.COPYRIGHT)
             if copyright is not None:
-                print(f"Setting copyright to '{copyright_str}'")
+                awire.log_info(f"Setting copyright to '{copyright_str}'")
                 copyright.set_value(copyright_str)
 
-            date_time_set = control.get_property_by_code(AwPropertyCode.DATE_TIME_SET)
+            date_time_set = control.get_property(AwPropertyCode.DATE_TIME_SET)
             if date_time_set is not None:
                 now = datetime.datetime.now()
                 
@@ -61,8 +66,8 @@ def set_metadata(photographer_str: str, copyright_str: str):
                 
                 # Format: YYYYmmddTHHMMSS.m+HHMM
                 time_str = now.strftime("%Y%m%dT%H%M%S") + f".{deci_sec}{offset_hours:+03d}{offset_mins:02d}"
-                
-                print(f"Setting time to '{time_str}'")
+
+                awire.log_info(f"Setting time to '{time_str}'")
                 date_time_set.set_value(time_str)
 
             device.close()

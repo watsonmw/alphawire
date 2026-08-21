@@ -298,7 +298,7 @@ void ShowDebugExtendedPropWindow(AppContext& c, AwPtpProperty *property) {
 
         AwPtpPropValueEnums outEnums{};
 
-        if (AwControl_GetEnumsForProperty(&c.aw, c.autoReleasePool, property, &outEnums) && MArraySize(outEnums.values)) {
+        if (AwControl_GetEnumsForProperty(&c.aw, c.autoReleasePool, property, AwPropertyEnumFlags_ALWAYS_STRINGIFY, &outEnums) && MArraySize(outEnums.values)) {
             if (ImGui::BeginTable("Properties", 3, flags)) {
                 ImGui::TableSetupColumn("Option", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed,130.0);
@@ -692,7 +692,7 @@ static void ImGuiBuildPropertyCombo(AppContext& c, u16 propCode, const char* lab
         AwControl_GetPropertyValueAsStr(&c.aw, c.autoReleasePool, property, &currentValAsStr);
         if (AwControl_IsPropertyWritable(&c.aw, property)) {
             AwPtpPropValueEnums options = {};
-            if (AwControl_GetEnumsForProperty(&c.aw, c.autoReleasePool, property, &options) &&
+            if (AwControl_GetEnumsForProperty(&c.aw, c.autoReleasePool, property, AwPropertyEnumFlags_ALWAYS_STRINGIFY, &options) &&
                 MArraySize(options.values)) {
                 if (ImGui::BeginCombo(label, currentValAsStr.str)) {
                     MArrayEachPtr(options.values, it) {
@@ -1350,7 +1350,7 @@ void ShowCameraControlsWindow(AppContext& c) {
 
             ImGui::PushID("remoteButtons");
             AwPtpPropValueEnums buttonListEnum = {};
-            if (AwControl_GetEnumsForProperty(&c.aw, c.autoReleasePool, buttonList, &buttonListEnum)) {
+            if (AwControl_GetEnumsForProperty(&c.aw, c.autoReleasePool, buttonList, AwPropertyEnumFlags_ALWAYS_STRINGIFY, &buttonListEnum)) {
                 MArrayEachPtr(buttonListEnum.values, it) {
                     MStr* buttonName = &it.p->str;
                     char buffer[256];
