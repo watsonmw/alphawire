@@ -20,8 +20,9 @@ Platform Support:
 - OSX (clang)
 - Linux (GCC)
 
-Build System:
+Build Systems:
 - CMake
+- meson
 
 > **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks or registered
 > trademarks of Sony Corporation.

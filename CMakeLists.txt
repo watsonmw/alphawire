@@ -241,21 +241,4 @@ if(LINUX)
     list(APPEND ALPHAWIREUI_LIBS OpenGL::GL)
 endif()
 
-# Copy to build directory, so alphawire-cffi-compile.py can pick up
-add_custom_command(
-        TARGET alphawire POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "pyawire/build"
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:alphawire>" "pyawire/build"
-        VERBATIM
-)
-
-# On Windows, also copy the .lib import library
-if (WIN32)
-    add_custom_command(
-            TARGET alphawire POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_LINKER_FILE:alphawire>" "pyawire/build"
-            VERBATIM
-    )
-endif ()
-
 target_link_libraries(alphawireui PRIVATE ${ALPHAWIREUI_LIBS})
