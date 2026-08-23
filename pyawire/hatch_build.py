@@ -5,9 +5,11 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
-        # root to python path so wo we can import ffi_builder
+        # root to python path so wo we can import build_extension
         sys.path.insert(0, self.root)
-        from build_extension import ffi_builder
+        import build_extension
+
+        ffi_builder, all_sources = build_extension.setup()
 
         if self.target_name == 'wheel':
             ffi_builder.compile(verbose=1, tmpdir=self.root)

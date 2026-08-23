@@ -17,19 +17,33 @@ def get_latest_mod_time(files):
             latest = max(latest, os.path.getmtime(f))
     return latest
 
+def get_script_dir():
+    return os.path.dirname(os.path.abspath(__file__))
 
-def main(build_args):
+
+PROJECT_ROOT = None
+
+def project_root():
+    global PROJECT_ROOT
+    if PROJECT_ROOT is None:
+        script_dir = get_script_dir()
+        if os.path.basename(script_dir) == "pyawire":
+            PROJECT_ROOT = os.path.dirname(script_dir)
+        else:
+            PROJECT_ROOT = script_dir
+        print(f"Project root: {PROJECT_ROOT}")
+    return PROJECT_ROOT
+
+
+def root_path(path: str) -> str:
+    return os.path.join(project_root(), path)
+
+
+def setup(debug: bool=False):
     ffi_builder = cffi.FFI()
 
     # src/ is in the parent directory when building from within pyawire/ and in the current directory when building from
     # within sdist
-    _script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    if os.path.basename(_script_dir) == "pyawire":
-        _project_root = os.path.dirname(_script_dir)
-    else:
-        _project_root = _script_dir
-    print(f"Project root: {_project_root}")
 
     ffi_builder.cdef("""
 typedef char i8;
@@ -349,9 +363,6 @@ void Aw_StrFree(MAllocator* allocator, MStr* str);
 void Aw_MemIOFree(MMemIO* memIO);
 """)
 
-    def root(path: str) -> str:
-        return os.path.join(_project_root, path)
-
     common_sources = [
         "src/mlib/mlib.c",
         "src/mlib/mlib-file-stdlib.c",
@@ -376,7 +387,7 @@ void Aw_MemIOFree(MMemIO* memIO);
     platform_defines = []
     extra_link_args = []
     extra_compile_args = []
-    include_dirs = [root("src")]
+    include_dirs = [root_path("src")]
 
     if sys.platform == "darwin":
         platform_sources = ["src/aw/platform/osx/aw-backend-iokit.c"] + ip_sources
@@ -409,18 +420,18 @@ void Aw_MemIOFree(MMemIO* memIO);
             ("AW_ENABLE_WIA", None),
             ("AW_ENABLE_IP", None),
         ]
-        include_dirs.append(root("libs\\libusbk"))
-        extra_link_args = [root('libs\\libusbk\\amd64\\libusbK.lib'), 'ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
+        include_dirs.append(root_path("libs\\libusbk"))
+        extra_link_args = [root_path('libs\\libusbk\\amd64\\libusbK.lib'), 'ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
                            'ole32.lib', 'wiaguid.lib', 'shell32.lib', 'Oleaut32.lib']
 
-    all_sources = [os.path.relpath(os.path.join(_project_root, src), _script_dir)
+    all_sources = [os.path.relpath(root_path(src), get_script_dir())
                    for src in common_sources + platform_sources]
     define_macros = [
                         ("ALPHAWIRE_BUILDING_SHARED_LIB", None),
                         ("AW_LOG_LEVEL", "3"),
                     ] + platform_defines
 
-    if build_args.debug:
+    if debug:
         platform_defines.append(("_DEBUG", None))
         if sys.platform.startswith("win32"):
             # pdb_path = os.path.join(_script_dir, "awire", "_binding.pdb")
@@ -446,24 +457,42 @@ void Aw_MemIOFree(MMemIO* memIO);
         extra_compile_args=extra_compile_args,
         py_limited_api=True,
     )
+
+    return ffi_builder, all_sources
+
+def main(build_args):
+    ffi_builder, all_sources = setup(debug=build_args.debug)
+
+    output_dir = os.path.join(get_script_dir(), "awire")
+    build_flags_file = os.path.join(output_dir, "_build_flags.txt")
+
     if build_args.only_if_changed:
         # Check if any source or header files have changed
         watch_files = all_sources[:]
         # Add this build script itself
         watch_files.append(__file__)
         # Add headers from src/ directory
-        for r, d, f in os.walk(root("src")):
+        for r, d, f in os.walk(root_path("src")):
             for file in f:
                 if file.endswith(".h"):
                     watch_files.append(os.path.join(r, file))
         
         # We'll check for _binding.* in the awire directory.
-        output_dir = os.path.join(_script_dir, "awire")
         output_files = glob.glob(os.path.join(output_dir, "_binding.*"))
         # Filter out .c, .o, .obj, .pdb files if any
         output_files = [f for f in output_files if not f.endswith((".c", ".o", ".obj", ".pdb", ".txt"))]
         
-        if output_files:
+        build_flags_changed = True # default to assuming it changed, False only when we can be sure it didnt
+        if os.path.exists(build_flags_file):
+            try:
+                with open(build_flags_file, "r") as f:
+                    content = f.read().strip()
+                    last_debug = (content == "debug=True")
+                    build_flags_changed = (last_debug != build_args.debug)
+            except OSError:
+                pass
+
+        if output_files and not build_flags_changed:
             latest_src_time = get_latest_mod_time(watch_files)
             latest_out_time = get_latest_mod_time(output_files)
             
@@ -472,6 +501,13 @@ void Aw_MemIOFree(MMemIO* memIO);
                 return
 
     ffi_builder.compile(verbose=True)
+
+    # Write build flags
+    try:
+        with open(build_flags_file, "w") as f:
+            f.write(f"debug={build_args.debug}")
+    except OSError:
+        pass
     print(f"Built alphawire extension")
 
 if __name__ == "__main__":

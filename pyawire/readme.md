@@ -26,7 +26,7 @@ Upload:
 Development & Debugging:
 
     # Remove current awire installation
-    pip uninstall pyawire
+    pip uninstall pyawire -y
     
     # Install in development mode, you can edit the source code and see changes immediately
     pip install -e .
