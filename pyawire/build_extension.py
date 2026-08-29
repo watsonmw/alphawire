@@ -406,6 +406,7 @@ void Aw_MemIOFree(MMemIO* memIO);
             ("M_PTHREADS", None),
         ]
         extra_link_args = ["-lusb-1.0"]
+        include_dirs.append("/usr/include/libusb-1.0")
         extra_compile_args = ["-fvisibility=hidden"]
     elif sys.platform.startswith("win32"):
         platform_sources = [
@@ -428,6 +429,7 @@ void Aw_MemIOFree(MMemIO* memIO);
                    for src in common_sources + platform_sources]
     define_macros = [
                         ("ALPHAWIRE_BUILDING_SHARED_LIB", None),
+                        ("M_THREADING", None),
                         ("AW_LOG_LEVEL", "3"),
                     ] + platform_defines
 
