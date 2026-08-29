@@ -103,8 +103,10 @@ extern "C" {
 #else
     #define M_TYPEOF(a) __typeof__(a)
 #endif
-#else
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
     #define M_TYPEOF(a) typeof(a)
+#elif defined(__GNUC__) || defined(__clang__)
+    #define M_TYPEOF(a) __typeof__(a)
 #endif
 
 #ifdef __cplusplus
