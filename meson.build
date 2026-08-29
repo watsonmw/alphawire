@@ -117,12 +117,8 @@ alphawireui_sources = files(
 
 ui_inc = include_directories('src', 'src/imgui')
 
-sdl3_dep = dependency('sdl3', required : false)
-if not sdl3_dep.found()
-  # Use the same version as CMakeLists.txt
-  sdl3_proj = cmake.subproject('sdl3', cmake_options: ['-DSDL_STATIC=OFF', '-DSDL_SHARED=ON'])
-  sdl3_dep = sdl3_proj.dependency('SDL3-shared')
-endif
+sdl3_dep = dependency('sdl3', required : true, static: true, fallback: ['sdl3', 'sdl dep'])
+
 ui_deps = [sdl3_dep]
 
 ui_args = ['-DSDL_MAIN_USE_CALLBACKS']
