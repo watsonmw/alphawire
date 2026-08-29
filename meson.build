@@ -1,5 +1,6 @@
 project('alphawire', ['c', 'cpp'],
   version : '0.1',
+  meson_version : '>= 1.3.0',
   default_options : [
     'c_std=gnu17', # meson will fallback to c17 if gcc/clang is not the compiler being used
     'cpp_std=c++20',
