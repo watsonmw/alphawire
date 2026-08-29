@@ -40,13 +40,15 @@ alphawire_deps = []
 alphawire_c_args = ['-DALPHAWIRE_BUILDING_SHARED_LIB']
 
 host_system = host_machine.system()
+message('Host system:', host_system)
 
 if host_system == 'darwin'
   alphawire_sources += files(
     'src/aw/platform/osx/aw-backend-iokit.c'
   )
   alphawire_sources += ptp_ip_sources
-  alphawire_c_args += ['-DAW_ENABLE_IOKIT', '-DAW_ENABLE_IP', '-DM_PTHREADS']
+  alphawire_c_args += ['-DAW_ENABLE_IOKIT', '-DAW_ENABLE_IP']
+  add_project_arguments('-DM_PTHREADS', language : ['c', 'cpp'])
   
   alphawire_deps += dependency('appleframeworks', modules : ['Cocoa', 'IOKit'])
 
@@ -82,7 +84,8 @@ elif host_system == 'linux'
   )
   alphawire_sources += ptp_ip_sources
   alphawire_deps += dependency('libusb-1.0')
-  alphawire_c_args += ['-DAW_ENABLE_LIBUSB', '-DAW_ENABLE_IP', '-DM_PTHREADS']
+  alphawire_c_args += ['-DAW_ENABLE_LIBUSB', '-DAW_ENABLE_IP']
+  add_project_arguments('-DM_PTHREADS', language : ['c', 'cpp'])
 endif
 
 alphawire_lib = shared_library('alphawire',
@@ -126,19 +129,18 @@ ui_args = ['-DSDL_MAIN_USE_CALLBACKS']
 
 if host_system == 'darwin'
   ui_deps += dependency('appleframeworks', modules : ['Cocoa', 'IOKit', 'OpenGL'])
-  ui_args += ['-DM_PTHREADS']
 elif host_system == 'windows'
   ui_deps += cc.find_library('opengl32')
   ui_args += ['-DWINVER=0x0A00', '-D_WIN32_WINNT=0x0600', '-DAW_ENABLE_LIBUSBK', '-DAW_ENABLE_WIA', '-DAW_ENABLE_IP']
 elif host_system == 'linux'
   ui_deps += dependency('gl')
-  ui_args += ['-DM_PTHREADS']
 endif
 
 executable('alphawireui',
   alphawireui_sources,
   include_directories : ui_inc,
   dependencies : ui_deps,
+  c_args : ui_args,
   cpp_args : ui_args,
   link_with : alphawire_lib,
   install : true,
