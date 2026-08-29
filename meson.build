@@ -1,11 +1,10 @@
 project('alphawire', ['c', 'cpp'],
   version : '0.1',
-  default_options : ['c_std=c17', 'cpp_std=c++20']
+  default_options : ['c_std=gnu17', 'cpp_std=c++20']
 )
 
 cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
-cmake = import('cmake')
 
 # Common definitions
 add_project_arguments('-DM_USE_SDL', '-DM_USE_STDLIB', '-DAW_LOG_LEVEL=3', language : ['c', 'cpp'])
@@ -117,7 +116,7 @@ alphawireui_sources = files(
 
 ui_inc = include_directories('src', 'src/imgui')
 
-sdl3_dep = dependency('sdl3', required : true, static: true, fallback: ['sdl3', 'sdl dep'])
+sdl3_dep = dependency('sdl3', required : true, static: true, fallback: ['sdl3', 'sdl3 dep'])
 
 ui_deps = [sdl3_dep]
 

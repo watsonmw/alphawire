@@ -415,7 +415,7 @@ static void* EventThreadProc(void* lpParameter) {
 }
 
 static AwResult AwDeviceLibusb_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc,
-                                          AwPtpEvent** outEvents) {
+                                          AwPtpEventArray* outEvents) {
     AwDeviceLibusb* dev = self->device;
 
     if (outEvents == NULL) {
