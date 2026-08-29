@@ -1,17 +1,24 @@
 project('alphawire', ['c', 'cpp'],
   version : '0.1',
-  default_options : ['c_std=gnu17', 'cpp_std=c++20']
+  default_options : [
+    'c_std=gnu17', # meson will fallback to c17 if gcc/clang is not the compiler being used
+    'cpp_std=c++20',
+  ]
 )
 
 cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
 
-# Common definitions
-add_project_arguments('-DM_USE_SDL', '-DM_USE_STDLIB', '-DAW_LOG_LEVEL=3', language : ['c', 'cpp'])
-
+debug_args = []
 if get_option('buildtype').startswith('debug')
-  add_project_arguments('-DDEBUG', '-DM_MEM_DEBUG', '-DM_ASSERT', '-DM_STACKTRACE', '-DM_THREADING', language : ['c', 'cpp'])
+  debug_args += ['-DDEBUG', '-DM_MEM_DEBUG', '-DM_ASSERT', '-DM_STACKTRACE']
 endif
+
+# Internal args used when building alphawire lib
+alphawire_c_args = debug_args
+# External args exported by alphawire lib when including it into a project
+alphawire_lib_args = ['-DM_THREADING', '-DM_USE_STDLIB', '-DAW_LOG_LEVEL=3']
+alphawire_lib_deps = []
 
 inc = [include_directories('src')]
 
@@ -35,8 +42,6 @@ ptp_ip_sources = files(
   'src/aw/platform/ip/aw-backend-ip.c'
 )
 
-alphawire_deps = []
-alphawire_c_args = ['-DALPHAWIRE_BUILDING_SHARED_LIB']
 
 host_system = host_machine.system()
 message('Host system:', host_system)
@@ -47,9 +52,8 @@ if host_system == 'darwin'
   )
   alphawire_sources += ptp_ip_sources
   alphawire_c_args += ['-DAW_ENABLE_IOKIT', '-DAW_ENABLE_IP']
-  add_project_arguments('-DM_PTHREADS', language : ['c', 'cpp'])
-  
-  alphawire_deps += dependency('appleframeworks', modules : ['Cocoa', 'IOKit'])
+  alphawire_lib_args += ['-DM_PTHREADS']
+  alphawire_lib_deps += dependency('appleframeworks', modules : ['Cocoa', 'IOKit'])
 
 elif host_system == 'windows'
   alphawire_sources += files(
@@ -62,19 +66,19 @@ elif host_system == 'windows'
   
   inc += include_directories('libs/libusbk')
   
-  alphawire_deps += cc.find_library('ws2_32')
-  alphawire_deps += cc.find_library('Iphlpapi')
-  alphawire_deps += cc.find_library('wiaguid')
-  alphawire_deps += cc.find_library('dbghelp')
+  alphawire_lib_deps += cc.find_library('ws2_32')
+  alphawire_lib_deps += cc.find_library('Iphlpapi')
+  alphawire_lib_deps += cc.find_library('wiaguid')
+  alphawire_lib_deps += cc.find_library('dbghelp')
   
   # libusbK library path depends on architecture. 
   # For now, let's assume amd64 as per CMakeLists.txt
   libusbk_lib = cc.find_library('libusbK', dirs : meson.current_source_dir() / 'libs/libusbk/amd64')
-  alphawire_deps += libusbk_lib
+  alphawire_lib_deps += libusbk_lib
 
   if cc.get_id() == 'gcc' # MinGW
     inc += include_directories('libs/mingw')
-    alphawire_deps += cc.find_library('uuid', dirs : meson.current_source_dir() / 'libs/mingw')
+    alphawire_lib_deps += cc.find_library('uuid', dirs : meson.current_source_dir() / 'libs/mingw')
   endif
 
 elif host_system == 'linux'
@@ -82,21 +86,28 @@ elif host_system == 'linux'
     'src/aw/platform/libusb/aw-backend-libusb.c'
   )
   alphawire_sources += ptp_ip_sources
-  alphawire_deps += dependency('libusb-1.0')
+  alphawire_lib_deps += dependency('libusb-1.0')
   alphawire_c_args += ['-DAW_ENABLE_LIBUSB', '-DAW_ENABLE_IP']
-  add_project_arguments('-DM_PTHREADS', language : ['c', 'cpp'])
+  alphawire_lib_args += ['-DM_PTHREADS']
 endif
 
-alphawire_lib = shared_library('alphawire',
+alphawire_lib = both_libraries('alphawire',
   alphawire_sources,
   include_directories : inc,
-  dependencies : alphawire_deps,
-  c_args : alphawire_c_args,
-  install : true
+  dependencies : alphawire_lib_deps,
+  c_args : alphawire_c_args + alphawire_lib_args,
+  c_shared_args : ['-DALPHAWIRE_BUILDING_SHARED_LIB'],
+)
+
+alphawire_lib_dep = declare_dependency(
+  include_directories : inc,
+  link_with : alphawire_lib,
+  dependencies : alphawire_lib_deps,
+  compile_args : alphawire_lib_args
 )
 
 # UI Application
-alphawireui_sources = files(
+ui_sources = files(
   'src/imgui/imgui.cpp',
   'src/imgui/imgui_demo.cpp',
   'src/imgui/imgui_draw.cpp',
@@ -114,13 +125,12 @@ alphawireui_sources = files(
   'src/ui/ui-ptp-debug.cpp'
 )
 
+sdl3_dep = dependency('sdl3', required : true, static: true, fallback: ['sdl3', 'sdl3_dep'])
+
 ui_inc = include_directories('src', 'src/imgui')
-
-sdl3_dep = dependency('sdl3', required : true, static: true, fallback: ['sdl3', 'sdl3 dep'])
-
 ui_deps = [sdl3_dep]
-
 ui_args = ['-DSDL_MAIN_USE_CALLBACKS']
+ui_args += debug_args
 
 if host_system == 'darwin'
   ui_deps += dependency('appleframeworks', modules : ['Cocoa', 'IOKit', 'OpenGL'])
@@ -132,12 +142,12 @@ elif host_system == 'linux'
 endif
 
 executable('alphawireui',
-  alphawireui_sources,
+  ui_sources,
   include_directories : ui_inc,
-  dependencies : ui_deps,
+  dependencies : ui_deps + [alphawire_lib_dep],
+  link_with : alphawire_lib.get_static_lib(),
   c_args : ui_args,
   cpp_args : ui_args,
-  link_with : alphawire_lib,
   install : true,
   win_subsystem : 'console'
 )

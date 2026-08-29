@@ -447,10 +447,7 @@ void Aw_MemIOFree(MMemIO* memIO);
     ffi_builder.set_source(
         "awire._binding",
         """
-#include "aw/aw-const.h"
-#include "aw/aw-control.h"
-#include "aw/aw-device-list.h"
-#include "aw/aw-util.h"
+#include "aw/aw.h"
 """,
         sources=all_sources,
         include_dirs=include_dirs,

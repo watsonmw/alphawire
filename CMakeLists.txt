@@ -5,8 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 17)
 
 # When building in debug add our extra debug flags
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -DM_MEM_DEBUG -DM_ASSERT -DM_STACKTRACE -DM_THREADING")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -DM_MEM_DEBUG -DM_ASSERT -DM_STACKTRACE -DM_THREADING")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -DM_MEM_DEBUG -DM_ASSERT -DM_STACKTRACE")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -DM_MEM_DEBUG -DM_ASSERT -DM_STACKTRACE")
 
 ##########################################
 # Alphawire shared library
@@ -44,7 +44,7 @@ set(PTP_IP_FILES
     src/aw/platform/ip/aw-backend-ip.h
 )
 
-target_compile_definitions(alphawire PRIVATE M_USE_SDL M_USE_STDLIB AW_LOG_LEVEL=3 ALPHAWIRE_BUILDING_SHARED_LIB)
+target_compile_definitions(alphawire PRIVATE M_THREADING M_USE_STDLIB AW_LOG_LEVEL=3 ALPHAWIRE_BUILDING_SHARED_LIB)
 target_include_directories(alphawire PUBLIC src)
 target_compile_features(alphawire PUBLIC cxx_std_17)
 
@@ -168,7 +168,7 @@ add_executable(alphawireui
     src/ui/ui-ptp-debug.h
 )
 
-target_compile_definitions(alphawireui PRIVATE M_USE_SDL M_USE_STDLIB AW_LOG_LEVEL=3)
+target_compile_definitions(alphawireui PRIVATE M_USE_STDLIB AW_LOG_LEVEL=3)
 target_include_directories(alphawireui PRIVATE src src/imgui)
 target_compile_features(alphawireui PRIVATE cxx_std_17)
 
