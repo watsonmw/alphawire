@@ -9,11 +9,13 @@ support.
 
 AlphaWire provides both low-level and high-level APIs for controlling Sony Alpha cameras.
 
-It has some advantages over the official SDK:
+It has some advantages over the official SDK / gphoto2:
 - Minimal dependencies
 - Fast image downloads
 - Supports older cameras not covered by official Sony Camera Remote SDK
 - Easy debugging of camera remote features
+
+In general the C API is low level, allowing the most control and the Python API is more convenient.
 
 Platform Support:
 - Windows (Visual Studio 2018 or MinGW)
@@ -31,13 +33,13 @@ Build Systems:
 ## Library Features
 
 ### Core Capabilities
-- Comprehensive camera control via low-level and high-level APIs
-- Full PTP device property control
-- Real-time Live View streaming
-- Tethered capture and file download
-- Camera settings management (save/load)
+- Fast and lightweight
 - Compatible with both pre-2020 and post-2020 Alpha cameras
+- Full PTP device property control
+- Tethered capture and file download
+- Real-time Live View streaming
 - IMGUI application for camera control and debugging
+- Camera settings management (save/load)
 
 ### Windows Backend Support
 - WIA (Windows Image Acquisition)
@@ -71,10 +73,10 @@ A GUI application is included for camera control and PTP protocol debugging.
 - Fast image download
 
 ### Limitations
-
 - PTPIP backend doesnt support SSL
 - Many properties not implemented (missing naming / description - but can still be controlled/inspected)
 - No ARW / image processing (outside of scope)
+- Limited workarounds for specific cameras, you'll have to test your workflows for the cameras you target
 
 ## Roadmap
 - [ ] Build System Improvements

@@ -4,6 +4,8 @@
 #
 
 import argparse
+import subprocess
+
 import cffi
 import os
 import sys
@@ -37,6 +39,26 @@ def project_root():
 
 def root_path(path: str) -> str:
     return os.path.join(project_root(), path)
+
+
+def get_pkg_config_flags(package: str):
+    try:
+        cflags = subprocess.check_output(
+            ["pkg-config", "--cflags-only-I", package],
+            text=True
+        ).strip().split()
+        # Strip '-I' prefix
+        inc_dirs = [flag[2:] for flag in cflags if flag.startswith("-I")]
+
+        libs = subprocess.check_output(
+            ["pkg-config", "--libs", package],
+            text=True
+        ).strip().split()
+
+        return inc_dirs, libs
+    except (subprocess.SubprocessError, FileNotFoundError):
+        print(f"pkg-config not found, unable to locate {package} headers and libraries")
+        return None, None
 
 
 def setup(debug: bool=False):
@@ -405,8 +427,15 @@ void Aw_MemIOFree(MMemIO* memIO);
             ("AW_ENABLE_IP", None),
             ("M_PTHREADS", None),
         ]
-        extra_link_args = ["-lusb-1.0"]
-        include_dirs.append("/usr/include/libusb-1.0")
+        libusb_includes, libusb_libs = get_pkg_config_flags("libusb-1.0")
+        if libusb_includes is not None:
+            include_dirs.extend(libusb_includes)
+            extra_link_args.extend(libusb_libs)
+        else:
+            fallback = "/usr/include/libusb-1.0"
+            print(f"libusb-1.0 not found, using hardcoded fallback location for headers: {fallback}")
+            include_dirs.append(fallback)
+            extra_link_args.append("-lusb-1.0")
         extra_compile_args = ["-fvisibility=hidden"]
     elif sys.platform.startswith("win32"):
         platform_sources = [
@@ -428,7 +457,6 @@ void Aw_MemIOFree(MMemIO* memIO);
     all_sources = [os.path.relpath(root_path(src), get_script_dir())
                    for src in common_sources + platform_sources]
     define_macros = [
-                        ("ALPHAWIRE_BUILDING_SHARED_LIB", None),
                         ("M_THREADING", None),
                         ("AW_LOG_LEVEL", "3"),
                     ] + platform_defines
