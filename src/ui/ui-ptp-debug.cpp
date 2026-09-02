@@ -1420,7 +1420,7 @@ void ShowCameraControlsWindow(AppContext& c) {
 static void FetchEvents(AppContext& c, float currentTime) {
     if (currentTime - c.eventRefreshTime >= AUTO_EVENT_FETCH_INTERVAL_SECS) {
         AwPtpEventArray events = {0};
-        AwControl_ReadEvents(&c.aw, 10, c.autoReleasePool, &events);
+        AwControl_ReadEvents(&c.aw, -1, c.autoReleasePool, &events);
         MArrayEachPtr(events, it) {
             AwPtpEvent* event = it.p;
             const char* eventName = AwGetEventLabel(event->code);

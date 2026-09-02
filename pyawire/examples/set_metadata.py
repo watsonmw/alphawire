@@ -70,6 +70,9 @@ def set_metadata(photographer_str: str, copyright_str: str):
                 awire.log_info(f"Setting time to '{time_str}'")
                 date_time_set.set_value(time_str)
 
+            if date_time_set is None and copyright is None and copyright is None:
+                awire.log_warn(f"No metadata settable on this camera model")
+
             device.close()
 
     device_list.close()

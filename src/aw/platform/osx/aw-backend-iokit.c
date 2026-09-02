@@ -691,6 +691,21 @@ static void HandleInterruptResponse(void *refcon, IOReturn result, void *arg0) {
     }
 }
 
+static b32 GetProcessedEvents(MAllocator *alloc, AwPtpEventArray *outEvents, AwDeviceIOKit *dev) {
+    b32 gotEvents = FALSE;
+    pthread_mutex_lock(&dev->eventLock);
+    if (MArraySize(dev->eventList) > 0) {
+        for (int i = 0; i < MArraySize(dev->eventList); i++) {
+            AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
+            *event = dev->eventList.data[i];
+        }
+        MArrayClear(dev->eventList);
+        gotEvents = TRUE;
+    }
+    pthread_mutex_unlock(&dev->eventLock);
+    return gotEvents;
+}
+
 static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds, MAllocator* alloc,
                                          AwPtpEventArray* outEvents) {
     AwDeviceIOKit* dev = self->device;
@@ -699,17 +714,49 @@ static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds
         return (AwResult){.code=AW_RESULT_PARAM_ERROR};
     }
 
-    pthread_mutex_lock(&dev->eventLock);
-    // Copy all events to output
-    if (MArraySize(dev->eventList) > 0) {
-        for (int i = 0; i < MArraySize(dev->eventList); i++) {
-            AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
-            *event = dev->eventList.data[i];
+    if (timeoutMilliseconds == 0) {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, false);
+        GetProcessedEvents(alloc, outEvents, dev);
+    } else if (timeoutMilliseconds > 0) {
+        u64 startTime = MGetTimeMilliseconds();
+        b32 done = false;
+
+        while (!done) {
+            // Run loop for a short period to allow interrupt handler to run
+            double runTime = 0.01; // 10ms
+            if (timeoutMilliseconds > 0) {
+                u64 elapsed = MGetTimeMilliseconds() - startTime;
+                if (elapsed >= (u64)timeoutMilliseconds) {
+                    runTime = 0;
+                    done = true;
+                } else {
+                    double remaining = (double)(timeoutMilliseconds - (int)elapsed) / 1000.0;
+                    if (remaining < runTime) {
+                        runTime = remaining;
+                    }
+                }
+            } else if (timeoutMilliseconds == 0) {
+                runTime = 0;
+                done = true;
+            }
+
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, runTime, false);
+
+            if (GetProcessedEvents(alloc, outEvents, dev)) {
+                done = TRUE;
+            }
+
+            if (timeoutMilliseconds > 0 && !done) {
+                u64 elapsed = MGetTimeMilliseconds() - startTime;
+                if (elapsed >= (u64)timeoutMilliseconds) {
+                    done = true;
+                }
+            }
         }
-        // Clear the stored events
-        MArrayClear(dev->eventList);
+    } else {
+        GetProcessedEvents(alloc, outEvents, dev);
     }
-    pthread_mutex_unlock(&dev->eventLock);
+
     return (AwResult){.code=AW_RESULT_OK};
 }
 

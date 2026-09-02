@@ -70,6 +70,51 @@ class AwSonyProtocolVersion(AwIntEnum):
     V3 = 300
 
 
+class AwPtpEventCode(AwIntEnum):
+    """PTP Event Codes."""
+    STORE_ADDED = 0x4004
+    STORE_REMOVED = 0x4005
+    OBJECT_ADDED = 0xC201
+    OBJECT_REMOVED = 0xC202
+    DEVICE_PROP_CHANGED = 0xC203
+    DATE_TIME_SETTING_RESULT = 0xC205
+    CAPTURED_EVENT = 0xC206
+    CWB_CAPTURED_RESULT = 0xC208
+    CAMERA_SETTING_READ_RESULT = 0xC209
+    FTP_SETTING_READ_RESULT = 0xC20A
+    MEDIA_FORMAT_RESULT = 0xC20B
+    FTP_DISPLAY_NAME_LIST_CHANGED = 0xC20C
+    CONTENTS_TRANSFER_EVENT = 0xC20D
+    ZOOM_AND_FOCUS_POSITION_EVENT = 0xC20E
+    DISPLAY_LIST_CHANGED_EVENT = 0xC20F
+    MEDIA_PROFILE_CHANGED = 0xC210
+    CONTROL_JOB_LIST_EVENT = 0xC211
+    CONTROL_UPLOAD_DATA_RESULT = 0xC214
+    FOCUS_POSITION_RESULT = 0xC218
+    LENS_INFORMATION_CHANGED = 0xC21B
+    OPERATION_RESULTS = 0xC222
+    AF_STATUS = 0xC223
+    MOVIE_REC_OPERATION_RESULTS = 0xC224
+
+
+class AwPtpEvent:
+    """Represents a PTP event."""
+    def __init__(self, code: AwPtpEventCode, size: int,
+                 param1: int = 0, param2: int = 0, param3: int = 0,
+                 object_handle: typing.Optional[int] = None) -> None:
+        self.code = code
+        self.size = size
+        self.param1 = param1
+        self.param2 = param2
+        self.param3 = param3
+        self.object_handle = object_handle
+
+    def __repr__(self) -> str:
+        return (f"AwPtpEvent(code={self.code.name}, size={self.size}, "
+                f"param1={self.param1:#x}, param2={self.param2:#x}, param3={self.param3:#x}, "
+                f"object_handle={self.object_handle})")
+
+
 class AwDialMode(AwIntEnum):
     """Camera Dial Mode."""
     CAMERA = 0x00
@@ -1303,6 +1348,7 @@ class AwCaptureStage(enum.Enum):
     WAIT_FOCUS = 0
     TRIGGER = 1
     WAIT_FILE = 2
+    WAIT_EVENT_OBJECT_ADDED = 2
     WAIT_DOWNLOAD = 3
 
 
@@ -1312,6 +1358,7 @@ class AwImageCaptureWorkflow:
         self.loop_wait_time: float = 0.1
         self.wait_focus: float = 3.0
         self.wait_file: float = 3.0
+        self.wait_event_object_added: float = 3.0
         self.wait_download: float = 3.0
 
     def get_wait_time(self, stage: AwCaptureStage) -> typing.Tuple[float, float]:
@@ -1319,6 +1366,8 @@ class AwImageCaptureWorkflow:
             return self.wait_focus, self.loop_wait_time
         elif stage == AwCaptureStage.WAIT_FILE:
             return self.wait_file, self.loop_wait_time
+        elif stage == AwCaptureStage.WAIT_EVENT_OBJECT_ADDED:
+            return self.wait_event_object_added, self.loop_wait_time
         elif stage == AwCaptureStage.WAIT_DOWNLOAD:
             return self.wait_download, self.loop_wait_time
         else:
@@ -1361,7 +1410,7 @@ class AwControl:
         Returns:
             An AwResult indicating success or failure.
         """
-        log_info(f"Connecting to device with protocol version {sony_protocol_version.name}")
+        log_info(f"Attempting to connect with protocol version: {sony_protocol_version.name}...")
         return lib.AwControl_Connect(self._ffi, sony_protocol_version.value)
 
     def close(self) -> None:
@@ -1378,6 +1427,15 @@ class AwControl:
         if self._live_view_mem is not None:
             lib.Aw_MemIOFree(self._live_view_mem)
             self._live_view_mem = None
+
+    def get_protocol_version(self) -> AwSonyProtocolVersion:
+        """
+        Get the protocol version being used.
+
+        Returns:
+            The protocol version.
+        """
+        return self._ffi[0].protocolVersion
 
     def refresh_properties(self, full_refresh: bool = True) -> bool:
         """
@@ -1559,6 +1617,39 @@ class AwControl:
         lib.AwControl_RefreshProperties(self._ffi, True)
         return lib.AwControl_GetPendingFiles(self._ffi)
 
+    def read_events(self, timeout_ms: int = -1) -> typing.List[AwPtpEvent]:
+        """
+        Read PTP events from the camera.
+
+        Args:
+            timeout_ms: Timeout in milliseconds to wait for events.
+
+        Returns:
+            A list of AwPtpEvent objects.
+        """
+        events_array = ffi.new("AwPtpEventArray[1]")
+        result = lib.AwControl_ReadEvents(self._ffi, timeout_ms, self._allocator, events_array)
+
+        events = []
+        if result.code == lib.AW_RESULT_OK:
+            for i in range(events_array[0].size):
+                c_event = events_array[0].data[i]
+                
+                event = AwPtpEvent(
+                    code=AwPtpEventCode(c_event.code),
+                    size=c_event.size,
+                    param1=c_event.param1,
+                    param2=c_event.param2,
+                    param3=c_event.param3,
+                    object_handle=c_event.objectHandle
+                )
+                events.append(event)
+            
+            if events_array[0].data != ffi.NULL:
+                lib.Aw_PtpEventArrayFree(self._allocator, events_array)
+
+        return events
+
     def get_captured_image(self) -> typing.Optional[AwCapturedFile]:
         """
         Download the next captured image from the camera's buffer.
@@ -1632,12 +1723,17 @@ class AwControl:
                     AwAutoFocusStatus.AFC_FAILED
                 }
 
+                last_focus = None
+
                 def check_focus():
+                    nonlocal last_focus
                     self.refresh_properties()
                     val = focus_state.get_value()
+                    last_focus = val
                     return val in focus_complete_states
 
-                self._wait_for_condition(check_focus, AwCaptureStage.WAIT_FOCUS, workflow, "focus")
+                if self._wait_for_condition(check_focus, AwCaptureStage.WAIT_FOCUS, workflow, "focus") is None:
+                    log(AwLogLevel.WARNING, f"Focus state: {last_focus}")
 
         self.set_control_toggle(AwControlCode.SHUTTER, True)
         workflow.wait(trigger_duration, AwCaptureStage.TRIGGER)
@@ -1648,6 +1744,14 @@ class AwControl:
                                               AwCaptureStage.WAIT_FILE, workflow, "file")
 
         return bool(file_ready)
+
+    def _check_object_added(self):
+        events = self.read_events(10)
+        for event in events:
+            if event.code == AwPtpEventCode.OBJECT_ADDED:
+                return True
+        else:
+            return False
 
     def download_image(self, workflow: typing.Optional[AwImageCaptureWorkflow] = None) -> typing.Optional[AwCapturedFile]:
         """
@@ -1662,7 +1766,15 @@ class AwControl:
         if workflow is None:
             workflow = AwImageCaptureWorkflow()
 
-        return self._wait_for_condition(self.get_captured_image, 
+        if self.get_protocol_version() == AwSonyProtocolVersion.V2:
+            # Some older cameras require a wait after triggering the shutter and waiting for pending files before
+            # issuing the file download, if don't do this the camera will reboot. A flat wait may be better but for
+            # now we query the backend for the object added event, since that seems to be long enough to avoid the
+            # crash.
+            self._wait_for_condition(self._check_object_added,
+                                     AwCaptureStage.WAIT_EVENT_OBJECT_ADDED, workflow, "file_added")
+
+        return self._wait_for_condition(self.get_captured_image,
                                         AwCaptureStage.WAIT_DOWNLOAD, workflow, "download")
 
     def capture_and_download(self, trigger_duration=.1,

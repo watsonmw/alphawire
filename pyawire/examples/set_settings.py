@@ -1,7 +1,6 @@
 import argparse
 import sys
 import time
-from time import sleep
 
 import awire
 from awire import AwPropertyCode, AwFocusMode, AwDialMode, AwExposureProgramMode
@@ -40,13 +39,16 @@ def set_settings(settings):
             # Override the dial mode while connected
             dial_mode = control.get_property_by_code(AwPropertyCode.DIAL_MODE)
             if dial_mode is not None:
+                awire.log_info(f"\'dial_mode\' setting to \'{AwDialMode.REMOTE}\'")
                 dial_mode.set_value(AwDialMode.REMOTE)
 
-            # Set the exposure mode firstm
+            # Set the exposure mode first
             if 'exposure_program' in settings:
                 exp_program = control.get_property_by_code(AwPropertyCode.EXPOSURE_PROGRAM_MODE)
                 if exp_program is not None:
-                    exp_program.set_value(settings['exposure_program'])
+                    exp_program_value = settings['exposure_program']
+                    awire.log_info(f"\'exposure_program\' setting to \'{exp_program_value}\'")
+                    exp_program.set_value(exp_program_value)
 
             # Set the settings
             props_to_check = []

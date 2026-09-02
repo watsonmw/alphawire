@@ -492,6 +492,31 @@ AW_EXPORT AwResult AwControl_PutCameraSettingsFile(AwControl* self, MMemIO* file
 
 /**
  * Read pending PTP events from the device.
+ *
+ * The backends vary in how they implement this function, but the general behavior is as follows:
+ *   If timeoutMilliseconds is -1, only return currently available events.
+ *   If timeoutMilliseconds is 0, the backend may query for events but not wait for events
+ *   If timeoutMilliseconds is > 0, the backend may wait for up to the specified timeout for the first available
+ *   event (but may return more than one).
+ *
+ *  Backend specific behavior:
+ *  OSX / IOKit
+ *    Events are handled on the current runloop, if you specify a timeout of >= 0 the runloop will be
+ *    ran until an event is found.  A timeout of -1 only previously processed events will be returned.
+ *
+ *  Windows / libusbk
+ *  Linux / libusb
+ *    Events are read on a background thread.  Timeout is ignored (will be treated as -1).
+ *    If using the background thread is disabled, then query the device for recent events (this may miss some events
+ *    if it has been too long since you last called this function).
+ *
+ *  Windows / WIA
+ *    WIA doesn't support events.
+ *
+ *  PTPIP
+ *    Events are read from dedicated socket.  timeoutMilliseconds sets the amount of time to block on the socket
+ *    waiting for events.
+ *
  * @param timeoutMilliseconds Maximum time to wait for events in milliseconds.
  * @param alloc Allocator to use for the event array.
  * @param outEvents Output pointer to array of events (caller must free).

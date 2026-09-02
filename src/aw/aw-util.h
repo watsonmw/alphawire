@@ -6,3 +6,4 @@
 AW_EXPORT void Aw_InitDefaultAllocator(MAllocator* allocator);
 AW_EXPORT void Aw_MemIOFree(MMemIO* memIO);
 AW_EXPORT void Aw_StrFree(MAllocator* allocator, MStr* str);
+AW_EXPORT void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);

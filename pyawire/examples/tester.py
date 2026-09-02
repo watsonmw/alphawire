@@ -45,7 +45,10 @@ def camera_tester():
                 awire.log_info(f"ISO Property: {iso_prop.get_label()} = {iso_prop.get_value()} (Raw: {iso_prop.get_value_as_str()})")
                 enums = iso_prop.get_enums()
                 if enums:
-                    awire.log_info(f"  Available ISO values: {[e[1] for e in enums[:5]]}...")
+                    iso_values = ", ".join([str(e[1]) for e in enums[:5]])
+                    if len(iso_values) > 5:
+                        iso_values += ", ..."
+                    awire.log_info(f"  Available ISO values: [{iso_values}]")
 
             f_number = control.get_property_by_id("f-number")
             if f_number:

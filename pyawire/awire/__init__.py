@@ -3,7 +3,7 @@ from .main import (
     AwDeviceInfo, AwDevice, AwDeviceList,
     # Control
     AwControl, AwPtpProperty,
-    AwSonyProtocolVersion,
+    AwSonyProtocolVersion, AwPtpEventCode, AwPtpEvent,
     AwControlCode, AwPropertyCode,
     AwDialMode, AwExposureProgramMode, AwCaptureMode, AwWhiteBalance, AwFocusMode,
     AwFocusArea, AwAutoFocusStatus, AwAspectRatio, AwShutterType, AwSilentMode, AwIso,
