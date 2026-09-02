@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.14)
 project(alphawire)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -109,7 +109,7 @@ if(WIN32)
     list(APPEND ALPHAWIRE_LIBS dbghelp.lib)
 endif()
 
-if(LINUX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(alphawire PRIVATE
         src/aw/platform/libusb/aw-backend-libusb.c
         src/aw/platform/libusb/aw-backend-libusb.h
@@ -168,7 +168,7 @@ add_executable(alphawireui
     src/ui/ui-ptp-debug.h
 )
 
-target_compile_definitions(alphawireui PRIVATE M_USE_STDLIB AW_LOG_LEVEL=3)
+target_compile_definitions(alphawireui PRIVATE M_THREADING M_USE_STDLIB AW_LOG_LEVEL=3)
 target_include_directories(alphawireui PRIVATE src src/imgui)
 target_compile_features(alphawireui PRIVATE cxx_std_17)
 
@@ -235,7 +235,7 @@ if(WIN32)
     )
 endif()
 
-if(LINUX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(alphawireui PRIVATE M_PTHREADS)
     find_package(OpenGL REQUIRED)
     list(APPEND ALPHAWIREUI_LIBS OpenGL::GL)

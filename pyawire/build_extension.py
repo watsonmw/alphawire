@@ -29,10 +29,7 @@ def project_root():
     global PROJECT_ROOT
     if PROJECT_ROOT is None:
         script_dir = get_script_dir()
-        if os.path.basename(script_dir) == "pyawire":
-            PROJECT_ROOT = os.path.dirname(script_dir)
-        else:
-            PROJECT_ROOT = script_dir
+        PROJECT_ROOT = os.path.dirname(script_dir)
         print(f"Project root: {PROJECT_ROOT}")
     return PROJECT_ROOT
 
@@ -337,6 +334,53 @@ typedef struct {
     size_t size;
 } AwPtpCapturedImageInfo;
 
+typedef enum {
+    PTP_StoreAdded = 0x4004,
+    PTP_StoreRemoved = 0x4005,
+    PTP_ObjectAdded = 0xC201,
+    PTP_ObjectRemoved = 0xC202,
+    PTP_DevicePropChanged = 0xC203,
+    PTP_DateTimeSettingResult = 0xC205,
+    PTP_CapturedEvent = 0xC206,
+    PTP_CWBCapturedResult = 0xC208,
+    PTP_CameraSettingReadResult = 0xC209,
+    PTP_FTPSettingReadResult = 0xC20A,
+    PTP_MediaFormatResult = 0xC20B,
+    PTP_FTPDisplayNameListChanged = 0xC20C,
+    PTP_ContentsTransferEvent = 0xC20D,
+    PTP_ZoomAndFocusPositionEvent = 0xC20E,
+    PTP_DisplayListChangedEvent = 0xC20F,
+    PTP_MediaProfileChanged = 0xC210,
+    PTP_ControlJobListEvent = 0xC211,
+    PTP_ControlUploadDataResult = 0xC214,
+    PTP_FocusPositionResult = 0xC218,
+    PTP_LensInformationChanged = 0xC21B,
+    PTP_OperationResults = 0xC222,
+    PTP_AFStatus = 0xC223,
+    PTP_MovieRecOperationResults = 0xC224,
+} AwPtpEventCode;
+
+typedef struct {
+    AwPtpEventCode code;
+    u32 size;
+    union {
+        struct {
+            u32 param1;
+            u32 param2;
+            u32 param3;
+        };
+        struct {
+            u32 objectHandle;
+        };
+    };
+} AwPtpEvent;
+
+typedef struct {
+    size_t size;
+    size_t capacity;
+    AwPtpEvent* data;
+} AwPtpEventArray;
+
 enum AwPropertyEnumFlags {
     AwPropertyEnumFlags_KNOWN_ONLY = 1 << 0,
     AwPropertyEnumFlags_ALWAYS_STRINGIFY = 1 << 1,
@@ -373,6 +417,8 @@ void AwControl_FreeLiveViewFrames(AwControl* self, AwLiveViewFrames* liveViewFra
 int AwControl_GetPendingFiles(AwControl* self);
 AwResult AwControl_GetCapturedImage(AwControl* self, MMemIO* outFile, AwPtpCapturedImageInfo* outCii);
 
+AwResult AwControl_ReadEvents(AwControl* self, int timeoutMilliseconds, MAllocator* alloc, AwPtpEventArray* outEvents);
+
 void AwLog_Log(AwLog* logger, AwLogLevel level, const char *fmt, ...);
 void AwLog_LogDefault(AwLog* logger, AwLogLevel level, const char *message);
 
@@ -383,6 +429,7 @@ char* AwGetOperationLabel(u16 operationCode);
 
 void Aw_StrFree(MAllocator* allocator, MStr* str);
 void Aw_MemIOFree(MMemIO* memIO);
+void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
 """)
 
     common_sources = [
@@ -454,7 +501,7 @@ void Aw_MemIOFree(MMemIO* memIO);
         extra_link_args = [root_path('libs\\libusbk\\amd64\\libusbK.lib'), 'ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
                            'ole32.lib', 'wiaguid.lib', 'shell32.lib', 'Oleaut32.lib']
 
-    all_sources = [os.path.relpath(root_path(src), get_script_dir())
+    all_sources = [os.path.relpath(root_path(src), os.getcwd())
                    for src in common_sources + platform_sources]
     define_macros = [
                         ("M_THREADING", None),
@@ -538,10 +585,10 @@ def main(build_args):
     print(f"Built alphawire extension")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--debug", action="store_true",
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--debug", "-d", action="store_true",
                         help="Build the C extension with debug symbols and no optimization.")
-    parser.add_argument("--only-if-changed", action="store_true",
+    parser.add_argument("--only-if-changed", "-i", action="store_true",
                         help="Build the C extension only if the source files have changed.")
     build_args, _ = parser.parse_known_args()
     main(build_args)

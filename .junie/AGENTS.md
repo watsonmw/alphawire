@@ -25,6 +25,7 @@ When working with the `pyawire` component:
     If you need to build or install the wrapper in development mode:
     ```
     # Build extension (if needed)
+    cd pyawire
     python build_extension.py --only-if-changed
     
     # Install in editable mode (typically already done)

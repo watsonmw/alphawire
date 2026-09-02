@@ -65,13 +65,13 @@ Install CMake.
 
 Debug build:
 
-    cmake -S . -B cmake-build
-    cmake --build cmake-build --config Debug
+    cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
+    cmake --build cmake-build
 
 Release build:
 
-    cmake -S . -B cmake-build
-    cmake --build cmake-build --config Release
+    cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
+    cmake --build cmake-build
 
 
 Alphawire Development
@@ -83,7 +83,7 @@ First download Miniconda and install it.
 
 Then create a conda environment:
 
-    conda create -n alphawire python=3.10
+    conda create -n alphawire python=3.13
     conda activate alphawire
     pip install meson ninja
 
