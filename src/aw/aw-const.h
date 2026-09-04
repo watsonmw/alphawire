@@ -6,15 +6,25 @@
 extern "C" {
 #endif
 
-#ifdef _WIN32
+/*
+ * Define ALPHAWIRE_BUILDING_SHARED_LIB when building as shared library
+ * Define ALPHAWIRE_IMPORTING_SHARED_LIB when importing as shared library
+ * Otherwise static linking
+ */
 #ifdef ALPHAWIRE_BUILDING_SHARED_LIB
-#define AW_EXPORT __declspec(dllexport)
+    #ifdef _WIN32
+        #define AW_EXPORT __declspec(dllexport)
+    #else
+        #define AW_EXPORT __attribute__((visibility("default")))
+    #endif
+#elif ALPHAWIRE_IMPORTING_SHARED_LIB
+    #ifdef _WIN32
+        #define AW_EXPORT __declspec(dllimport)
+    #endif
 #else
-#define AW_EXPORT __declspec(dllimport)
+    #define AW_EXPORT
 #endif
-#else
-#define AW_EXPORT __attribute__((visibility("default")))
-#endif
+
 
 typedef enum {
     PTP_DT_UNDEF = 0x0000,

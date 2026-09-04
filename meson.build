@@ -4,6 +4,7 @@ project('alphawire', ['c', 'cpp'],
   default_options : [
     'c_std=gnu17', # meson will fallback to c17 if gcc/clang is not the compiler being used
     'cpp_std=c++20',
+    'b_vscrt=mt'
   ]
 )
 
@@ -72,11 +73,6 @@ elif host_system == 'windows'
   alphawire_lib_deps += cc.find_library('wiaguid')
   alphawire_lib_deps += cc.find_library('dbghelp')
   
-  # libusbK library path depends on architecture. 
-  # For now, let's assume amd64 as per CMakeLists.txt
-  libusbk_lib = cc.find_library('libusbK', dirs : meson.current_source_dir() / 'libs/libusbk/amd64')
-  alphawire_lib_deps += libusbk_lib
-
   if cc.get_id() == 'gcc' # MinGW
     inc += include_directories('libs/mingw')
     alphawire_lib_deps += cc.find_library('uuid', dirs : meson.current_source_dir() / 'libs/mingw')
@@ -97,12 +93,21 @@ alphawire_lib = both_libraries('alphawire',
   include_directories : inc,
   dependencies : alphawire_lib_deps,
   c_args : alphawire_c_args + alphawire_lib_args,
-  c_shared_args : ['-DALPHAWIRE_BUILDING_SHARED_LIB'],
+  c_shared_args : ['-DALPHAWIRE_BUILDING_SHARED_LIB']
 )
 
-alphawire_lib_dep = declare_dependency(
+# Dependency for clients linking against the shared library
+alphawire_lib_shared_dep = declare_dependency(
   include_directories : inc,
-  link_with : alphawire_lib,
+  link_with : alphawire_lib.get_shared_lib(),
+  dependencies : alphawire_lib_deps,
+  compile_args : alphawire_lib_args + ['-DALPHAWIRE_IMPORTING_SHARED_LIB']
+)
+
+# Dependency for clients linking against the static library
+alphawire_lib_static_dep = declare_dependency(
+  include_directories : inc,
+  link_with : alphawire_lib.get_static_lib(),
   dependencies : alphawire_lib_deps,
   compile_args : alphawire_lib_args
 )
@@ -145,8 +150,7 @@ endif
 executable('alphawireui',
   ui_sources,
   include_directories : ui_inc,
-  dependencies : ui_deps + [alphawire_lib_dep],
-  link_with : alphawire_lib.get_static_lib(),
+  dependencies : ui_deps + [alphawire_lib_static_dep],
   c_args : ui_args,
   cpp_args : ui_args,
   install : true,

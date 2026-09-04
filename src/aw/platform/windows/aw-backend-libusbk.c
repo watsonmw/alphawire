@@ -30,6 +30,10 @@ AwResult AwUsbkDeviceList_Close(AwUsbkBackend* self) {
     AW_TRACE("AwUsbkDeviceList_Close");
     AwUsbkDeviceList_ReleaseList(self);
     MArrayFree(self->allocator, self->openDevices);
+    if (self->hLib) {
+        FreeLibrary(self->hLib);
+        self->hLib = NULL;
+    }
     return (AwResult){.code=AW_RESULT_OK};
 }
 
@@ -45,7 +49,7 @@ static b32 CheckDeviceHasPtpEndPoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle
     // Get the len of the configuration descriptor
     USB_CONFIGURATION_DESCRIPTOR configDesc;
     UINT transferred = 0;
-    if (!UsbK_GetDescriptor(usbHandle,
+    if (!self->libk.UsbK_GetDescriptor(usbHandle,
                             USB_DESCRIPTOR_TYPE_CONFIGURATION,
                             0, 0,
                             (PUCHAR) &configDesc,
@@ -58,7 +62,7 @@ static b32 CheckDeviceHasPtpEndPoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle
         }
 
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
-            !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
+            !self->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
             CloseHandle(overlapped.hEvent);
             AW_ERROR("Overlapped I/O failed for configuration descriptor");
             return FALSE;
@@ -79,7 +83,7 @@ static b32 CheckDeviceHasPtpEndPoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle
     ResetEvent(overlapped.hEvent);
 
     // Get the full configuration descriptor
-    if (!UsbK_GetDescriptor(usbHandle,
+    if (!self->libk.UsbK_GetDescriptor(usbHandle,
                             USB_DESCRIPTOR_TYPE_CONFIGURATION,
                             0, 0,
                             configBuffer,
@@ -93,7 +97,7 @@ static b32 CheckDeviceHasPtpEndPoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle
         }
 
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
-            !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
+            !self->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
             MFree(self->allocator, configBuffer, descriptorLength);
             CloseHandle(overlapped.hEvent);
             WinUtils_LogLastError(&self->logger, "Overlapped I/O failed for full configuration");
@@ -149,7 +153,7 @@ static AwResult IssueOverlappedEventRead(PTPUsbkDeviceUsbk* dev, MAllocator* all
     }
 
     *transferred = 0;
-    if (UsbK_ReadPipe(dev->usbHandle, dev->usbInterrupt, dev->eventMem.mem, dev->eventMem.capacity, transferred,
+    if (dev->backend->libk.UsbK_ReadPipe(dev->usbHandle, dev->usbInterrupt, dev->eventMem.mem, dev->eventMem.capacity, transferred,
             &dev->eventOverlapped)) {
         *immediateResult = TRUE;
         return (AwResult){.code=AW_RESULT_OK};
@@ -215,11 +219,11 @@ static DWORD WINAPI EventThreadProc(LPVOID lpParameter) {
 
             if (waitResult == WAIT_OBJECT_0 + 1) {
                 // Stop signal received
-                UsbK_AbortPipe(dev->usbHandle, dev->usbInterrupt);
+                dev->backend->libk.UsbK_AbortPipe(dev->usbHandle, dev->usbInterrupt);
                 break;
             } else if (waitResult == WAIT_OBJECT_0) {
                 // Event data available
-                UsbK_GetOverlappedResult(dev->usbHandle, &dev->eventOverlapped, &transferred, FALSE);
+                dev->backend->libk.UsbK_GetOverlappedResult(dev->usbHandle, &dev->eventOverlapped, &transferred, FALSE);
             } else if (waitResult == WAIT_TIMEOUT) {
                 // Timeout, continue loop
                 continue;
@@ -294,11 +298,11 @@ static AwResult AwDeviceUsbk_ReadEvents(AwDevice* self, int timeoutMilliseconds,
         DWORD result = WaitForSingleObject(dev->eventOverlapped.hEvent, 0);
         if (result == WAIT_OBJECT_0) {
             // Get results
-            UsbK_GetOverlappedResult(dev->usbHandle, &dev->eventOverlapped, &transferred, FALSE);
+            dev->backend->libk.UsbK_GetOverlappedResult(dev->usbHandle, &dev->eventOverlapped, &transferred, FALSE);
         } else if (result != WAIT_TIMEOUT) {
             WinUtils_LogLastError(&dev->logger, "Failed waiting for event");
             // No event available, cancel the transfer
-            UsbK_AbortPipe(dev->usbHandle, dev->usbInterrupt);
+            dev->backend->libk.UsbK_AbortPipe(dev->usbHandle, dev->usbInterrupt);
         }
     }
 
@@ -330,7 +334,7 @@ AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* de
 
     // Print libusbk version number
     if (!self->libkVersion.Major || !self->libkVersion.Minor || !self->libkVersion.Micro || !self->libkVersion.Nano) {
-        LibK_GetVersion(&self->libkVersion);
+        self->libk.LibK_GetVersion(&self->libkVersion);
         AW_INFO_F("LibK version: %d.%d.%d.%d", self->libkVersion.Major, self->libkVersion.Minor,
             self->libkVersion.Micro, self->libkVersion.Nano);
     }
@@ -340,7 +344,7 @@ AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* de
     KUSB_HANDLE usbHandle = NULL;
 
     // Initialize the device list
-    if (!LstK_Init(&deviceList, 0)) {
+    if (!self->libk.LstK_Init(&deviceList, 0)) {
         AW_ERROR("Failed to initialize device list.");
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
@@ -348,7 +352,7 @@ AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* de
     self->deviceListHandle = deviceList;
 
     // Iterate through the device list
-    while (LstK_MoveNext(deviceList, &deviceInfo)) {
+    while (self->libk.LstK_MoveNext(deviceList, &deviceInfo)) {
         // Skip if not Sony
         if (deviceInfo->Common.Vid != USB_SONY_VID) {
             AW_ERROR("Skipping non Sony device");
@@ -356,23 +360,23 @@ AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* de
         }
 
         // Connect to the device and check its descriptors to see if it is a PTP device
-        if (UsbK_Init(&usbHandle, deviceInfo)) {
+        if (self->libk.UsbK_Init(&usbHandle, deviceInfo)) {
             if (CheckDeviceHasPtpEndPoints(self, usbHandle, self->timeoutMilliseconds)) {
                 USB_DEVICE_DESCRIPTOR deviceDescriptor;
 
                 // Get the device descriptor
-                if (!UsbK_GetDescriptor(usbHandle, USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
+                if (!self->libk.UsbK_GetDescriptor(usbHandle, USB_DESCRIPTOR_TYPE_DEVICE, 0, 0,
                         (PUCHAR)&deviceDescriptor,sizeof(USB_DEVICE_DESCRIPTOR), NULL)) {
                     AW_ERROR("Error getting device descriptor");
-                    UsbK_Free(usbHandle);
-                    LstK_Free(deviceList);
+                    self->libk.UsbK_Free(usbHandle);
+                    self->libk.LstK_Free(deviceList);
                     return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
                 }
 
                 if (deviceDescriptor.iProduct > 0) {  // Check if product string exists
                     UINT transferLength = 0;
                     UCHAR stringDescriptor[256] = {};
-                    if (UsbK_GetDescriptor(usbHandle,
+                    if (self->libk.UsbK_GetDescriptor(usbHandle,
                                            USB_DESCRIPTOR_TYPE_STRING,
                                            deviceDescriptor.iProduct,  // Index from device descriptor
                                            USB_EN_US,
@@ -406,7 +410,7 @@ AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* de
             }
 
             // Close the USB device
-            UsbK_Free(usbHandle);
+            self->libk.UsbK_Free(usbHandle);
         } else {
             AW_ERROR("Failed to open device.");
         }
@@ -425,7 +429,7 @@ AwResult AwUsbkDeviceList_ReleaseList(AwUsbkBackend* self) {
 
     // Free the device list
     if (self->deviceListHandle) {
-        LstK_Free((KLST_HANDLE)self->deviceListHandle);
+        self->libk.LstK_Free((KLST_HANDLE)self->deviceListHandle);
         self->deviceListHandle = NULL;
     }
 
@@ -490,7 +494,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
 
     // 1. Send request header packet (with params)
     u32 transferred = 0;
-    result = UsbK_WritePipe(usbHandle, deviceUsbk->usbBulkOut, (PUCHAR)requestData, requestSize,
+    result = deviceUsbk->backend->libk.UsbK_WritePipe(usbHandle, deviceUsbk->usbBulkOut, (PUCHAR)requestData, requestSize,
                             &transferred, &overlapped);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
         CloseHandle(overlapped.hEvent);
@@ -500,7 +504,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
 
     waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
     if (waitResult != WAIT_OBJECT_0) {
-        UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
+        deviceUsbk->backend->libk.UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
         CloseHandle(overlapped.hEvent);
         AW_ERROR("Timeout or error while sending PTP request");
         return (AwResult){.code=AW_RESULT_TIMEOUT};
@@ -516,7 +520,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
         requestData->code = request->OpCode;
         requestData->transactionId = request->TransactionId;
 
-        result = UsbK_WritePipe(usbHandle, deviceUsbk->usbBulkOut, (PUCHAR)requestData, requestSize,
+        result = deviceUsbk->backend->libk.UsbK_WritePipe(usbHandle, deviceUsbk->usbBulkOut, (PUCHAR)requestData, requestSize,
                                 &transferred, &overlapped);
         if (!result && GetLastError() != ERROR_IO_PENDING) {
             CloseHandle(overlapped.hEvent);
@@ -526,7 +530,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
 
         waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
         if (waitResult != WAIT_OBJECT_0) {
-            UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
+            deviceUsbk->backend->libk.UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkOut);
             CloseHandle(overlapped.hEvent);
             AW_ERROR("Timeout or error while sending PTP data");
             return (AwResult){.code=AW_RESULT_TIMEOUT};
@@ -537,7 +541,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
     ResetEvent(overlapped.hEvent);
     u32 actual = 0;
     PTPContainerHeader* responseHeader = (PTPContainerHeader*)(((u8*)dataOut) - sizeof(PTPContainerHeader));
-    result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
+    result = deviceUsbk->backend->libk.UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
                           sizeof(PTPContainerHeader) + dataOutSize, &actual, &overlapped);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
         WinUtils_LogLastError(&self->logger, "Failed to read PTP response");
@@ -548,12 +552,12 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
     waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
     if (waitResult != WAIT_OBJECT_0) {
         AW_ERROR("Timeout or error while reading PTP response");
-        UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
+        deviceUsbk->backend->libk.UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
         CloseHandle(overlapped.hEvent);
         return (AwResult){.code=AW_RESULT_TIMEOUT};
     }
 
-    if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
+    if (!deviceUsbk->backend->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
         WinUtils_LogLastError(&self->logger, "Failed to get overlapped result");
         CloseHandle(overlapped.hEvent);
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
@@ -567,7 +571,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
         while (actual < payloadLength) {
             ResetEvent(overlapped.hEvent);
             u32 dataTransfer = 0;
-            result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)cp, payloadLength - actual,
+            result = deviceUsbk->backend->libk.UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)cp, payloadLength - actual,
                 &dataTransfer, &overlapped);
             if (!result && GetLastError() != ERROR_IO_PENDING) {
                 WinUtils_LogLastError(&self->logger, "Failed to read PTP response data");
@@ -577,13 +581,13 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
 
             waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
             if (waitResult != WAIT_OBJECT_0) {
-                UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
+                deviceUsbk->backend->libk.UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
                 CloseHandle(overlapped.hEvent);
                 AW_ERROR("Timeout or error while reading PTP response data");
                 return (AwResult){.code=AW_RESULT_TIMEOUT};
             }
 
-            if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &dataTransfer, FALSE)) {
+            if (!deviceUsbk->backend->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &dataTransfer, FALSE)) {
                 WinUtils_LogLastError(&self->logger, "Failed to get overlapped result for data");
                 CloseHandle(overlapped.hEvent);
                 return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
@@ -599,7 +603,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
         size_t responseSize = sizeof(PTPContainerHeader) + (PTP_MAX_PARAMS * sizeof(u32));
         responseHeader = alloca(responseSize);
 
-        result = UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
+        result = deviceUsbk->backend->libk.UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
                               responseSize, &actual, &overlapped);
         if (!result && GetLastError() != ERROR_IO_PENDING) {
             WinUtils_LogLastError(&self->logger, "Failed to read final PTP response");
@@ -610,12 +614,12 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
         waitResult = WaitForSingleObject(overlapped.hEvent, deviceUsbk->timeoutMilliseconds);
         if (waitResult != WAIT_OBJECT_0) {
             WinUtils_LogLastError(&self->logger,"Timeout or error while reading final PTP response");
-            UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
+            deviceUsbk->backend->libk.UsbK_AbortPipe(usbHandle, deviceUsbk->usbBulkIn);
             CloseHandle(overlapped.hEvent);
             return (AwResult){.code=AW_RESULT_TIMEOUT};
         }
 
-        if (!UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
+        if (!deviceUsbk->backend->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &actual, FALSE)) {
             WinUtils_LogLastError(&self->logger, "Failed to get overlapped result for final response");
             CloseHandle(overlapped.hEvent);
             return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
@@ -648,7 +652,7 @@ static b32 AwDeviceUsbk_Reset(AwDevice* device) {
     if (!deviceUsbk || !deviceUsbk->usbHandle) {
         return FALSE;
     }
-    return UsbK_ResetDevice(deviceUsbk->usbHandle) ? TRUE : FALSE;
+    return deviceUsbk->backend->libk.UsbK_ResetDevice(deviceUsbk->usbHandle) ? TRUE : FALSE;
 }
 
 static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
@@ -670,7 +674,7 @@ static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UC
     }
 
     // Get configuration descriptor size
-    if (!UsbK_GetDescriptor(usbHandle,
+    if (!self->libk.UsbK_GetDescriptor(usbHandle,
                             USB_DESCRIPTOR_TYPE_CONFIGURATION,
                             0, 0,
                             (PUCHAR)&configDesc,
@@ -683,7 +687,7 @@ static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UC
 
         // Wait for completion or timeout
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
-              !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
+              !self->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
             CloseHandle(overlapped.hEvent);
             return FALSE;
         }
@@ -700,7 +704,7 @@ static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UC
     ResetEvent(overlapped.hEvent);
 
     // Get full configuration descriptor
-    if (!UsbK_GetDescriptor(usbHandle,
+    if (!self->libk.UsbK_GetDescriptor(usbHandle,
                             USB_DESCRIPTOR_TYPE_CONFIGURATION,
                             0, 0,
                             buffer,
@@ -714,7 +718,7 @@ static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UC
 
         // Wait for completion or timeout
         if (WaitForSingleObject(overlapped.hEvent, timeoutMilliseconds) != WAIT_OBJECT_0 ||
-              !UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
+              !self->libk.UsbK_GetOverlappedResult(usbHandle, &overlapped, &transferred, FALSE)) {
             MFree(self->allocator, buffer, configDesc.wTotalLength);
             CloseHandle(overlapped.hEvent);
             return FALSE;
@@ -764,13 +768,13 @@ AwResult AwUsbkDeviceList_OpenDevice(AwUsbkBackend* self, AwDeviceInfo* deviceIn
     KLST_DEVINFO_HANDLE deviceInfoHandle = (KLST_DEVINFO_HANDLE)device->deviceId;
     KUSB_HANDLE usbHandle = NULL;
 
-    if (UsbK_Init(&usbHandle, deviceInfoHandle)) {
+    if (self->libk.UsbK_Init(&usbHandle, deviceInfoHandle)) {
         // Find bulk endpoints
         UCHAR bulkIn = 0, bulkOut = 0, interruptOut = 0;
         UCHAR interruptInterval = 0;
         if (!FindBulkInOutEndpoints(self, usbHandle, &bulkIn, &bulkOut, &interruptOut, &interruptInterval, self->timeoutMilliseconds)) {
             AW_WARNING("Failed to connected to device: Unable to get endpoints");
-            UsbK_Free(usbHandle);
+            self->libk.UsbK_Free(usbHandle);
             return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
         }
 
@@ -788,6 +792,7 @@ AwResult AwUsbkDeviceList_OpenDevice(AwUsbkBackend* self, AwDeviceInfo* deviceIn
         usbkDevice->allocator = self->allocator;
         usbkDevice->eventThread = NULL;
         usbkDevice->eventThreadStopEvent = NULL;
+        usbkDevice->backend = self;
 
         (*deviceOut)->transport.reallocBuffer = AwDeviceUsbk_ReallocBuffer;
         (*deviceOut)->transport.freeBuffer = AwDeviceUsbk_FreeBuffer;
@@ -866,7 +871,7 @@ AwResult AwUsbkDeviceList_CloseDevice(AwUsbkBackend* self, AwDevice* device) {
     MMemFree(&deviceUsbk->eventMem);
 
     if (deviceUsbk->usbHandle) {
-        UsbK_Free(deviceUsbk->usbHandle);
+        self->libk.UsbK_Free(deviceUsbk->usbHandle);
         deviceUsbk->usbHandle = NULL;
     }
 
@@ -919,7 +924,38 @@ AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMillisecond
         timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;
     }
 
+    HMODULE hLib = LoadLibraryA("libusbk.dll");
+    if (!hLib) {
+        AW_LOG_ERROR(&backend->logger, "Failed to load libusbk.dll. USB Sony backend will be unavailable.");
+        return (AwResult){.code=AW_RESULT_BACKEND_NOT_FOUND};
+    }
+
     AwUsbkBackend* deviceList = MMallocZ(backend->allocator, sizeof(AwUsbkBackend));
+    deviceList->hLib = hLib;
+
+    #define LOAD_KFUNC(name) \
+        deviceList->libk.name = (void*)GetProcAddress(hLib, #name); \
+        if (!deviceList->libk.name) { \
+            AW_LOG_ERROR(&backend->logger, "Failed to get proc address for " #name); \
+            FreeLibrary(hLib); \
+            MFree(backend->allocator, deviceList, sizeof(AwUsbkBackend)); \
+            return (AwResult){.code=AW_RESULT_BACKEND_NOT_FOUND}; \
+        }
+
+    LOAD_KFUNC(LibK_GetVersion);
+    LOAD_KFUNC(LstK_Init);
+    LOAD_KFUNC(LstK_Free);
+    LOAD_KFUNC(LstK_MoveNext);
+    LOAD_KFUNC(UsbK_Init);
+    LOAD_KFUNC(UsbK_Free);
+    LOAD_KFUNC(UsbK_GetDescriptor);
+    LOAD_KFUNC(UsbK_GetOverlappedResult);
+    LOAD_KFUNC(UsbK_WritePipe);
+    LOAD_KFUNC(UsbK_ReadPipe);
+    LOAD_KFUNC(UsbK_AbortPipe);
+    LOAD_KFUNC(UsbK_ResetDevice);
+    #undef LOAD_KFUNC
+
     backend->self = deviceList;
     backend->close = AwUsbkDeviceList_Close_;
     backend->refreshList = AwUsbkDeviceList_RefreshList_;

@@ -16,6 +16,8 @@
 extern "C" {
 #endif
 
+typedef struct AwUsbkBackend AwUsbkBackend;
+
 typedef struct {
     void* deviceId;
 } UsbkDeviceInfo;
@@ -41,9 +43,10 @@ typedef struct {
     HANDLE eventThreadStopEvent;
     SRWLOCK eventLock;
     AwPtpEventArray eventList; // MArray of stored events
+    AwUsbkBackend* backend;
 } PTPUsbkDeviceUsbk;
 
-typedef struct {
+struct AwUsbkBackend {
     MArray(UsbkDeviceInfo) deviceList;
     KLIB_VERSION libkVersion;
     MArray(PTPUsbkDeviceUsbk) openDevices;
@@ -52,7 +55,23 @@ typedef struct {
     MAllocator* allocator;
     AwLog logger;
     struct AwBackend* backend; // Reference to parent backend
-} AwUsbkBackend;
+
+    HMODULE hLib;
+    struct {
+        VOID (KUSB_API *LibK_GetVersion)(PKLIB_VERSION Version);
+        BOOL (KUSB_API *LstK_Init)(KLST_HANDLE* DeviceList, KLST_FLAG Flags);
+        BOOL (KUSB_API *LstK_Free)(KLST_HANDLE DeviceList);
+        BOOL (KUSB_API *LstK_MoveNext)(KLST_HANDLE DeviceList, KLST_DEVINFO_HANDLE* DeviceInfo);
+        BOOL (KUSB_API *UsbK_Init)(KUSB_HANDLE* InterfaceHandle, KLST_DEVINFO_HANDLE DevInfo);
+        BOOL (KUSB_API *UsbK_Free)(KUSB_HANDLE InterfaceHandle);
+        BOOL (KUSB_API *UsbK_GetDescriptor)(KUSB_HANDLE InterfaceHandle, UCHAR DescriptorType, UCHAR Index, USHORT LanguageID, PUCHAR Buffer, UINT BufferLength, PUINT LengthTransferred);
+        BOOL (KUSB_API *UsbK_GetOverlappedResult)(KUSB_HANDLE InterfaceHandle, LPOVERLAPPED Overlapped, PUINT lpNumberOfBytesTransferred, BOOL bWait);
+        BOOL (KUSB_API *UsbK_WritePipe)(KUSB_HANDLE InterfaceHandle, UCHAR PipeID, PUCHAR Buffer, UINT BufferLength, PUINT LengthTransferred, LPOVERLAPPED Overlapped);
+        BOOL (KUSB_API *UsbK_ReadPipe)(KUSB_HANDLE InterfaceHandle, UCHAR PipeID, PUCHAR Buffer, UINT BufferLength, PUINT LengthTransferred, LPOVERLAPPED Overlapped);
+        BOOL (KUSB_API *UsbK_AbortPipe)(KUSB_HANDLE InterfaceHandle, UCHAR PipeID);
+        BOOL (KUSB_API *UsbK_ResetDevice)(KUSB_HANDLE InterfaceHandle);
+    } libk;
+};
 
 AW_EXPORT AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMilliseconds);
 AW_EXPORT AwResult AwUsbkDeviceList_Open(AwUsbkBackend* self);

@@ -498,7 +498,7 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
             ("AW_ENABLE_IP", None),
         ]
         include_dirs.append(root_path("libs\\libusbk"))
-        extra_link_args = [root_path('libs\\libusbk\\amd64\\libusbK.lib'), 'ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
+        extra_link_args = ['ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
                            'ole32.lib', 'wiaguid.lib', 'shell32.lib', 'Oleaut32.lib']
 
     all_sources = [os.path.relpath(root_path(src), os.getcwd())

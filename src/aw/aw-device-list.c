@@ -62,6 +62,8 @@ b32 AwDeviceList_Open(AwDeviceList* self, MAllocator* allocator) {
                 AwResult result = AwUsbkDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
                 if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
+                } else {
+                    MArrayPop(self->backends);
                 }
                 break;
 #endif
@@ -72,6 +74,8 @@ b32 AwDeviceList_Open(AwDeviceList* self, MAllocator* allocator) {
                 AwResult result = AwLibusbDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
                 if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
+                } else {
+                    MArrayPop(self->backends);
                 }
 #endif
                 break;
@@ -82,6 +86,8 @@ b32 AwDeviceList_Open(AwDeviceList* self, MAllocator* allocator) {
                 AwResult result = AwWiaDeviceList_OpenBackend(backend);
                 if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
+                } else {
+                    MArrayPop(self->backends);
                 }
 #endif
                 break;
@@ -92,6 +98,8 @@ b32 AwDeviceList_Open(AwDeviceList* self, MAllocator* allocator) {
                 AwResult result = AwIokitDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
                 if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
+                } else {
+                    MArrayPop(self->backends);
                 }
 #endif
                 break;
@@ -102,6 +110,8 @@ b32 AwDeviceList_Open(AwDeviceList* self, MAllocator* allocator) {
                 AwResult result = AwIpDeviceList_OpenBackend(backend, self->timeoutMilliseconds);
                 if (result.code == AW_RESULT_OK) {
                     backendsOpened = TRUE;
+                } else {
+                    MArrayPop(self->backends);
                 }
 #endif
                 break;

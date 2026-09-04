@@ -84,7 +84,6 @@ if(WIN32)
 
     # Configure libUSBK
     target_include_directories(alphawire PRIVATE libs/libusbk)
-    list(APPEND ALPHAWIRE_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/libs/libusbk/amd64/libusbK.lib)
 
     # Socket libs
     list(APPEND ALPHAWIRE_LIBS ws2_32 Iphlpapi)
@@ -201,6 +200,7 @@ list(APPEND ALPHAWIREUI_LIBS SDL3::SDL3)
 
 # Link alphawire lib to ui
 list(APPEND ALPHAWIREUI_LIBS alphawire)
+target_compile_definitions(alphawireui PRIVATE ALPHAWIRE_IMPORTING_SHARED_LIB)
 
 if(APPLE)
     target_compile_definitions(alphawireui PRIVATE M_PTHREADS)
