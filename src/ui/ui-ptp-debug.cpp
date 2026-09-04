@@ -865,7 +865,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         // Button is released
         c.shutterReleasePressed = false;
         AwControl_SetControlToggle(&c.aw, DPC_SHUTTER, false);
-        u64 now = MGetTimeMilliseconds();
+        u64 now = MTimerMilliseconds();
         if (now > c.shutterReleaseTimeMillisStart) {
             AW_LOG_INFO_F(&c.aw.logger, "Shutter button released - held for %lld ms",
                 now - c.shutterReleaseTimeMillisStart);
@@ -876,7 +876,7 @@ void ShowCameraControlsWindow(AppContext& c) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             // Button is pressed
             c.shutterReleasePressed = true;
-            c.shutterReleaseTimeMillisStart = MGetTimeMilliseconds();
+            c.shutterReleaseTimeMillisStart = MTimerMilliseconds();
             AwControl_SetControlToggle(&c.aw, DPC_SHUTTER, true);
         }
     }

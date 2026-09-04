@@ -40,5 +40,11 @@ char* AwLog_LevelAsStr(AwLogLevel level) {
 }
 
 void AwLog_LogDefault(AwLog* logger, AwLogLevel level, const char *message) {
-    MLogf("%s: %s", AwLog_LevelAsStr(level), message);
+    u64 now = MTimeNowMilliseconds();
+    char timeBuffer[64];
+    MStrView timeStr = {timeBuffer, sizeof(timeBuffer)};
+    timeStr.size = MTimeFormatWithMillis(now, "%H:%M:%S", &timeStr);
+    if (timeStr.size > 0) {
+        MLogf("%.*s %s: %s", timeStr.size, timeStr.str, AwLog_LevelAsStr(level), message);
+    }
 }

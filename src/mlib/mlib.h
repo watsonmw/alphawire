@@ -1142,10 +1142,16 @@ u32 MStrAppend(MMemIO* memIo, const char* str);
 u32 MStrAppendf(MMemIO* memIo, const char* format, ...);
 
 /////////////////////////////////////////////////////////
-// Timer functions
-f64 MGetTimeSeconds();
-u64 MGetTimeMilliseconds();
-u64 MGetTimeMicroseconds();
+// Time functions
+// MTimer* - time units since boot, can be used to count elapsed time
+f64 MTimerSeconds();
+u64 MTimerMilliseconds();
+u64 MTimerMicroseconds();
+
+// MTime*  - wall clock time, can be used for formatting times, measured from platform specific epoch
+u64 MTimeNowMilliseconds();
+u32 MTimeFormat(u64 epoch_ms, const char* format, MStrView* out);
+u32 MTimeFormatWithMillis(u64 epoch_ms, const char* format, MStrView* out);
 
 /////////////////////////////////////////////////////////
 // Stacktraces

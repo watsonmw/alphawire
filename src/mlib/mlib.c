@@ -2,12 +2,18 @@
 
 #ifndef M_CLIB_DISABLE
 #include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
 #endif
 
 #ifdef _WIN32
+#define PLATFORM_WINDOWS
+#elif defined(__unix__) || defined(__APPLE__) || defined(_POSIX_VERSION)
+#define PLATFORM_POSIX
+#endif
+
+#ifdef PLATFORM_WINDOWS
 #include <windows.h>
-#else
-#include <time.h>
 #endif
 
 #ifdef M_THREADING
@@ -1667,15 +1673,12 @@ i32 MFileWriteDataFully(const char* filePath, u8* data, u32 size) {
 
 #ifdef _WIN32
 static LARGE_INTEGER sPerfCounterFrequency;
-#endif
-
-#ifdef _WIN32
-void GetPerformanceFrequency(void) {
+static void GetPerformanceFrequency(void) {
     QueryPerformanceFrequency(&sPerfCounterFrequency);
 }
 #endif
 
-u64 MGetTimeMicroseconds() {
+u64 MTimerMicroseconds() {
 #ifdef _WIN32
     static MOnce hasFreqOnce = M_ONCE_INIT;
     MExecuteOnce(&hasFreqOnce, GetPerformanceFrequency);
@@ -1691,13 +1694,102 @@ u64 MGetTimeMicroseconds() {
 #endif
 }
 
-u64 MGetTimeMilliseconds() {
-    return (MGetTimeMicroseconds() / 1000);
+u64 MTimerMilliseconds() {
+    return (MTimerMicroseconds() / 1000);
 }
 
-f64 MGetTimeSeconds() {
-    return ((f64)MGetTimeMicroseconds()) / 1000000.0;
+f64 MTimerSeconds() {
+    return ((f64)MTimerMicroseconds()) / 1000000.0;
 }
+
+#ifdef PLATFORM_POSIX
+#include <sys/time.h>
+#endif
+
+/**
+ * Gets the current wall-clock time in milliseconds since the Unix Epoch (Jan 1, 1970).
+ */
+u64 MTimeNowMilliseconds(void) {
+#ifdef PLATFORM_WINDOWS
+    FILETIME ft;
+    ULARGE_INTEGER uli;
+
+    // 1. Get system time in 100-nanosecond intervals since Jan 1, 1601 (UTC)
+    GetSystemTimeAsFileTime(&ft);
+
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+
+    // 2. Convert Windows epoch (1601) to Unix epoch (1970)
+    // Difference is 11,644,473,600 seconds
+    unsigned long long win_intervals = uli.QuadPart;
+    unsigned long long unix_intervals = win_intervals - 116444736000000000ULL;
+
+    // 3. Convert 100-nanosecond intervals to milliseconds
+    return (long long)(unix_intervals / 10000);
+
+#elif defined(PLATFORM_POSIX)
+    struct timespec ts;
+
+    // Use CLOCK_REALTIME for the wall-clock time
+    if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+        return ((u64)ts.tv_sec * 1000LL) + (ts.tv_nsec / 1000000LL);
+    }
+
+    return 0; // Fallback failure
+#else
+    // Fallback if no supported platform is found (seconds precision only)
+    return (u64)time(NULL) * 1000LL;
+#endif
+}
+
+#ifndef M_CLIB_DISABLE
+static u32 MTimeFormatWithMillisOpt(u64 epoch_ms, const char* format, MStrView* out, b32 includeMillis) {
+    // 1. Separate into whole seconds and fractional milliseconds
+    time_t raw_time = (time_t)(epoch_ms / 1000LL);
+    u64 ms = epoch_ms % 1000LL;
+
+    struct tm time_info = {};
+
+    // 2. Thread-safe conversion to local time structure
+#ifdef PLATFORM_WINDOWS
+    if (localtime_s(&time_info, &raw_time) != 0) {
+        return 0;
+    }
+#elif defined(PLATFORM_POSIX)
+    if (localtime_r(&raw_time, &time_info) == NULL) {
+        return 0;
+    }
+#endif
+
+    // 3. Format the main date/time string up to the seconds part
+    size_t written = strftime(out->str, out->size, format, &time_info);
+    if (written == 0 || written >= out->size) {
+        return 0; // Buffer overflow or formatting error
+    }
+
+    if (includeMillis) {
+        // 4. Append the milliseconds to the end of the string
+        // snprintf ensures we don't overflow the remaining buffer space
+        int ms_written = snprintf(out->str + written, out->size - written, ".%03lld", ms);
+        if (ms_written < 0 || (size_t)ms_written >= (out->size - written)) {
+            return 0; // Buffer space was too small for milliseconds
+        }
+
+        return written + (size_t)ms_written;
+    } else {
+        return written;
+    }
+}
+
+u32 MTimeFormat(u64 epoch_ms, const char* format, MStrView* out) {
+    return MTimeFormatWithMillisOpt(epoch_ms, format, out, FALSE);
+}
+
+u32 MTimeFormatWithMillis(u64 epoch_ms, const char* format, MStrView* out) {
+    return MTimeFormatWithMillisOpt(epoch_ms, format, out, TRUE);
+}
+#endif
 
 #if defined(M_STACKTRACE)
 
@@ -1782,7 +1874,6 @@ b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
 }
 
 #elif defined(WIN32)
-#include <windows.h>
 #include <dbghelp.h>
 #ifdef _MSC_VER
 #pragma comment(lib, "dbghelp.lib")

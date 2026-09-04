@@ -676,7 +676,7 @@ static AwResult AwIp_RefreshList(AwPtpIpBackend* self, AwDeviceInfoArray* device
     AW_TRACE("AwIp_RefreshList");
 
     self->isDiscoveryInProgress = TRUE;
-    self->discoveryStartTime = MGetTimeMilliseconds();
+    self->discoveryStartTime = MTimerMilliseconds();
     MSockClose(self->discoverySock);
     AwIp_ClearSdpRecvBufs(self);
 
@@ -954,7 +954,7 @@ static b32 AwIp_PollListUpdates(AwPtpIpBackend* self, AwDeviceInfoArray* deviceL
         }
     }
 
-    u64 currentTime = MGetTimeMilliseconds();
+    u64 currentTime = MTimerMilliseconds();
     if (currentTime - self->discoveryStartTime > 10000) {
         AW_TRACE("SSDP discovery stopped after waiting for responses for 10s.");
         MSockClose(self->discoverySock);
