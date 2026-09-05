@@ -20,6 +20,8 @@ extern "C" {
 #elif ALPHAWIRE_IMPORTING_SHARED_LIB
     #ifdef _WIN32
         #define AW_EXPORT __declspec(dllimport)
+    #else
+        #define AW_EXPORT
     #endif
 #else
     #define AW_EXPORT

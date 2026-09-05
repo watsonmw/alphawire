@@ -718,14 +718,14 @@ static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, false);
         GetProcessedEvents(alloc, outEvents, dev);
     } else if (timeoutMilliseconds > 0) {
-        u64 startTime = MGetTimeMilliseconds();
+        u64 startTime = MTimerMilliseconds();
         b32 done = false;
 
         while (!done) {
             // Run loop for a short period to allow interrupt handler to run
             double runTime = 0.01; // 10ms
             if (timeoutMilliseconds > 0) {
-                u64 elapsed = MGetTimeMilliseconds() - startTime;
+                u64 elapsed = MTimerMilliseconds() - startTime;
                 if (elapsed >= (u64)timeoutMilliseconds) {
                     runTime = 0;
                     done = true;
@@ -747,7 +747,7 @@ static AwResult AwDeviceIokit_ReadEvents(AwDevice* self, int timeoutMilliseconds
             }
 
             if (timeoutMilliseconds > 0 && !done) {
-                u64 elapsed = MGetTimeMilliseconds() - startTime;
+                u64 elapsed = MTimerMilliseconds() - startTime;
                 if (elapsed >= (u64)timeoutMilliseconds) {
                     done = true;
                 }
