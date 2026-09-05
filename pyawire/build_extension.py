@@ -509,7 +509,16 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
                     ] + platform_defines
 
     if debug:
-        platform_defines.append(("_DEBUG", None))
+        define_macros.extend([
+            ("DEBUG", None),
+            ("_DEBUG", None),
+            ("M_MEM_DEBUG", None),
+            ("M_ASSERT", None),
+            ("M_STACKTRACE", None),
+        ])
+        if sys.platform.startswith("linux"):
+            define_macros.append(("M_LIBBACKTRACE", None))
+            extra_link_args.append("-lbacktrace")
         if sys.platform.startswith("win32"):
             # pdb_path = os.path.join(_script_dir, "awire", "_binding.pdb")
             # print(f"{pdb_path}")

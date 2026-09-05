@@ -19,7 +19,7 @@
 //  - M_LOG_ALLOCATIONS   Log allocations
 //  - M_MEM_DEBUG         Heap checking
 //  - M_STACKTRACE        Enable Stacktraces
-//  -- M_LIBBACKTRACE     Use libbacktrace
+//  -- M_LIBBACKTRACE     Use libbacktrace  (Required for full stacktraces on Linux)
 //  - M_THREADING         Enable threading / thread local / mutexes
 //  -- M_PTHREADS         Use pthreads
 //
@@ -935,7 +935,7 @@ MINLINE MStr M_StrMake(MDEBUG_SOURCE_DEFINE MAllocator* alloc, u32 len) {
 #define MStrInit(alloc, len) M_StrMake(MDEBUG_SOURCE_MACRO alloc, len)
 
 // Free allocated string
-#define MStrFree(a, s) ((s).capacity ? (M_Free(MDEBUG_SOURCE_MACRO (a), (void*)(s).str, (s).capacity), \
+#define MStrFree(a, s) ((s).str ? (M_Free(MDEBUG_SOURCE_MACRO (a), (void*)(s).str, (s).capacity), \
     (s).str = 0, (s).size = 0, (s).capacity = 0) : 0)
 
 MINLINE MStr MStrMakeEmpty() {
@@ -945,6 +945,7 @@ MINLINE MStr MStrMakeEmpty() {
 // Make a MStr copy from a C string - expects nul-terminator on 'c'
 // Strings made this way keep the nul-terminator
 MINLINE MStr MStrMakeCopyLenNul(MAllocator* alloc, const char* c, u32 len) {
+    if (len == 0) {return MStrMakeEmpty();}
     MStr r = MStrInit(alloc, len + 1);
     if (!r.str) {return r;}
     memcpy((void*)r.str, c, len + 1);
@@ -955,6 +956,7 @@ MINLINE MStr MStrMakeCopyLenNul(MAllocator* alloc, const char* c, u32 len) {
 
 // Make a MStr copy from a string of given length - no nul-terminator
 MINLINE MStr MStrMakeCopyLen(MAllocator* alloc, const char* c, u32 len) {
+    if (len == 0) {return MStrMakeEmpty();}
     MStr r = MStrInit(alloc, len);
     if (!r.str) {return r;}
     memcpy((void*)r.str, c, len);

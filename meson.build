@@ -86,6 +86,11 @@ elif host_system == 'linux'
   alphawire_lib_deps += dependency('libusb-1.0')
   alphawire_c_args += ['-DAW_ENABLE_LIBUSB', '-DAW_ENABLE_IP']
   alphawire_lib_args += ['-DM_PTHREADS']
+
+  if get_option('buildtype').startswith('debug')
+    alphawire_lib_args += ['-DM_LIBBACKTRACE']
+    alphawire_lib_deps += cc.find_library('backtrace')
+  endif
 endif
 
 alphawire_lib = both_libraries('alphawire',

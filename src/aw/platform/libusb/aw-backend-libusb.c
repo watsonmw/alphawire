@@ -154,8 +154,8 @@ AwResult AwLibusbDeviceList_RefreshList(AwLibusbDeviceList* self, AwDeviceInfoAr
 
 AwResult AwLibusbDeviceList_ReleaseList(AwLibusbDeviceList* self) {
     AW_TRACE("AwLibusbDeviceList_ReleaseList");
-    MArrayEach(self->devices, i) {
-        libusb_unref_device((libusb_device*)self->devices.data[i].device);
+    MArrayEachPtr(self->devices, it) {
+        libusb_unref_device((libusb_device*)it.p->device);
     }
     MArrayFree(self->allocator, self->devices);
     return (AwResult){.code=AW_RESULT_OK};

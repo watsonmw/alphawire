@@ -120,6 +120,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         pkg_check_modules(LIBUSB libusb-1.0)
     endif()
 
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DM_LIBBACKTRACE")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DM_LIBBACKTRACE")
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_libraries(alphawire PRIVATE backtrace)
+    endif()
+
     if (LIBUSB_FOUND)
         target_link_libraries(alphawire PRIVATE ${LIBUSB_LIBRARIES})
         target_include_directories(alphawire PRIVATE ${LIBUSB_INCLUDE_DIRS})
