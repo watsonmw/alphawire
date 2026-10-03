@@ -1497,7 +1497,7 @@ static EnumValueU8 sProp_MovieFrameRate[] = {
 };
 
 static EnumValueU8 sProp_AutoFocusStatus[] = {
-    {0x01, "Unlock"},
+    {0x01, "Unlocked"},
     {0x02, "[AF-S] Focused, AF Locked"},
     {0x03, "[AF-S] No focus / Low Contrast"},
     {0x04, "Not Used"},

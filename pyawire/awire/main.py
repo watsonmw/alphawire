@@ -617,7 +617,7 @@ class AwFocusArea(AwIntEnum):
 
 class AwAutoFocusStatus(AwIntEnum):
     """Auto Focus Status."""
-    UNLOCK = 0x01
+    UNLOCKED = 0x01
     AFS_LOCKED = 0x02
     AFS_FAILED = 0x03
     AFC_TRACKING = 0x05
