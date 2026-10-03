@@ -25,14 +25,14 @@ class CustomBuildHook(BuildHookInterface):
             # For macOS 11+, the standard compatibility tag is often 'macosx_11_0_arm64'
             # regardless of the minor version, especially for Apple Silicon.
             # Pip debug tags usually include 'macosx_11_0_arm64'.
-            if raw_platform.startswith('macosx-11'):
+            if raw_platform.startswith('macosx-') and raw_platform.endswith('-arm64'):
                 platform_tag = 'macosx_11_0_arm64'
             else:
                 platform_tag = raw_platform.replace('-', '_').replace('.', '_')
             
             # Use abi3 tag for broad Python 3 compatibility.
-            # cp37 is a safe minimum for most modern features.
-            python_tag = 'cp37'
+            # cp38 is a safe minimum for most modern features.
+            python_tag = 'cp38'
             abi_tag = 'abi3'
             build_data['tag'] = f'{python_tag}-{abi_tag}-{platform_tag}'
 

@@ -1,0 +1,62 @@
+name: pyawire wheels
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-wheels:
+    name: Build wheels (${{ matrix.runner }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+            platform: manylinux
+          - runner: macos-13
+            arch: x86_64
+            platform: macosx
+          - runner: macos-14
+            arch: arm64
+            platform: macosx
+    env:
+      CIBW_ARCHS: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install build tooling
+        run: python -m pip install --upgrade cibuildwheel
+      - name: Build wheels
+        run: python -m cibuildwheel pyawire --output-dir pyawire/dist
+      - name: Validate wheel tags
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+          EXPECTED_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from packaging.utils import parse_wheel_filename
+          import os
+
+          wheels = list(Path("pyawire/dist").glob("*.whl"))
+          assert wheels, "cibuildwheel produced no wheels"
+          for wheel in wheels:
+              _, _, _, tags = parse_wheel_filename(wheel.name)
+              assert any(tag.interpreter == "cp38" and tag.abi == "abi3" for tag in tags), wheel.name
+              assert any(os.environ["EXPECTED_PLATFORM"] in tag.platform
+                         and os.environ["EXPECTED_ARCH"] in tag.platform for tag in tags), wheel.name
+          PY
+      - name: Install wheel and smoke-test awire
+        run: |
+          python -m pip install pyawire/dist/*.whl
+          python -c "import awire"
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyawire-${{ matrix.runner }}-${{ matrix.arch }}
+          path: pyawire/dist/*.whl
+          if-no-files-found: error
