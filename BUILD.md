@@ -1,5 +1,5 @@
 
-Buuilding using both CMake and Meson are supported.
+Building with either CMake or Meson is supported.
 
 The library is not single header, but should be easy to add to your own build system as well, just see the meson build
 file as an example.

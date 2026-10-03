@@ -29,7 +29,10 @@ def project_root():
     global PROJECT_ROOT
     if PROJECT_ROOT is None:
         script_dir = get_script_dir()
-        PROJECT_ROOT = os.path.dirname(script_dir)
+        if os.path.isdir(os.path.join(script_dir, "src")):
+            PROJECT_ROOT = script_dir
+        else:
+            PROJECT_ROOT = os.path.dirname(script_dir)
         print(f"Project root: {PROJECT_ROOT}")
     return PROJECT_ROOT
 

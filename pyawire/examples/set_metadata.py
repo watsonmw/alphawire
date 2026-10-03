@@ -64,7 +64,7 @@ def set_metadata(photographer_str: str, copyright_str: str):
                 # deciSec (1/10th of a second)
                 deci_sec = int(now.microsecond / 100000)
                 
-                # Format: YYYYmmddTHHMMSS.m+HHMM
+                # Format: YYYYmmddTHHMMSS.m+HHMM 20261003T105626.9-0700
                 time_str = now.strftime("%Y%m%dT%H%M%S") + f".{deci_sec}{offset_hours:+03d}{offset_mins:02d}"
 
                 awire.log_info(f"Setting time to '{time_str}'")
