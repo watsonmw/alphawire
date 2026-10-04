@@ -27,7 +27,7 @@ build = "cp39-*"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64"]
-before-all = "if command -v yum; then yum install -y pkgconfig libusbx-devel; elif command -v apk; then apk add --no-cache pkgconfig libusb-dev; fi"
+before-all = "if command -v yum; then yum install -y pkgconfig libusbx-devel; elif command -v apk; then apk add --no-cache pkgconfig gcc musl-dev libusb-dev; fi"
 manylinux-x86_64-image = "manylinux2014"
 
 [tool.cibuildwheel.macos]
