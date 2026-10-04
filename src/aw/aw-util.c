@@ -12,6 +12,9 @@ void Aw_MemIOFree(MMemIO* memIO) {
 }
 
 void Aw_StrFree(MAllocator* allocator, MStr* str) {
+    if (str->capacity == 0) {
+        return;
+    }
     MStrFree(allocator, *str);
 }
 

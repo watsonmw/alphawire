@@ -29,7 +29,7 @@ def list_settings(show_all=False):
     for device_info in device_list:
         awire.log_info(f"    {device_info.manufacturer} - {device_info.product} (S/N: {device_info.serial})")
 
-        device = device_list.open_device(device_info)
+        device, result = device_list.open_device(device_info)
         if device is not None:
             control = device.open_control()
             control.connect()

@@ -3,6 +3,8 @@ UI
 
 - Connect multiple cameras at the same time (maybe with separate UI)
 - Detect transport errors and disconnect
+- Make debugger secondary
+- Maybe do a virtual camera for testing?
 - Button list and control tab
   - Make tab list for camera settings
   - Add buttons UI
@@ -27,11 +29,6 @@ Backends
 - IP: Don't copy packet buffer so much
 - IP: Connect via IP only?
 - IP: Connect with password (TLS)
-
-Build
-===
-
-- consider alphawirelib as static only / mainly
 
 Python Bindings
 ===

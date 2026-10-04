@@ -31,7 +31,7 @@ def set_settings(settings):
     for device_info in device_list:
         awire.log_info(f"{device_info.manufacturer} - {device_info.product} (S/N: {device_info.serial})")
 
-        device = device_list.open_device(device_info)
+        device, result = device_list.open_device(device_info)
         if device is not None:
             control = device.open_control()
             control.connect()
@@ -129,7 +129,6 @@ if __name__ == '__main__':
     )
     if len(sys.argv) == 1:
         parser.print_help()
-        print("\n---")
         main()
         sys.exit(0)
     args = parser.parse_args()

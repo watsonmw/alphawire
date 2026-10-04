@@ -31,7 +31,7 @@ def camera_tester():
         awire.log_info(f"    {device_info.manufacturer} - {device_info.product} (S/N: {device_info.serial})")
         awire.log_info(f"    IP: {device_info.ip_address}, USB VID: 0x{device_info.usb_vid:04x}, PID: 0x{device_info.usb_pid:04x}, Version: {device_info.usb_version}")
 
-        device = device_list.open_device(device_info)
+        device, result = device_list.open_device(device_info)
         if device is not None:
             control = device.open_control()
             control.connect()

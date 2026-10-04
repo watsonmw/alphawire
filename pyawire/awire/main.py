@@ -33,6 +33,43 @@ def _convert_m_str(m_str: typing.Any) -> str:
 def _usb_bcd_version_as_string(usb_version: int) -> str:
     return f"{(usb_version >> 8) & 0xFF}.{usb_version & 0xFF:02d}"
 
+class AwResultCode(enum.IntEnum):
+    OK = 0
+    TIMEOUT = 1
+    UNSUPPORTED = 2
+    CONNECTION_CLOSED = 3
+    MALFORMED_RESPONSE = 4
+    TRANSPORT_ERROR = 5
+    PTP_FAILURE = 6
+    PARAM_ERROR = 7
+    NOT_SUPPORTED = 8
+    DEVICE_INFO_FAILURE = 9
+
+class AwResult:
+    def __init__(self, code: int, ptp_code: int = 0):
+        self.code = AwResultCode(code)
+        self.ptp_code = ptp_code
+
+    def __bool__(self) -> bool:
+        return self.code == AwResultCode.OK
+
+    def __repr__(self) -> str:
+        if self.ptp_code != 0:
+            return f"AwResult(code={self.code.name}, ptp_code={self.ptp_code:#x})"
+        return f"AwResult(code={self.code.name})"
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, AwResult):
+            return self.code == other.code and self.ptp_code == other.ptp_code
+        if isinstance(other, (AwResultCode, int)):
+            return self.code == other
+        return False
+
+
+def _convert_aw_result(res: typing.Any) -> AwResult:
+    print(res)
+    return AwResult(res.code, res.ptp)
+
 
 class AwIntEnum(enum.IntEnum):
     def __str__(self) -> str:
@@ -1076,6 +1113,29 @@ class AwDeviceInfo:
         self.usb_version: str = _usb_bcd_version_as_string(ffi_device.usbVersion)
         self._ffi_device = ffi_device
 
+
+def _shutter_speed_conv(current_val) -> typing.Union[int, float]:
+    if current_val == 0xffffffff:
+        return  current_val
+    shutter_denom = current_val & 0xffff
+    if shutter_denom:
+        return ((current_val >> 16 ) & 0xffff) / shutter_denom
+    else:
+        return 0
+
+
+def _shutter_speed_str_conv(value: str) -> float:
+    if value == "Bulb":
+        return 0.
+    if "/" in value:
+        nom, denom = value.split("/", 1)
+        denom_f = float(denom)
+        if denom_f == 0:
+            return 0.
+        return float(nom) / denom_f
+    return float(value)
+
+
 class AwPtpProperty:
     """
     Represents a PTP (Picture Transfer Protocol) property of a camera.
@@ -1266,10 +1326,13 @@ class AwPtpProperty:
         return result
 
     def is_writable(self) -> bool:
+        if self._ffi_property.isNotch:
+            # Check if we can apply notching logic to change the value
+            return self._ffi_property.isEnabled == 1
         r = lib.AwControl_IsPropertyWritable(self._ffi_control, self._ffi_property)
         return True if r else False
 
-    def set_value(self, value: typing.Union[str, int, AwIntEnum]) -> bool:
+    def set_value(self, value: typing.Union[str, int, AwIntEnum]) -> AwResult:
         """
         Set the value of the property.
 
@@ -1287,17 +1350,16 @@ class AwPtpProperty:
                     value = self._enum_type[value]
                 except KeyError:
                     # If not a name, maybe it's a value represented as string? 
-                    # set_property_str below will handle it if it's a known string value for the property.
+                    # set_value_str below will handle it if it's a known string value for the property.
                     pass
 
             if isinstance(value, str):
-                res = self._control.set_property_str(self._ffi_property, value)
-                return res.code == lib.AW_RESULT_OK
+                return self.set_value_str(value)
 
         if isinstance(value, AwIntEnum) and self._enum_type is not None:
             # Validate that the enum value is of the correct type for this property
             if type(value) != self._enum_type:
-                return False
+                return AwResult(AwResultCode.PARAM_ERROR)
 
         if isinstance(value, (int, AwIntEnum)):
             int_value = int(value)
@@ -1313,18 +1375,109 @@ class AwPtpProperty:
             elif dt == PtpDataType.INT64: prop_value.i64 = int_value
             elif dt == PtpDataType.UINT64: prop_value.u64 = int_value
             else:
-                return False
-            res = lib.AwControl_SetPropertyValue(self._ffi_control, self._ffi_property, prop_value[0])
-            return res.code == lib.AW_RESULT_OK
-        return False
+                return AwResult(AwResultCode.PARAM_ERROR)
+            if self._ffi_property.isNotch:
+                # For some properties in the older protocol, values can't be set directly only incremented/decremented
+
+                # 1. Find the list of enum values for the property to see how far we must notch
+                enums = self.get_enums()
+                if not enums:
+                    if self._ffi_property.propCode == AwPropertyCode.SHUTTER_SPEED:
+                        current_val = int(self.get_raw_value())
+                        if int_value == 0xffffffff:
+                            return AwResult(AwResultCode.PARAM_ERROR)
+                        shutter_speed_1 = _shutter_speed_conv(current_val)
+                        shutter_speed_2 = _shutter_speed_conv(int_value)
+
+                enum_values = [int(e[0]) for e in enums]
+                current_val = int(self.get_raw_value())
+
+                if int_value not in enum_values or current_val not in enum_values:
+                    return AwResult(AwResultCode.PARAM_ERROR)
+
+                current_idx = enum_values.index(current_val)
+                target_idx = enum_values.index(int_value)
+                diff = target_idx - current_idx
+
+                if diff == 0:
+                    return AwResult(AwResultCode.OK)
+
+                # 3. Execute notch that number of times in the direction needed
+                direction = b'\x01' if diff > 0 else b'\xff'
+                res = None
+                for _ in range(abs(diff)):
+                    res = lib.AwControl_SetPropertyNotch(self._ffi_control, self._ffi_property, direction)
+                    if res.code != AwResultCode.OK:
+                        return AwResult(res.code, res.ptpCode)
+                    time.sleep(0.25)
+                    # add refresh properties here to see if we are changing
+                    #enum position
+
+                return _convert_aw_result(res) if res is not None else AwResult(AwResultCode.OK)
+            else:
+                res = lib.AwControl_SetPropertyValue(self._ffi_control, self._ffi_property, prop_value[0])
+            return _convert_aw_result(res)
+        return AwResult(AwResultCode.PARAM_ERROR)
+
+    def set_value_str(self, value: str) -> AwResult:
+        c_val = ffi.new("char[]", value.encode("utf-8"))
+        m_str = ffi.new("MStr[1]")
+        m_str[0].str = c_val
+        m_str[0].size = len(value)
+        m_str[0].capacity = 0
+        if self._ffi_property.isNotch:
+            # For some properties in the older protocol, values can't be set directly only incremented/decremented
+            if self._ffi_property.propCode == AwPropertyCode.SHUTTER_SPEED:
+                # Implement for shutter speed for now
+                current_val = int(self.get_raw_value())
+                target_float_shutter_speed = _shutter_speed_str_conv(value)
+                current_float_shutter_speed = _shutter_speed_conv(current_val)
+                print(f"{target_float_shutter_speed}, {current_float_shutter_speed}")
+
+                if target_float_shutter_speed == current_float_shutter_speed:
+                    return AwResult(AwResultCode.OK)
+
+                # handle bulb case
+                if target_float_shutter_speed > current_float_shutter_speed:
+                    direction = b'\xff'
+                else:
+                    direction = b'\x01'
+
+                attempts = 50
+                while attempts >= 0:
+                    attempts -= 1
+                    res = lib.AwControl_SetPropertyNotch(self._ffi_control, self._ffi_property, direction)
+                    if res.code != AwResultCode.OK:
+                        return _convert_aw_result(res)
+                    # Sleep & refresh properties - if no change wait another bit - this becomes the new def. wait time
+                    # for this property
+                    time.sleep(0.25)
+                    self._control.refresh_properties()
+                    current_val = int(self.get_raw_value())
+                    current_float_shutter_speed = _shutter_speed_conv(current_val)
+                    print(f"{target_float_shutter_speed}, {current_float_shutter_speed}")
+                    # Retry fresh properties until you see a change in current value
+                    if target_float_shutter_speed == current_float_shutter_speed:
+                        return AwResult(AwResultCode.OK)
+                    # if we overshoot - we may want to try again by reversing direction + perhaps the wait wasn't long
+                    # enough
+                    if (direction == b'\xff' and target_float_shutter_speed > current_float_shutter_speed or
+                            direction == b'\x01' and target_float_shutter_speed < current_float_shutter_speed):
+                        return AwResult(AwResultCode.PARAM_ERROR)
+
+                return AwResult(AwResultCode.TIMEOUT)
+        else:
+            return _convert_aw_result(lib.AwControl_SetPropertyStr(self._ffi_control, self._ffi_property, m_str[0]))
+        return AwResult(AwResultCode.PARAM_ERROR)
+
 
 
 class AwPtpControl:
     """
     Represents a PTP control (command) of a camera.
 
-    Controls correspond to actions such as triggering the shutter, starting movie
-    recording, or adjusting focus step.
+    Controls correspond to actions such as triggering the shutter, putting the shutter into half-pressed state,
+    starting movie recording, or a manual focus step.
     """
     def __init__(self, control: 'AwControl', ffi_control: typing.Any,
                  allocator: typing.Any, ffi_ptp_control: typing.Any) -> None:
@@ -1395,7 +1548,7 @@ class AwControl:
         self._ffi[0].logger.level = _aw_log_level.value
         _aw_log_instances.append(weakref.ref(self))
 
-    def connect(self, sony_protocol_version: AwSonyProtocolVersion = AwSonyProtocolVersion.V3) -> typing.Any:
+    def connect(self, sony_protocol_version: AwSonyProtocolVersion = AwSonyProtocolVersion.V3) -> AwResult:
         """
         Connect to the Sony camera over PTP.
 
@@ -1411,7 +1564,7 @@ class AwControl:
             An AwResult indicating success or failure.
         """
         log_info(f"Attempting to connect with protocol version: {sony_protocol_version.name}...")
-        return lib.AwControl_Connect(self._ffi, sony_protocol_version.value)
+        return _convert_aw_result(lib.AwControl_Connect(self._ffi, sony_protocol_version.value))
 
     def close(self) -> None:
         """
@@ -1437,7 +1590,7 @@ class AwControl:
         """
         return self._ffi[0].protocolVersion
 
-    def refresh_properties(self, full_refresh: bool = True) -> bool:
+    def refresh_properties(self, full_refresh: bool = True) -> AwResult:
         """
         Update the local cache of camera properties by pulling latest values from the device.
 
@@ -1448,10 +1601,9 @@ class AwControl:
                 correctly on certain cameras.
 
         Returns:
-            True if successful, False otherwise.
+            An AwResult indicating success or failure.
         """
-        result = lib.AwControl_RefreshProperties(self._ffi, full_refresh)
-        return result.code == lib.AW_RESULT_OK
+        return _convert_aw_result(lib.AwControl_RefreshProperties(self._ffi, full_refresh))
 
     def get_num_properties(self) -> int:
         """
@@ -1567,7 +1719,7 @@ class AwControl:
             return None
         return AwPtpControl(self, self._ffi, self._allocator, control)
 
-    def set_control_toggle(self, control_code: int, pressed: bool) -> typing.Any:
+    def set_control_toggle(self, control_code: int, pressed: bool) -> AwResult:
         """
         Toggle a control (press or release).
 
@@ -1578,15 +1730,7 @@ class AwControl:
         Returns:
             An AwResult.
         """
-        return lib.AwControl_SetControlToggle(self._ffi, control_code, pressed)
-
-    def set_property_str(self, ffi_property: typing.Any, value: str) -> typing.Any:
-        c_val = ffi.new("char[]", value.encode("utf-8"))
-        m_str = ffi.new("MStr[1]")
-        m_str[0].str = c_val
-        m_str[0].size = len(value)
-        m_str[0].capacity = 0
-        return lib.AwControl_SetPropertyStr(self._ffi, ffi_property, m_str[0])
+        return _convert_aw_result(lib.AwControl_SetControlToggle(self._ffi, control_code, pressed))
 
     def get_live_view_image(self) -> typing.Optional[memoryview]:
         """
@@ -1631,7 +1775,7 @@ class AwControl:
         result = lib.AwControl_ReadEvents(self._ffi, timeout_ms, self._allocator, events_array)
 
         events = []
-        if result.code == lib.AW_RESULT_OK:
+        if result.code == AwResultCode.OK:
             for i in range(events_array[0].size):
                 c_event = events_array[0].data[i]
                 
@@ -1664,7 +1808,7 @@ class AwControl:
         mem_io[0].allocator = self._allocator
         cii = ffi.new("AwPtpCapturedImageInfo[1]")
         result = lib.AwControl_GetCapturedImage(self._ffi, mem_io, cii)
-        if result.code == lib.AW_RESULT_OK and mem_io[0].size:
+        if result.code == AwResultCode.OK and mem_io[0].size:
             filename = _convert_m_str(cii[0].filename)
             data = bytes(ffi.buffer(mem_io[0].mem, mem_io[0].size))
             lib.Aw_MemIOFree(mem_io)
@@ -1768,7 +1912,7 @@ class AwControl:
 
         if self.get_protocol_version() == AwSonyProtocolVersion.V2:
             # Some older cameras require a wait after triggering the shutter and waiting for pending files before
-            # issuing the file download, if don't do this the camera will reboot. A flat wait may be better but for
+            # issuing the file download, if we don't do this the camera will reboot. A flat wait may be better but for
             # now we query the backend for the object added event, since that seems to be long enough to avoid the
             # crash.
             self._wait_for_condition(self._check_object_added,
@@ -1941,7 +2085,7 @@ class AwDeviceList:
             return False
         return bool(lib.AwDeviceList_PollUpdates(self._devlist))
 
-    def open_device(self, device_info: AwDeviceInfo) -> typing.Optional[AwDevice]:
+    def open_device(self, device_info: AwDeviceInfo) -> typing.Tuple[typing.Optional[AwDevice], AwResult]:
         """
         Open a device from the list.
 
@@ -1949,18 +2093,18 @@ class AwDeviceList:
             device_info: The info of the device to open.
 
         Returns:
-            An AwDevice object, or None if it could not be opened.
+            A tuple of (AwDevice object or None, AwResult).
         """
         if not self._is_open:
-            return None
+            return None, AwResult(AwResultCode.PARAM_ERROR)
         device_out = ffi.new("AwDevice**")
         ffi_device_info = ffi.addressof(device_info._ffi_device)
         result = lib.AwDeviceList_OpenDevice(self._devlist, ffi_device_info, device_out)
-        if result.code == lib.AW_RESULT_OK:
+        if result.code == AwResultCode.OK:
             device = AwDevice(device_out[0], self)
             self._devices.append(device)
-            return device
-        return None
+            return device, _convert_aw_result(result)
+        return None, _convert_aw_result(result)
 
     def __len__(self) -> int:
         if not self._is_open:

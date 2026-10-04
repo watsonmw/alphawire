@@ -405,6 +405,7 @@ b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* alloc, AwPtpPro
 b32 AwControl_GetPropertyValueAsKnownStr(AwControl* self, MAllocator* alloc, AwPtpProperty* property, MStr* strOut);
 AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, AwPtpPropValue value);
 AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value);
+AwResult AwControl_SetPropertyNotch(AwControl* self, AwPtpProperty* property, i8 notch);
 b32 AwControl_IsPropertyWritable(AwControl* self, AwPtpProperty* property);
 b32 AwControl_GetPropertyId(AwControl* self, AwPtpProperty* property, MStr* idOut);
 
