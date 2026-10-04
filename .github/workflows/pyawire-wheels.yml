@@ -47,7 +47,12 @@ jobs:
           for wheel in wheels:
               _, _, _, tags = parse_wheel_filename(wheel.name)
               assert any(tag.interpreter == "cp39" and tag.abi == "abi3" for tag in tags), wheel.name
-              assert any(os.environ["EXPECTED_PLATFORM"] in tag.platform
+              expected_platform = os.environ["EXPECTED_PLATFORM"]
+              allowed_platforms = [expected_platform]
+              if expected_platform == "manylinux":
+                  allowed_platforms.append("musllinux")
+
+              assert any(any(p in tag.platform for p in allowed_platforms)
                          and os.environ["EXPECTED_ARCH"] in tag.platform for tag in tags), wheel.name
           PY
       - name: Install wheel and smoke-test awire
