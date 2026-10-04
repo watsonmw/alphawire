@@ -3,7 +3,7 @@ requires = ["hatchling>=1.8.0", "cffi>=1.15.0", "setuptools>=61.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pyawire"
+name = "awire"
 version = "0.1.0"
 dependencies = ["cffi>=1.15.0"]
 
@@ -34,6 +34,7 @@ manylinux-aarch64-image = "manylinux2014"
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
+#before-all = "brew install libusb"
 
 [tool.hatch.build.targets.sdist.force-include]
 "../libs" = "libs"

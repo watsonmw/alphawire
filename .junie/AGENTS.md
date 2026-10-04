@@ -5,7 +5,7 @@
 During development use the Miniconda environment named `alphawire`.   This has meson, ninja and dependencies needed for
 building the Python binding.
 
-Activate this environment before running any Python-related commands or scripts for `pyawire`.
+Activate this environment before running any Python-related commands or scripts for `awire`.
 
 To activate the environment:
 ```
@@ -14,7 +14,7 @@ conda activate alphawire
 
 ## Running the `awire` Wrapper
 
-When working with the `pyawire` component:
+When working with the `awire` component:
 
 1.  **Navigate to the `pyawire` directory**:
     ```
@@ -25,7 +25,6 @@ When working with the `pyawire` component:
     If you need to build or install the wrapper in development mode:
     ```
     # Build extension (if needed)
-    cd pyawire
     python build_extension.py --only-if-changed
     
     # Install in editable mode (typically already done)
@@ -40,7 +39,6 @@ When working with the `pyawire` component:
 
 
 ## Notes
-- The package is named `pyawire` for installation but the module is `awire`
 - On Windows conda is installed in "C:\Users\<username>\miniconda3\condabin\conda.bat"
 - On OSX conda is installed in "$HOME\miniconda3\condabin\conda"
 - On Linux conda is installed in "$HOME\miniconda3\condabin\conda"

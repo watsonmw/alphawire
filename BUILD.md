@@ -11,12 +11,12 @@ Packages:
 
     libalphawire - static or shared object library (for use in your program)
     alphawireui  - IMGUI + SDL3 UI for controlling single camera (uses libalphawire)
-    pyawire      - Python bindings for alphawire (directly builds alphawire sources into the python bindings
+    awire        - Python bindings for alphawire (directly builds alphawire sources into the python bindings
 
 
 libalphawire and alphawireui are built using meson / cmake.
 
-pyawire is built using the Python build module, see [README.md](pyawire/README.md).
+awire is built using the Python build module, see [README.md](pyawire/README.md).
 
 
 Ubuntu

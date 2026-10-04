@@ -9,7 +9,7 @@ Build:
 
 Install:
 
-    pip install dist/pyawire-0.1.0-*.whl --force-reinstall
+    pip install dist/awire-0.1.0-*.whl --force-reinstall
 
 
 Compatibility:
@@ -26,7 +26,7 @@ Upload:
 Development & Debugging:
 
     # Remove current awire installation
-    pip uninstall pyawire -y
+    pip uninstall awire -y
     
     # Install in development mode, you can edit the source code and see changes immediately
     pip install -e .
