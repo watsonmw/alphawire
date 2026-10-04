@@ -29,10 +29,22 @@ def project_root():
     global PROJECT_ROOT
     if PROJECT_ROOT is None:
         script_dir = get_script_dir()
-        if os.path.isdir(os.path.join(script_dir, "src")):
+        # In a source checkout, pyawire/ and src/ are subdirectories of the root.
+        # In an sdist, files of pyawire/ are at the root and src/ is also at the root.
+
+        # Check if we are in a source checkout
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.isfile(os.path.join(parent_dir, "src", "aw", "aw.h")):
+            PROJECT_ROOT = parent_dir
+        # Check if we are in an sdist
+        elif os.path.isfile(os.path.join(script_dir, "src", "aw", "aw.h")):
+            PROJECT_ROOT = script_dir
+        elif os.path.isdir(os.path.join(script_dir, "src")):
             PROJECT_ROOT = script_dir
         else:
-            PROJECT_ROOT = os.path.dirname(script_dir)
+            PROJECT_ROOT = parent_dir
+
+        PROJECT_ROOT = os.path.abspath(PROJECT_ROOT)
         print(f"Project root: {PROJECT_ROOT}")
     return PROJECT_ROOT
 
@@ -460,7 +472,7 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
     platform_defines = []
     extra_link_args = []
     extra_compile_args = []
-    include_dirs = [root_path("src")]
+    include_dirs = [os.path.normpath(root_path("src"))]
 
     if sys.platform == "darwin":
         platform_sources = ["src/aw/platform/osx/aw-backend-iokit.c"] + ip_sources
@@ -480,12 +492,12 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
         ]
         libusb_includes, libusb_libs = get_pkg_config_flags("libusb-1.0")
         if libusb_includes is not None:
-            include_dirs.extend(libusb_includes)
+            include_dirs.extend([os.path.normpath(d) for d in libusb_includes])
             extra_link_args.extend(libusb_libs)
         else:
             fallback = "/usr/include/libusb-1.0"
             print(f"libusb-1.0 not found, using hardcoded fallback location for headers: {fallback}")
-            include_dirs.append(fallback)
+            include_dirs.append(os.path.normpath(fallback))
             extra_link_args.append("-lusb-1.0")
         extra_compile_args = ["-fvisibility=hidden"]
     elif sys.platform.startswith("win32"):
@@ -501,12 +513,27 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
             ("AW_ENABLE_WIA", None),
             ("AW_ENABLE_IP", None),
         ]
-        include_dirs.append(root_path("libs\\libusbk"))
+        include_dirs.append(os.path.normpath(root_path("libs/libusbk")))
         extra_link_args = ['ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
                            'ole32.lib', 'wiaguid.lib', 'shell32.lib', 'Oleaut32.lib']
 
-    all_sources = [os.path.relpath(root_path(src), os.getcwd())
+    # Add project root to include dirs as well to handle different include styles
+    include_dirs.append(os.path.normpath(project_root()))
+
+    all_sources = [os.path.normpath(root_path(src))
                    for src in common_sources + platform_sources]
+    
+    print(f"Build configuration:")
+    print(f"  Project root: {project_root()}")
+    print(f"  Include dirs: {include_dirs}")
+    for d in include_dirs:
+        if not os.path.isdir(d):
+            print(f"  WARNING: Include directory does not exist: {d}")
+        else:
+            # Check for aw/aw.h if it's the src dir
+            if os.path.isfile(os.path.join(d, "aw", "aw.h")):
+                print(f"  Found aw/aw.h in: {d}")
+
     define_macros = [
                         ("M_THREADING", None),
                         ("AW_LOG_LEVEL", "3"),
