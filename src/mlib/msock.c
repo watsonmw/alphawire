@@ -5,7 +5,8 @@
 #ifdef _WIN32
     #include <iphlpapi.h>
 #else
-    #include <sys/fcntl.h>
+    #include <fcntl.h>
+    #include <sys/time.h>
     #include <arpa/inet.h>
     #include <netdb.h>
     #include <unistd.h>
