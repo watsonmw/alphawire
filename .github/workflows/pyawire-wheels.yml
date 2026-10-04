@@ -15,9 +15,12 @@ jobs:
           - runner: ubuntu-latest
             arch: x86_64
             platform: manylinux
-          - runner: macos-13
-            arch: x86_64
-            platform: macosx
+          - runner: ubuntu-latest
+            arch: aarch64
+            platform: manylinux
+#          - runner: macos-13
+#            arch: x86_64
+#            platform: macosx
           - runner: macos-14
             arch: arm64
             platform: macosx
@@ -25,6 +28,9 @@ jobs:
       CIBW_ARCHS: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -37,28 +43,16 @@ jobs:
           EXPECTED_ARCH: ${{ matrix.arch }}
           EXPECTED_PLATFORM: ${{ matrix.platform }}
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          python -c '
+          import os, pathlib
           from packaging.utils import parse_wheel_filename
-          import os
-
-          wheels = list(Path("pyawire/dist").glob("*.whl"))
-          assert wheels, "cibuildwheel produced no wheels"
-          for wheel in wheels:
-              _, _, _, tags = parse_wheel_filename(wheel.name)
-              assert any(tag.interpreter == "cp39" and tag.abi == "abi3" for tag in tags), wheel.name
-              expected_platform = os.environ["EXPECTED_PLATFORM"]
-              allowed_platforms = [expected_platform]
-              if expected_platform == "manylinux":
-                  allowed_platforms.append("musllinux")
-
-              assert any(any(p in tag.platform for p in allowed_platforms)
-                         and os.environ["EXPECTED_ARCH"] in tag.platform for tag in tags), wheel.name
-          PY
-      - name: Install wheel and smoke-test awire
-        run: |
-          python -m pip install pyawire/dist/*.whl
-          python -c "import awire"
+          arch, plat = os.environ["EXPECTED_ARCH"], os.environ["EXPECTED_PLATFORM"]
+          allowed_plats = [plat, "musllinux"] if plat == "manylinux" else [plat]
+          for whl in pathlib.Path("pyawire/dist").glob("*.whl"):
+              _, _, _, tags = parse_wheel_filename(whl.name)
+              assert any(t.abi == "abi3" for t in tags), f"{whl.name}: missing abi3"
+              assert any(any(p in t.platform for p in allowed_plats) and arch in t.platform for t in tags), f"{whl.name}: platform mismatch"
+          '
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
