@@ -15,7 +15,7 @@ Install:
 Compatibility:
 
 The package is built using the Python Stable ABI (Limited API), meaning a single wheel
-should work on all CPython versions from 3.8 onwards for a given platform.
+should work on all CPython versions from 3.9 onwards for a given platform.
 For Apple Silicon (arm64), the wheel is tagged with `macosx_11_0_arm64` for maximum compatibility
 across macOS 11 and newer.
 

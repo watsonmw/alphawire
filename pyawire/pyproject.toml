@@ -23,11 +23,12 @@ path = "hatch_build.py"
 packages = ["awire"]
 
 [tool.cibuildwheel]
-build = "cp38-*"
+build = "cp39-*"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64"]
 before-all = "yum install -y pkgconfig libusbx-devel"
+manylinux-x86_64-image = "manylinux2014"
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]

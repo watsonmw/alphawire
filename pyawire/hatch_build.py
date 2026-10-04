@@ -31,8 +31,8 @@ class CustomBuildHook(BuildHookInterface):
                 platform_tag = raw_platform.replace('-', '_').replace('.', '_')
             
             # Use abi3 tag for broad Python 3 compatibility.
-            # cp38 is a safe minimum for most modern features.
-            python_tag = 'cp38'
+            # cp39 is a safe minimum for most modern features.
+            python_tag = 'cp39'
             abi_tag = 'abi3'
             build_data['tag'] = f'{python_tag}-{abi_tag}-{platform_tag}'
 

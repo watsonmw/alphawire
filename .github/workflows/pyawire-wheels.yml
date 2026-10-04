@@ -46,7 +46,7 @@ jobs:
           assert wheels, "cibuildwheel produced no wheels"
           for wheel in wheels:
               _, _, _, tags = parse_wheel_filename(wheel.name)
-              assert any(tag.interpreter == "cp38" and tag.abi == "abi3" for tag in tags), wheel.name
+              assert any(tag.interpreter == "cp39" and tag.abi == "abi3" for tag in tags), wheel.name
               assert any(os.environ["EXPECTED_PLATFORM"] in tag.platform
                          and os.environ["EXPECTED_ARCH"] in tag.platform for tag in tags), wheel.name
           PY
