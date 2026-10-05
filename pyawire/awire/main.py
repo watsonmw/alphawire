@@ -67,7 +67,6 @@ class AwResult:
 
 
 def _convert_aw_result(res: typing.Any) -> AwResult:
-    print(res)
     return AwResult(res.code, res.ptp)
 
 
