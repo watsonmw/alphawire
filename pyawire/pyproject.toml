@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "awire"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python bindings for AlphaWire - Sony camera tethered control"
 readme = "README.md"
 requires-python = ">=3.9"
