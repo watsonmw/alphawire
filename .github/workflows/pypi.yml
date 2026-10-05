@@ -35,6 +35,17 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64 aarch64
           CIBW_ARCHS_MACOS: x86_64 arm64
 
+      - name: Validate wheel tags
+        run: |
+          pip install packaging
+          python -c '
+          import os, pathlib
+          from packaging.utils import parse_wheel_filename
+          for whl in pathlib.Path("./wheelhouse").glob("*.whl"):
+              _, _, _, tags = parse_wheel_filename(whl.name)
+              assert any(t.abi == "abi3" for t in tags), f"{whl.name}: missing abi3"
+          '
+
       - uses: actions/upload-artifact@v4
         with:
           name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
