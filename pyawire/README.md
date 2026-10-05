@@ -1,41 +1,91 @@
 
-Install dependencies:
+# awire
 
-    pip install --upgrade build twine
+Python bindings for [AlphaWire](https://github.com/watsonmw/alphawire) - a C library for Sony Alpha camera tethered control.
 
-Build:
+## Overview
 
-    python -m build
+`awire` provides a convenient Python interface to control Sony Alpha cameras via USB or IP connections. It is based on the AlphaWire C library, which focuses on minimal dependencies and broad camera support.
 
-Install:
+### Features
+- **Fast and lightweight**: Minimal overhead for camera control.
+- **Broad Compatibility**: Supports both pre-2020 and post-2020 Sony Alpha cameras.
+- **Full Control**: Access to PTP device properties and camera settings.
+- **Tethered Capture**: Trigger captures and download images directly.
+- **Live View**: Real-time streaming support.
 
-    pip install dist/awire-0.1.0-*.whl --force-reinstall
+## Installation
 
+```bash
+pip install awire
+```
 
-Compatibility:
+## Quick Start
 
-The package is built using the Python Stable ABI (Limited API), meaning a single wheel
-should work on all CPython versions from 3.9 onwards for a given platform.
-For Apple Silicon (arm64), the wheel is tagged with `macosx_11_0_arm64` for maximum compatibility
-across macOS 11 and newer.
+### List Connected Cameras
 
-Upload:
+```python
+import awire
+import time
 
-    twine upload dist/*
-    
-Development & Debugging:
+def main():
+    # Set logging level (optional)
+    awire.log_set_level(awire.AwLogLevel.INFO)
 
-    # Remove current awire installation
-    pip uninstall awire -y
-    
-    # Install in development mode, you can edit the source code and see changes immediately
-    pip install -e .
+    # Initialize device list
+    device_list = awire.AwDeviceList()
+    if not device_list.open():
+        return
 
-    # Build the c extension shared library as needed
-    python build_extension.py --debug
+    # Start searching for cameras
+    device_list.refresh()
 
-    # To support IDE development you can build only if the shared library dependant source files change (i.e. cffi)
-    # python build_extension.py --debug --only-if-changed
+    # Wait for discovery (or poll in a loop)
+    while device_list.is_refreshing():
+        device_list.poll_updates()
+        time.sleep(0.1)
 
-    # Run tester
-    python examples\tester.py
+    # List found devices
+    for device in device_list:
+        print(f"Found: {device.manufacturer} {device.product} (S/N: {device.serial})")
+
+    device_list.close()
+
+if __name__ == "__main__":
+    main()
+```
+
+## Development
+
+To build and install the package in development mode:
+
+1. **Install Build Dependencies**:
+   ```bash
+   pip install --upgrade build twine cffi
+   ```
+
+2. **Build the C extension**:
+   ```bash
+   python build_extension.py --debug
+   ```
+
+3. **Install in editable mode**:
+   ```bash
+   pip install -e .
+   ```
+
+### Building Wheels
+
+```bash
+python -m build
+```
+
+## Compatibility
+
+The package is built using the Python Stable ABI (Limited API), meaning a single wheel should work on all CPython versions from 3.9 onwards for a given platform.
+
+## License
+
+MIT License. See the main [LICENSE](../LICENSE) file for details.
+
+> **Note**: This project is not affiliated with or endorsed by Sony. 'Sony' and 'Alpha' are trademarks or registered trademarks of Sony Corporation.
