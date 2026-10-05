@@ -27,6 +27,10 @@ jobs:
         with:
           platforms: all
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         with:
@@ -37,7 +41,7 @@ jobs:
 
       - name: Validate wheel tags
         run: |
-          pip install packaging
+          python -m pip install packaging
           python -c '
           import os, pathlib
           from packaging.utils import parse_wheel_filename
@@ -59,9 +63,13 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Build sdist
         run: |
-          pip install hatch
+          python -m pip install hatch
           cd pyawire
           hatch build -t sdist
 
