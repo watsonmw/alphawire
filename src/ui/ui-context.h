@@ -359,8 +359,7 @@ struct AppContext {
         AwDeviceList_Close(&deviceList);
     }
 
-    void GraphicsCleanup()
-    {
+    void GraphicsCleanup() {
         TextureRelease(&liveViewImageGLId);
         TextureRelease(&osdImageGLId);
     }

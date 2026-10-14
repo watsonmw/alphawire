@@ -30,8 +30,9 @@ typedef union uFixedEnums {
     EnumValueU32* u32;
 } FixedEnums;
 
-typedef b32 (*PTP_PropBuildEnumsFunc_t)(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums);
+typedef b32  (*PTP_PropBuildEnumsFunc_t)(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValueEnums* outEnums);
 typedef MStr (*PTP_PropValueAsStringFunc_t)(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue value);
+typedef b32  (*PTP_PropValueFromStringFunc_t)(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr str, AwPtpPropValue* outValue);
 
 typedef struct {
     u16 code;
@@ -50,9 +51,81 @@ typedef struct AwPtpPropertyMetadata {
     // dynamically create the strings for each enum
     PTP_PropBuildEnumsFunc_t buildEnumsFunc;
     PTP_PropValueAsStringFunc_t valueAsStringFunc;
+    PTP_PropValueFromStringFunc_t stringToValueFunc;
 
     char *desc; // TODO: Add descriptions
 } PTPPropertyMetadata;
+
+static b32 ParseEvValueFromString(MStr str, i16* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    int sign = 1;
+    if (*p == '-') {
+        sign = -1;
+        p++;
+    } else if (*p == '+') {
+        sign = 1;
+        p++;
+    }
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    i32 whole = 0;
+    MParseResult r = MParseI32(p, end, &whole);
+    if (r.result != MParse_SUCCESS || whole < 0) {
+        return FALSE;
+    }
+    p = r.end;
+
+    i32 decimals = 0;
+    b32 hasDot = FALSE;
+    if (p < end && *p == '.') {
+        hasDot = TRUE;
+        p++;
+        if (p < end && MCharIsDigit(*p)) {
+            decimals = *p - '0';
+            p++;
+            while (p < end && MCharIsDigit(*p)) p++;
+        }
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p + 2 <= end && (p[0] == 'E' || p[0] == 'e') && (p[1] == 'V' || p[1] == 'v')) {
+        p += 2;
+    }
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p != end) {
+        return FALSE;
+    }
+
+    i32 val = 0;
+    if (hasDot) {
+        val = sign * (whole * 1000 + decimals * 100);
+    } else {
+        if (whole >= 100) {
+            val = sign * whole;
+        } else {
+            val = sign * (whole * 1000);
+        }
+    }
+
+    if (val < I16_MIN || val > I16_MAX) {
+        return FALSE;
+    }
+    *outValue = (i16)val;
+    return TRUE;
+}
 
 static MStr GetFNumberAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
@@ -79,6 +152,85 @@ static MStr GetFNumberAsString(AwControl* self, MAllocator* allocator, AwPtpProp
         r = MStrMakeCopyLenNul(allocator, text, len);
     }
     return r;
+}
+
+static b32 GetFNumberFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "Iris Close")) {
+        outValue->u16 = 0xfffd;
+        return TRUE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "--")) {
+        outValue->u16 = 0xfffe;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+    if (p < end && (*p == 'f' || *p == 'F')) {
+        p++;
+        if (p < end && *p == '/') {
+            p++;
+        }
+        while (p < end && MCharIsWhitespace(*p)) p++;
+    }
+
+    if (p >= end) {
+        return FALSE;
+    }
+
+    i32 whole = 0;
+    MParseResult r = MParseI32(p, end, &whole);
+    if (r.result != MParse_SUCCESS || whole < 0) {
+        return FALSE;
+    }
+    p = r.end;
+
+    i32 decimals = 0;
+    b32 hasDot = FALSE;
+    if (p < end && *p == '.') {
+        hasDot = TRUE;
+        p++;
+        if (p < end && MCharIsDigit(*p)) {
+            decimals = *p - '0';
+            p++;
+            while (p < end && MCharIsDigit(*p)) {
+                p++;
+            }
+        }
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p != end) {
+        return FALSE;
+    }
+
+    u32 value = 0;
+    if (hasDot) {
+        value = (u32)(whole * 100 + decimals * 10);
+    } else {
+        if (whole >= 100) {
+            value = (u32)whole;
+        } else {
+            value = (u32)(whole * 100);
+        }
+    }
+
+    if (value > U16_MAX) {
+        return FALSE;
+    }
+
+    outValue->u16 = (u16)value;
+    return TRUE;
 }
 
 static MStr GetShutterSpeedAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -109,6 +261,124 @@ static MStr GetShutterSpeedAsString(AwControl* self, MAllocator* allocator, AwPt
         }
     }
     return r;
+}
+
+static b32 GetShutterSpeedFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                     MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "n/a")) {
+        outValue->u32 = 0xffffffff;
+        return TRUE;
+    }
+    if (MStrViewEqIgnoreCaseC(v, "Bulb")) {
+        outValue->u32 = 0x0;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    const char* slash = NULL;
+    for (const char* s = p; s < end; s++) {
+        if (*s == '/') {
+            slash = s;
+            break;
+        }
+    }
+
+    if (slash) {
+        i32 top = 0;
+        MParseResult r1 = MParseI32(p, slash, &top);
+        if (r1.result != MParse_SUCCESS || top < 0 || top > U16_MAX) {
+            return FALSE;
+        }
+
+        const char* bstart = slash + 1;
+        while (bstart < end && MCharIsWhitespace(*bstart)) bstart++;
+        i32 bottom = 0;
+        MParseResult r2 = MParseI32(bstart, end, &bottom);
+        if (r2.result != MParse_SUCCESS || bottom < 0 || bottom > U16_MAX) {
+            return FALSE;
+        }
+
+        const char* bend = r2.end;
+        while (bend < end && (
+                  MCharIsWhitespace(*bend) || *bend == 's' || *bend == 'S' || *bend == '"' || *bend == '\'')) {
+            bend++;
+        }
+        if (bend != end) {
+            return FALSE;
+        }
+        outValue->u32 = (((u32)top) << 16) | ((u32)bottom);
+        return TRUE;
+    }
+
+    const char* dot = NULL;
+    for (const char* s = p; s < end; s++) {
+        if (*s == '.') {
+            dot = s;
+            break;
+        }
+    }
+
+    if (dot) {
+        i32 w = 0;
+        MParseResult r1 = MParseI32(p, dot, &w);
+        if (r1.result != MParse_SUCCESS || w < 0) {
+            return FALSE;
+        }
+
+        const char* dstart = dot + 1;
+        if (dstart >= end || !MCharIsDigit(*dstart)) {
+            return FALSE;
+        }
+
+        i32 d = *dstart - '0';
+        const char* dend = dstart + 1;
+        while (dend < end && (
+            MCharIsWhitespace(*dend) || *dend == 's' || *dend == 'S' || *dend == '"' || *dend == '\'')) {
+            dend++;
+        }
+
+        if (dend != end) {
+            return FALSE;
+        }
+
+        u32 top = (u32)(w * 10 + d);
+        u32 bottom = 10;
+        if (top > U16_MAX) {
+            return FALSE;
+        }
+        outValue->u32 = (top << 16) | bottom;
+        return TRUE;
+    }
+
+    i32 val = 0;
+    MParseResult r = MParseI32(p, end, &val);
+    if (r.result != MParse_SUCCESS || val < 0) {
+        return FALSE;
+    }
+
+    const char* q = r.end;
+    while (q < end && (MCharIsWhitespace(*q) || *q == 's' || *q == 'S' || *q == '"' || *q == '\'')) {
+        q++;
+    }
+    if (q != end) {
+        return FALSE;
+    }
+
+    if ((u32)val > 0xffff) {
+        outValue->u32 = (u32)val;
+    } else {
+        u32 top = (u32)val * 10;
+        u32 bottom = 10;
+        outValue->u32 = (top << 16) | bottom;
+    }
+    return TRUE;
 }
 
 static MStr GetWhiteBalanceGMAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -155,6 +425,97 @@ static MStr GetWhiteBalanceGMAsString(AwControl* self, MAllocator* allocator, Aw
     }
 
     return r;
+}
+
+static b32 GetWhiteBalanceGMFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                       MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "0.0") || MStrViewEqIgnoreCaseC(v, "0")) {
+        outValue->u8 = 0x9C + 0x24;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    int sign = 0;
+    if (*p == 'G' || *p == 'g' || *p == '+') {
+        sign = 1;
+        p++;
+    } else if (*p == 'M' || *p == 'm' || *p == '-') {
+        sign = -1;
+        p++;
+    }
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    i32 whole = 0;
+    MParseResult r = MParseI32(p, end, &whole);
+    if (r.result != MParse_SUCCESS || whole < 0) {
+        return FALSE;
+    }
+    p = r.end;
+
+    int f = 0;
+    if (p < end && *p == '.') {
+        p++;
+        if (p < end && p + 1 < end && p[0] == '2' && p[1] == '5') {
+            f = 1;
+            p += 2;
+        } else if (p < end && p + 1 < end && p[0] == '7' && p[1] == '5') {
+            f = 3;
+            p += 2;
+        } else if (p < end && p[0] == '5') {
+            f = 2;
+            p++;
+        } else if (p < end && p[0] == '0') {
+            f = 0;
+            p++;
+        } else if (p < end && p[0] == '2') {
+            f = 1;
+            p++;
+        } else if (p < end && p[0] == '7') {
+            f = 3;
+            p++;
+        }
+    } else if (sign == 0 && whole >= 0x9C && whole <= 0xE4) {
+        while (p < end && MCharIsWhitespace(*p)) {
+            p++;
+        }
+        if (p == end) {
+            outValue->u8 = (u8)whole;
+            return TRUE;
+        }
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p != end) {
+        return FALSE;
+    }
+
+    if (sign == 0 && whole == 0 && f == 0) {
+        outValue->u8 = 0x9C + 0x24;
+        return TRUE;
+    }
+    if (sign == 0) {
+        return FALSE;
+    }
+
+    int step = (whole << 2) | f;
+    int value = (0x9C + 0x24) + sign * step;
+    if (value < 0x9C || value > 0xE4) {
+        return FALSE;
+    }
+
+    outValue->u8 = (u8)value;
+    return TRUE;
 }
 
 static MStr GetWhiteBalanceABAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -204,6 +565,100 @@ static MStr GetWhiteBalanceABAsString(AwControl* self, MAllocator* allocator, Aw
     return r;
 }
 
+static b32 GetWhiteBalanceABFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                       MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "0.0") || MStrViewEqIgnoreCaseC(v, "0")) {
+        outValue->u8 = 0x9C + 0x24;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    int sign = 0;
+    if (*p == 'A' || *p == 'a' || *p == '+') {
+        sign = 1;
+        p++;
+    } else if (*p == 'B' || *p == 'b' || *p == '-') {
+        sign = -1;
+        p++;
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    i32 whole = 0;
+    MParseResult r = MParseI32(p, end, &whole);
+    if (r.result != MParse_SUCCESS || whole < 0) {
+        return FALSE;
+    }
+    p = r.end;
+
+    int f = 0;
+    if (p < end && *p == '.') {
+        p++;
+        if (p < end && p + 1 < end && p[0] == '2' && p[1] == '5') {
+            f = 1;
+            p += 2;
+        } else if (p < end && p + 1 < end && p[0] == '7' && p[1] == '5') {
+            f = 3;
+            p += 2;
+        } else if (p < end && p[0] == '5') {
+            f = 2;
+            p++;
+        } else if (p < end && p[0] == '0') {
+            f = 0;
+            p++;
+        } else if (p < end && p[0] == '2') {
+            f = 1;
+            p++;
+        } else if (p < end && p[0] == '7') {
+            f = 3;
+            p++;
+        }
+    } else if (sign == 0 && whole >= 0x9C && whole <= 0xE4) {
+        while (p < end && MCharIsWhitespace(*p)) {
+            p++;
+        }
+        if (p == end) {
+            outValue->u8 = (u8)whole;
+            return TRUE;
+        }
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p != end) {
+        return FALSE;
+    }
+
+    if (sign == 0 && whole == 0 && f == 0) {
+        outValue->u8 = 0x9C + 0x24;
+        return TRUE;
+    }
+
+    if (sign == 0) {
+        return FALSE;
+    }
+
+    int step = (whole << 2) | f;
+    int value = (0x9C + 0x24) + sign * step;
+    if (value < 0x9C || value > 0xE4) {
+        return FALSE;
+    }
+
+    outValue->u8 = (u8)value;
+    return TRUE;
+}
+
 static MStr GetPendingFileInfoAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
@@ -243,6 +698,46 @@ static MStr GetPixelShootingNumberAsString(AwControl* self, MAllocator* allocato
     return r;
 }
 
+static b32 GetPixelShootingNumberFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "None") || MStrViewEqIgnoreCaseC(v, "Off")) {
+        outValue->u16 = 0;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    i32 val = 0;
+    MParseResult r = MParseI32(p, end, &val);
+    if (r.result != MParse_SUCCESS || val < 0 || val > U16_MAX) {
+        return FALSE;
+    }
+    p = r.end;
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p < end && (p[0] == 's' || p[0] == 'S')) {
+        while (p < end && !MCharIsWhitespace(*p)) {
+            p++;
+        }
+    }
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p != end) {
+        return FALSE;
+    }
+
+    outValue->u16 = (u16)val;
+    return TRUE;
+}
+
 static MStr GetPixelShootingIntervalAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u16 value = propValue.u16;
@@ -257,6 +752,46 @@ static MStr GetPixelShootingIntervalAsString(AwControl* self, MAllocator* alloca
         }
     }
     return r;
+}
+
+static b32 GetPixelShootingIntervalFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "Shortest Interval") || MStrViewEqIgnoreCaseC(v, "Shortest")) {
+        outValue->u16 = 0xFFFF;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    i32 val = 0;
+    MParseResult r = MParseI32(p, end, &val);
+    if (r.result != MParse_SUCCESS || val < 0 || val > 0x7fff) {
+        return FALSE;
+    }
+    p = r.end;
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p < end && (p[0] == 's' || p[0] == 'S')) {
+        while (p < end && !MCharIsWhitespace(*p)) {
+            p++;
+        }
+    }
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+    if (p != end) {
+        return FALSE;
+    }
+
+    outValue->u16 = (u16)val;
+    return TRUE;
 }
 
 static MStr GetPixelShootingProgressAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -314,6 +849,56 @@ static MStr GetCustomColorTempAsString(AwControl* self, MAllocator* allocator, A
     return r;
 }
 
+static b32 GetCustomColorTempFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                        MStr str, AwPtpPropValue* outValue) {
+
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, "N/A")) {
+        outValue->u16 = 0x0000;
+        return TRUE;
+    }
+
+    if (MStrViewEqIgnoreCaseC(v, ">9900K") ||
+            MStrViewEqIgnoreCaseC(v, ">9900") ||
+            MStrViewEqIgnoreCaseC(v, "> 9900K") ||
+            MStrViewEqIgnoreCaseC(v, "> 9900")) {
+        outValue->u16 = 0xFFFF;
+        return TRUE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+    i32 val = 0;
+    MParseResult r = MParseI32(p, end, &val);
+    if (r.result != MParse_SUCCESS || val < 0 || val > U16_MAX) {
+        return FALSE;
+    }
+
+    p = r.end;
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p < end && (*p == 'K' || *p == 'k')) {
+        p++;
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p != end) {
+        return FALSE;
+    }
+
+    outValue->u16 = (u16)val;
+    return TRUE;
+}
+
 static MStr GetIsoAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
@@ -351,7 +936,72 @@ static MStr GetIsoAsString(AwControl* self, MAllocator* allocator, AwPtpProperty
     return r;
 }
 
-static MStr GetExposureBiasAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
+static b32 GetIsoFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                            MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    u32 mode = 0;
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    const char* prefixHigh = "Multi-Frame NR High";
+    u32 lenHigh = MCStrLen(prefixHigh);
+    const char* prefix = "Multi-Frame NR";
+    u32 lenPrefix = MCStrLen(prefix);
+
+    if (v.size >= lenHigh && MStrViewEqIgnoreCaseC((MStrView){(char*)v.str, lenHigh}, prefixHigh)) {
+        mode = 0x2;
+        p += lenHigh;
+    } else if (v.size >= lenPrefix && MStrViewEqIgnoreCaseC((MStrView){(char*)v.str, lenPrefix}, prefix)) {
+        mode = 0x1;
+        p += lenPrefix;
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p + 3 <= end && (p[0] == 'I' || p[0] == 'i') && (p[1] == 'S' || p[1] == 's') && (p[2] == 'O' || p[2] == 'o')) {
+        p += 3;
+        while (p < end && MCharIsWhitespace(*p)) {
+            p++;
+        }
+    }
+
+    MStrView rem = { (char*)p, (u32)(end - p) };
+    rem = MStrViewTrimAnyWhitespace(rem);
+
+    if (MStrViewEqIgnoreCaseC(rem, "Auto")) {
+        outValue->u32 = (mode << 24) | 0x00ffffff;
+        return TRUE;
+    }
+
+    i32 isoVal = 0;
+    MParseResult r = MParseI32(rem.str, rem.str + rem.size, &isoVal);
+    if (r.result != MParse_SUCCESS || isoVal < 0) {
+        return FALSE;
+    }
+
+    if (r.end != rem.str + rem.size) {
+        return FALSE;
+    }
+
+    if (mode != 0) {
+        if ((u32)isoVal > 0xffffff) {
+            return FALSE;
+        }
+        outValue->u32 = (mode << 24) | ((u32)isoVal & 0xffffff);
+    } else {
+        outValue->u32 = (u32)isoVal;
+    }
+
+    return TRUE;
+}
+
+static MStr GetExposureCompAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     i16 value = propValue.i16;
     MStr r = {};
     int whole = value / 1000;
@@ -365,6 +1015,11 @@ static MStr GetExposureBiasAsString(AwControl* self, MAllocator* allocator, AwPt
         r = MStrMakeCopyLenNul(allocator, text, len);
     }
     return r;
+}
+
+static b32 GetExposureCompFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                     MStr str, AwPtpPropValue* outValue) {
+    return ParseEvValueFromString(str, &outValue->i16);
 }
 
 static MStr GetFlashCompAsString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -381,6 +1036,10 @@ static MStr GetFlashCompAsString(AwControl* self, MAllocator* allocator, AwPtpPr
         r = MStrMakeCopyLenNul(allocator, text, len);
     }
     return r;
+}
+
+static b32 GetFlashCompFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr str, AwPtpPropValue* outValue) {
+    return ParseEvValueFromString(str, &outValue->i16);
 }
 
 static MStr GetZoomScale(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -1609,6 +2268,79 @@ static MStr GetFocusMagnifyScale(AwControl* self, MAllocator* allocator, AwPtpPr
     return r;
 }
 
+static b32 GetFocusMagnifyScaleFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                          MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    if (p < end && (*p == 'x' || *p == 'X')) {
+        p++;
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    i32 whole = 0;
+    MParseResult r = MParseI32(p, end, &whole);
+    if (r.result != MParse_SUCCESS || whole < 0) {
+        return FALSE;
+    }
+    p = r.end;
+
+    i32 decimals = 0;
+    b32 hasDot = FALSE;
+    if (p < end && *p == '.') {
+        hasDot = TRUE;
+        p++;
+        if (p < end && MCharIsDigit(*p)) {
+            decimals = *p - '0';
+            p++;
+            while (p < end && MCharIsDigit(*p)) {
+                p++;
+            }
+        }
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p < end && (*p == 'x' || *p == 'X')) {
+        p++;
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    if (p != end) {
+        return FALSE;
+    }
+
+    u32 val = 0;
+    if (hasDot) {
+        val = (u32)(whole * 10 + decimals);
+    } else {
+        if (whole >= 100) {
+            val = (u32)whole;
+        } else {
+            val = (u32)(whole * 10);
+        }
+    }
+
+    if (val > U16_MAX) {
+        return FALSE;
+    }
+    outValue->u16 = (u16)val;
+    return TRUE;
+}
+
 static MStr GetFocusMagnifyPos(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
@@ -1620,6 +2352,62 @@ static MStr GetFocusMagnifyPos(AwControl* self, MAllocator* allocator, AwPtpProp
         r = MStrMakeCopyLenNul(allocator, text, len);
     }
     return r;
+}
+
+static b32 GetFocusMagnifyPosFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                        MStr str, AwPtpPropValue* outValue) {
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    if (p < end && *p == '(') {
+        p++;
+    }
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    i32 x = 0;
+    MParseResult r1 = MParseI32(p, end, &x);
+    if (r1.result != MParse_SUCCESS || x < 0) {
+        return FALSE;
+    }
+    p = r1.end;
+
+    while (p < end && (MCharIsWhitespace(*p) || *p == ',')) {
+        p++;
+    }
+
+    if (p >= end || *p == ')') {
+        if (p < end && *p == ')') p++;
+        while (p < end && MCharIsWhitespace(*p)) p++;
+        if (p == end) {
+            outValue->u32 = (u32)x;
+            return TRUE;
+        }
+        return FALSE;
+    }
+
+    i32 y = 0;
+    MParseResult r2 = MParseI32(p, end, &y);
+    if (r2.result != MParse_SUCCESS || y < 0) {
+        return FALSE;
+    }
+    p = r2.end;
+
+    while (p < end && (MCharIsWhitespace(*p) || *p == ')')) {
+        p++;
+    }
+    if (p != end) {
+        return FALSE;
+    }
+
+    outValue->u32 = (((u32)(x & 0xffff)) << 16) | ((u32)(y & 0xffff));
+    return TRUE;
 }
 
 static MStr GetFocusMagnify(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -1647,6 +2435,107 @@ static MStr GetFocusMagnify(AwControl* self, MAllocator* allocator, AwPtpPropert
     return r;
 }
 
+static b32 GetFocusMagnifyFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                     MStr str, AwPtpPropValue* outValue) {
+
+    MStrView v = MStrViewTrimAnyWhitespace(MStrViewFromStr(str));
+    if (v.size == 0) {
+        return FALSE;
+    }
+
+    const char* p = v.str;
+    const char* end = v.str + v.size;
+
+    u32 ratio = 0;
+    if (v.size >= 3 && (p[0] == 'O' || p[0] == 'o') && (p[1] == 'F' || p[1] == 'f') && (p[2] == 'F' || p[2] == 'f')) {
+        ratio = 0;
+        p += 3;
+    } else {
+        if (p < end && (*p == 'x' || *p == 'X')) {
+            p++;
+        }
+        while (p < end && MCharIsWhitespace(*p)) {
+            p++;
+        }
+
+        i32 whole = 0;
+        MParseResult r = MParseI32(p, end, &whole);
+        if (r.result != MParse_SUCCESS || whole < 0) {
+            return FALSE;
+        }
+        p = r.end;
+
+        i32 decimals = 0;
+        b32 hasDot = FALSE;
+        if (p < end && *p == '.') {
+            hasDot = TRUE;
+            p++;
+            if (p < end && MCharIsDigit(*p)) {
+                decimals = *p - '0';
+                p++;
+                while (p < end && MCharIsDigit(*p)) {
+                    p++;
+                }
+            }
+        }
+
+        if (hasDot) {
+            ratio = (u32)(whole * 10 + decimals);
+        } else {
+            if (whole >= 100) {
+                ratio = (u32)whole;
+            } else {
+                ratio = (u32)(whole * 10);
+            }
+        }
+    }
+
+    while (p < end && MCharIsWhitespace(*p)) {
+        p++;
+    }
+
+    i32 x = 0;
+    i32 y = 0;
+    if (p < end && *p == '(') {
+        p++;
+        while (p < end && MCharIsWhitespace(*p)) {
+            p++;
+        }
+        MParseResult rx = MParseI32(p, end, &x);
+        if (rx.result != MParse_SUCCESS || x < 0) {
+            return FALSE;
+        }
+        p = rx.end;
+
+        while (p < end && (MCharIsWhitespace(*p) || *p == ',')) {
+            p++;
+        }
+        MParseResult ry = MParseI32(p, end, &y);
+        if (ry.result != MParse_SUCCESS || y < 0) {
+            return FALSE;
+        }
+        p = ry.end;
+
+        while (p < end && (MCharIsWhitespace(*p) || *p == ')')) {
+            p++;
+        }
+    } else if (ratio == 0 && p == end) {
+        x = 0;
+        y = 0;
+    } else if (p == end && ratio > 0) {
+        x = 0;
+        y = 0;
+    }
+
+    if (p != end) {
+        return FALSE;
+    }
+
+    u64 value = (((u64)ratio) << 32) | (((u64)(x & 0xffff)) << 16) | ((u64)(y & 0xffff));
+    outValue->u64 = value;
+    return TRUE;
+}
+
 static MStr GetFocusSpotPos(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
     MStr r = {};
     u32 value = propValue.u32;
@@ -1658,6 +2547,11 @@ static MStr GetFocusSpotPos(AwControl* self, MAllocator* allocator, AwPtpPropert
         r = MStrMakeCopyLenNul(allocator, text, len);
     }
     return r;
+}
+
+static b32 GetFocusSpotPosFromString(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                     MStr str, AwPtpPropValue* outValue) {
+    return GetFocusMagnifyPosFromString(self, allocator, property, str, outValue);
 }
 
 static MStr GetFocalDistanceMeters(AwControl* self, MAllocator* allocator, AwPtpProperty* property, AwPtpPropValue propValue) {
@@ -1686,13 +2580,17 @@ static MStr GetFocalDistanceMeters(AwControl* self, MAllocator* allocator, AwPtp
 #define META_ENUM_I16(n, c, e) {n, c, PTP_DT_IINT16, .fixedEnums.i16=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_U16(n, c, e) {n, c, PTP_DT_UINT16, .fixedEnums.u16=(e), .fixedEnumsSize=MStaticArraySize(e)}
 #define META_ENUM_U32(n, c, e) {n, c, PTP_DT_UINT32, .fixedEnums.u32=(e), .fixedEnumsSize=MStaticArraySize(e)}
-#define META_FUNC_I8(n, c, g) {n, c, PTP_DT_INT8, .valueAsStringFunc=(g)}
-#define META_FUNC_U8(n, c, g) {n, c, PTP_DT_UINT8, .valueAsStringFunc=(g)}
-#define META_FUNC_I16(n, c, g) {n, c, PTP_DT_INT16, .valueAsStringFunc=(g)}
-#define META_FUNC_U16(n, c, g) {n, c, PTP_DT_UINT16, .valueAsStringFunc=(g)}
-#define META_FUNC_I32(n, c, g) {n, c, PTP_DT_INT32, .valueAsStringFunc=(g)}
-#define META_FUNC_U32(n, c, g) {n, c, PTP_DT_UINT32, .valueAsStringFunc=(g)}
-#define META_FUNC_U64(n, c, g) {n, c, PTP_DT_UINT64, .valueAsStringFunc=(g)}
+#define META_FUNC_I8(n, c, g, s) {n, c, PTP_DT_INT8, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_U8(n, c, g, s) {n, c, PTP_DT_UINT8, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_I16(n, c, g, s) {n, c, PTP_DT_INT16, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_U16(n, c, g, s) {n, c, PTP_DT_UINT16, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_I32(n, c, g, s) {n, c, PTP_DT_INT32, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_U32(n, c, g, s) {n, c, PTP_DT_UINT32, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_U64(n, c, g, s) {n, c, PTP_DT_UINT64, .valueAsStringFunc=(g), .stringToValueFunc=(s)}
+#define META_FUNC_RO_I8(n, c, g) {n, c, PTP_DT_INT8, .valueAsStringFunc=(g)}
+#define META_FUNC_RO_U8(n, c, g) {n, c, PTP_DT_UINT8, .valueAsStringFunc=(g)}
+#define META_FUNC_RO_U16(n, c, g) {n, c, PTP_DT_UINT16, .valueAsStringFunc=(g)}
+#define META_FUNC_RO_U32(n, c, g) {n, c, PTP_DT_UINT32, .valueAsStringFunc=(g)}
 
 static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("image-file-format", DPC_COMPRESSION_SETTING, sProp_CompressionSetting),
@@ -1710,10 +2608,10 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("dial-override", DPC_DIAL_MODE, sProp_DialOverride),
     META_ENUM_U16("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode16),
     META_ENUM_U32("capture-mode", DPC_CAPTURE_MODE, sProp_CaptureMode32),
-    META_FUNC_U16("f-number", DPC_F_NUMBER, GetFNumberAsString),
-    META_FUNC_U32("shutter-speed", DPC_SHUTTER_SPEED, GetShutterSpeedAsString),
-    META_FUNC_U32("iso", DPC_ISO, GetIsoAsString),
-    META_FUNC_U32("iso-current", DPC_ISO_CURRENT, GetIsoAsString),
+    META_FUNC_U16("f-number", DPC_F_NUMBER, GetFNumberAsString, GetFNumberFromString),
+    META_FUNC_U32("shutter-speed", DPC_SHUTTER_SPEED, GetShutterSpeedAsString, GetShutterSpeedFromString),
+    META_FUNC_U32("iso", DPC_ISO, GetIsoAsString, GetIsoFromString),
+    META_FUNC_U32("iso-current", DPC_ISO_CURRENT, GetIsoAsString, GetIsoFromString),
     META_ENUM_U8 ("image-stabilization", DPC_IMAGE_STABILIZATION, sProp_OnOff1),
     META_ENUM_U8 ("shutter-mode", DPC_SHUTTER_MODE, sProp_ShutterMode),
     META_ENUM_U8 ("shutter-type", DPC_SHUTTER_TYPE, sProp_ShutterType),
@@ -1728,13 +2626,13 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("iris-mode", DPC_IRIS_MODE, sProp_IrisMode),
 
     META_ENUM_U16("white-balance", DPC_WHITE_BALANCE, sProp_WhiteBalance),
-    META_FUNC_U16("white-balance-custom-temp", DPC_CUSTOM_COLOR_TEMP, GetCustomColorTempAsString),
-    META_FUNC_U8 ("white-balance-gm", DPC_WHITE_BALANCE_GM, GetWhiteBalanceGMAsString),
-    META_FUNC_U8 ("white-balance-ab", DPC_WHITE_BALANCE_AB, GetWhiteBalanceABAsString),
+    META_FUNC_U16("white-balance-custom-temp", DPC_CUSTOM_COLOR_TEMP, GetCustomColorTempAsString, GetCustomColorTempFromString),
+    META_FUNC_U8 ("white-balance-gm", DPC_WHITE_BALANCE_GM, GetWhiteBalanceGMAsString, GetWhiteBalanceGMFromString),
+    META_FUNC_U8 ("white-balance-ab", DPC_WHITE_BALANCE_AB, GetWhiteBalanceABAsString, GetWhiteBalanceABFromString),
 
     META_ENUM_U8 ("gain-control", DPC_GAIN_CONTROL, sProp_GainControl),
     META_ENUM_U16("exposure-metering-mode", DPC_EXPOSURE_METERING_MODE, sProp_ExposureMeteringMode),
-    META_FUNC_I16("exposure-bias-compensation", DPC_EXPOSURE_COMPENSATION, GetExposureBiasAsString),
+    META_FUNC_I16("exposure-compensation", DPC_EXPOSURE_COMPENSATION, GetExposureCompAsString, GetExposureCompFromString),
     META_ENUM_U8 ("dro-hdr-mode", DPC_DRO_HDR_MODE, sProp_DRO),
 
     META_ENUM_U8 ("awb-lock-satus", DPC_AWB_LOCK_STATUS, sProp_LockedUnlocked),
@@ -1747,18 +2645,18 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("auto-focus-adjust-enabled", DPC_AUTO_FOCUS_ADJUST_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("af-tracking-sens", DPC_AF_TRACKING_SENS, sProp_AFTrackingSensitivity),
     META_ENUM_U8 ("auto-focus-status", DPC_AUTO_FOCUS_STATUS, sProp_AutoFocusStatus),
-    META_FUNC_U16("focus-magnify-scale", DPC_FOCUS_MAGNIFY_SCALE, GetFocusMagnifyScale),
-    META_FUNC_U32("focus-magnify-pos", DPC_FOCUS_MAGNIFY_POS, GetFocusMagnifyPos),
-    META_FUNC_U64("focus-magnify", DPC_FOCUS_MAGNIFY, GetFocusMagnify),
-    META_FUNC_U32("focus-spot-pos", DPC_FOCUS_AREA_POS_OLD, GetFocusSpotPos),
-    META_FUNC_U8("focus-position", DPC_FOCUS_POSITION, NULL),
-    META_FUNC_U16("focus-position-abs", DPC_FOCUS_POSITION_ABS, NULL),
-    META_FUNC_U32("focal-distance-meters", DPC_FOCAL_DISTANCE_METER, GetFocalDistanceMeters),
+    META_FUNC_U16("focus-magnify-scale", DPC_FOCUS_MAGNIFY_SCALE, GetFocusMagnifyScale, GetFocusMagnifyScaleFromString),
+    META_FUNC_U32("focus-magnify-pos", DPC_FOCUS_MAGNIFY_POS, GetFocusMagnifyPos, GetFocusMagnifyPosFromString),
+    META_FUNC_U64("focus-magnify", DPC_FOCUS_MAGNIFY, GetFocusMagnify, GetFocusMagnifyFromString),
+    META_FUNC_U32("focus-spot-pos", DPC_FOCUS_AREA_POS_OLD, GetFocusSpotPos, GetFocusSpotPosFromString),
+    META_FUNC_RO_U8("focus-position", DPC_FOCUS_POSITION, NULL),
+    META_FUNC_RO_U16("focus-position-abs", DPC_FOCUS_POSITION_ABS, NULL),
+    META_FUNC_RO_U32("focal-distance-meters", DPC_FOCAL_DISTANCE_METER, GetFocalDistanceMeters),
 
     META_ENUM_U16("flash-mode", DPC_FLASH_MODE, sProp_FlashMode),
     META_ENUM_U8 ("wireless-flash", DPC_WIRELESS_FLASH, sProp_OnOff0),
     META_ENUM_U8 ("red-eye-reduction", DPC_RED_EYE_REDUCTION, sProp_OnOff0),
-    META_FUNC_I16("flash-compensation", DPC_FLASH_COMPENSATION, GetFlashCompAsString),
+    META_FUNC_I16("flash-compensation", DPC_FLASH_COMPENSATION, GetFlashCompAsString, GetFlashCompFromString),
 
     META_ENUM_U16("picture-effect", DPC_PICTURE_EFFECT, sProp_PictureEffect),
     META_ENUM_U8 ("picture-profile", DPC_PICTURE_PROFILE, sProp_PictureProfile),
@@ -1790,7 +2688,7 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("live-view-setting-effect", DPC_LIVE_VIEW_SETTING_EFFECT, sProp_LiveViewSettingEffect),
     META_ENUM_U8 ("osd-image-mode", DPC_OSD_IMAGE_MODE, sProp_OnOff0),
 
-    META_FUNC_I8 ("battery-remaining", DPC_BATTERY_REMAINING, GetBatteryRemainingAsString),
+    META_FUNC_RO_I8("battery-remaining", DPC_BATTERY_REMAINING, GetBatteryRemainingAsString),
     META_ENUM_U8 ("battery-level", DPC_BATTERY_LEVEL, sProp_BatteryLevel),
     META_ENUM_U8 ("device-overheating-state", DPC_DEVICE_OVERHEATING_STATE, sProp_DeviceOverheatingState),
     META_ENUM_U8 ("touch-operation", DPC_TOUCH_OPERATION, sProp_TouchOperation),
@@ -1798,20 +2696,20 @@ static PTPPropertyMetadata sPropertyMetadata[] = {
     META_ENUM_U8 ("remote-touch-enabled", DPC_REMOTE_TOUCH_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("remote-touch-cancel-enabled", DPC_REMOTE_TOUCH_CANCEL_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("time-code-format", DPC_TIME_CODE_FORMAT, sProp_TimeCodeFormat),
-    META_FUNC_U32("predicted-max-file-size", DPC_PREDICTED_MAX_FILE_SIZE, GetPredictedMaxFileSizeAsString),
-    META_FUNC_U16("pending-files", DPC_PENDING_FILES, GetPendingFileInfoAsString),
+    META_FUNC_RO_U32("predicted-max-file-size", DPC_PREDICTED_MAX_FILE_SIZE, GetPredictedMaxFileSizeAsString),
+    META_FUNC_RO_U16("pending-files", DPC_PENDING_FILES, GetPendingFileInfoAsString),
 
     META_ENUM_U8 ("pixel-shift-shooting-mode", DPC_PIXEL_SHIFT_SHOOTING_MODE, sProp_PixelShiftShootingMode),
-    META_FUNC_U16("pixel-shift-shooting-number", DPC_PIXEL_SHIFT_SHOOTING_NUMBER, GetPixelShootingNumberAsString),
-    META_FUNC_U16("pixel-shift-shooting-interval", DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, GetPixelShootingIntervalAsString),
+    META_FUNC_U16("pixel-shift-shooting-number", DPC_PIXEL_SHIFT_SHOOTING_NUMBER, GetPixelShootingNumberAsString, GetPixelShootingNumberFromString),
+    META_FUNC_U16("pixel-shift-shooting-interval", DPC_PIXEL_SHIFT_SHOOTING_INTERVAL, GetPixelShootingIntervalAsString, GetPixelShootingIntervalFromString),
     META_ENUM_U8 ("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_STATUS, sProp_PixelShiftShootingStatus),
-    META_FUNC_U16("pixel-shift-shooting-status", DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, GetPixelShootingProgressAsString),
+    META_FUNC_RO_U16("pixel-shift-shooting-progress", DPC_PIXEL_SHIFT_SHOOTING_PROGRESS, GetPixelShootingProgressAsString),
 
     META_ENUM_U8 ("zoom-operation-enabled", DPC_ZOOM_OPERATION_ENABLED, sProp_EnabledDisabled),
     META_ENUM_U8 ("zoom-setting", DPC_ZOOM_SETTING, sProp_ZoomSetting),
     META_ENUM_U8 ("zoom-type-status", DPC_ZOOM_TYPE_STATUS, sProp_ZoomSetting),
-    META_FUNC_U32("zoom-scale", DPC_ZOOM_SCALE, GetZoomScale),
-    META_FUNC_U32("zoom-bar-info", DPC_ZOOM_BAR_INFO, GetZoomBarInfo),
+    META_FUNC_RO_U32("zoom-scale", DPC_ZOOM_SCALE, GetZoomScale),
+    META_FUNC_RO_U32("zoom-bar-info", DPC_ZOOM_BAR_INFO, GetZoomBarInfo),
 
     META_ENUM_U8 ("remote-restrict-status", DPC_REMOTE_RESTRICT_STATUS, sProp_EnabledDisabled),
     META_ENUM_U16("button-list", DPC_BUTTON_LIST, sProp_ButtonList),
@@ -5142,19 +6040,29 @@ b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* allocator, AwPt
     if (property == NULL) {
         return FALSE;
     }
+    return AwControl_GetPropertyGivenValueAsStr(self, allocator, property, &property->value, strOut);
+}
+
+AW_EXPORT b32 AwControl_GetPropertyGivenValueAsStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+    AwPtpPropValue* value, MStr* strOut) {
+
+    if (property == NULL) {
+        return FALSE;
+    }
+
     PTPPropertyMetadata* meta = property->meta;
     if (!meta) {
         // No metadata / unrecognised property  but its a string - just return
         if (property->dataType == PTP_DT_STR) {
-            if (MStrIsEmpty(property->value.str)) {
+            if (MStrIsEmpty(value->str)) {
                 *strOut = MStrMakeEmpty();
             } else {
-                *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
+                *strOut = MStrMakeCopyLenNul(allocator, value->str.str, value->str.size);
             }
             return TRUE;
         }
 
-        *strOut = AwGetPropValueStr(allocator, (PtpDataType) property->dataType, property->value);
+        *strOut = AwGetPropValueStr(allocator, (PtpDataType) property->dataType, *value);
         return TRUE;
     }
 
@@ -5162,13 +6070,13 @@ b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* allocator, AwPt
         char* str = NULL;
         switch (meta->type) {
             case PTP_DT_UINT8:
-                str = EnumValue8_Lookup(meta->fixedEnums.u8, meta->fixedEnumsSize, property->value.u8);
+                str = EnumValue8_Lookup(meta->fixedEnums.u8, meta->fixedEnumsSize, value->u8);
                 break;
             case PTP_DT_UINT16:
-                str = EnumValue16_Lookup(meta->fixedEnums.u16, meta->fixedEnumsSize, property->value.u16);
+                str = EnumValue16_Lookup(meta->fixedEnums.u16, meta->fixedEnumsSize, value->u16);
                 break;
             case PTP_DT_UINT32:
-                str = EnumValue32_Lookup(meta->fixedEnums.u32, meta->fixedEnumsSize, property->value.u32);
+                str = EnumValue32_Lookup(meta->fixedEnums.u32, meta->fixedEnumsSize, value->u32);
                 break;
             default:
                 AW_ERROR_F("Unhandled enum prop type %d", (int)meta->type);
@@ -5181,21 +6089,65 @@ b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* allocator, AwPt
             return TRUE;
         }
     } else if (meta->valueAsStringFunc) {
-        *strOut = meta->valueAsStringFunc(self, allocator, property, property->value);
+        *strOut = meta->valueAsStringFunc(self, allocator, property, *value);
         return strOut->str != NULL;
     } else {
         if (property->dataType == PTP_DT_STR) {
-            if (MStrIsEmpty(property->value.str)) {
+            if (MStrIsEmpty(value->str)) {
                 *strOut = MStrMakeEmpty();
             } else {
-                *strOut = MStrMakeCopyLenNul(allocator, property->value.str.str, property->value.str.size);
+                *strOut = MStrMakeCopyLenNul(allocator, value->str.str, value->str.size);
             }
             return TRUE;
         }
     }
 
-    *strOut = AwGetPropValueStr(allocator, (PtpDataType) property->dataType, property->value);
+    *strOut = AwGetPropValueStr(allocator, (PtpDataType) property->dataType, *value);
     return strOut->str != NULL;
+}
+
+AW_EXPORT b32 AwControl_GetPropertyGivenValueFromStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+    MStr* str, AwPtpPropValue* outValue)
+{
+    if (property->dataType == PTP_DT_STR) {
+         *outValue = (AwPtpPropValue) { .str = *str };
+        return TRUE;
+    }
+
+    if (property->formFlag == PTP_FORM_FLAG_ENUM) {
+        AwPtpPropValueEnums enums = {0};
+        if (AwControl_GetEnumsForProperty(self, self->allocator, property, 0, &enums)) {
+            for (int i = 0; i < MArraySize(enums.values); i++) {
+                AwPtpPropValueEnum* enumValue = enums.values.data + i;
+                if (MStrCmp(enumValue->str, *str) == 0) {
+                    *outValue = enumValue->propValue;
+                    AwControl_FreePropValueEnums(self, &enums);
+                    return TRUE;
+                }
+            }
+            i32 valueI32 = 0;
+            MParseResult result = MParseI32(str->str, str->str + str->size,  &valueI32);
+            if (result.result && valueI32 > 0) {
+                if (valueI32 < MArraySize(enums.values)) {
+                    AwPtpPropValueEnum* enumValue = enums.values.data + valueI32;
+                    *outValue = enumValue->propValue;
+                    AwControl_FreePropValueEnums(self, &enums);
+                    return TRUE;
+                }
+            }
+
+            AwControl_FreePropValueEnums(self, &enums);
+        }
+    }
+
+    PTPPropertyMetadata* meta = property->meta;
+    if (meta && meta->stringToValueFunc) {
+        if (property->meta->stringToValueFunc(self, self->allocator, property, *str, outValue)) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
 }
 
 static void UpdateStr(MAllocator* allocator, MStr* strIn, MStr* strOut) {
@@ -5225,6 +6177,9 @@ AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, Aw
 }
 
 AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value) {
+    if (!property) {
+        return RESULT_CODE(AW_RESULT_PARAM_ERROR);
+    }
     if (property->dataType == PTP_DT_STR) {
         return AwControl_SetPropertyValue(self, property, (AwPtpPropValue) { .str = value });
     }
@@ -5252,6 +6207,13 @@ AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr
             }
 
             AwControl_FreePropValueEnums(self, &enums);
+        }
+    }
+    PTPPropertyMetadata* meta = property->meta;
+    if (meta && meta->stringToValueFunc) {
+        AwPtpPropValue propValue = {};
+        if (meta->stringToValueFunc(self, self->allocator, property, value, &propValue)) {
+            return AwControl_SetPropertyValue(self, property, propValue);
         }
     }
 

@@ -82,6 +82,6 @@ A GUI application is included for camera control and PTP protocol debugging.
 - [ ] Build System Improvements
    - Packaged releases for UI application
 - [ ] API Development
-   - Python bindings
    - Descriptions for each property
-   - Enhanced high-level API
+   - Expand Python convenience API
+   - Backport Python convenience API to C

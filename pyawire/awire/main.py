@@ -1102,7 +1102,7 @@ class AwPropertyCode(AwIntEnum):
 
 class AwDeviceInfo:
     """Information about a discovered camera device."""
-    def __init__(self, ffi_device: typing.Any) -> None:
+    def __init__(self, ffi_device: typing.Any):
         self.manufacturer: str = _convert_m_str(ffi_device.manufacturer)
         self.product: str = _convert_m_str(ffi_device.product)
         self.serial: str = _convert_m_str(ffi_device.serial)
@@ -1113,26 +1113,91 @@ class AwDeviceInfo:
         self._ffi_device = ffi_device
 
 
-def _shutter_speed_conv(current_val) -> typing.Union[int, float]:
+class AwNotchDirection(enum.Enum):
+    DOWN = b'\xff'
+    UP = b'\x01'
+
+
+class AwNotchValueCompare(enum.Enum):
+    LESS = -1
+    EQUAL = 0
+    GREATER = 1
+
+
+def _shutter_speed_as_float(current_val) -> float:
     if current_val == 0xffffffff:
-        return  current_val
-    shutter_denom = current_val & 0xffff
+        return float(current_val)
+    shutter_denom = float(current_val & 0xffff)
     if shutter_denom:
         return ((current_val >> 16 ) & 0xffff) / shutter_denom
     else:
-        return 0
-
-
-def _shutter_speed_str_conv(value: str) -> float:
-    if value == "Bulb":
         return 0.
-    if "/" in value:
-        nom, denom = value.split("/", 1)
-        denom_f = float(denom)
-        if denom_f == 0:
-            return 0.
-        return float(nom) / denom_f
-    return float(value)
+
+
+class AwNotchContext:
+    def __init__(self, name):
+        self.name = name
+        self.max_attempts = 200
+        self.read_attempt = 30
+        self.property_sleep = 0.1
+        self.notch_apply_wait = 0.25 # time to wait before we can issue next notch
+        self.notch_apply_finish_wait = 0.5
+        self.cmp_func: Callable[[int, int], AwNotchValueCompare] = self.cmp_default
+        self.value_up = AwNotchDirection.UP
+        self.value_down = AwNotchDirection.DOWN
+
+        if self.name == "shutter-speed":
+            self.value_up = AwNotchDirection.DOWN
+            self.value_down = AwNotchDirection.UP
+            self.cmp_func = self.cmp_shutter
+        elif self.name == "f_number":
+            self.cmp_func = self.cmp_f_number
+        elif self.name == "iso":
+            self.cmp_func = self.cmp_iso
+
+    @staticmethod
+    def cmp_default(target_val: int, current_val: int) -> AwNotchValueCompare:
+        if target_val < current_val:
+            return AwNotchValueCompare.LESS
+        elif target_val > current_val:
+            return AwNotchValueCompare.GREATER
+        else:
+            return AwNotchValueCompare.EQUAL
+
+    @staticmethod
+    def cmp_shutter(target_val: int, current_val: int) -> AwNotchValueCompare:
+        current_float = _shutter_speed_as_float(target_val)
+        target_float = _shutter_speed_as_float(current_val)
+        if current_float < target_float:
+            return AwNotchValueCompare.LESS
+        elif current_float > target_float:
+            return AwNotchValueCompare.GREATER
+        else:
+            return AwNotchValueCompare.EQUAL
+
+    @staticmethod
+    def cmp_f_number(target_val: int, current_val: int) -> AwNotchValueCompare:
+        if target_val < current_val:
+            return AwNotchValueCompare.LESS
+        elif target_val > current_val:
+            return AwNotchValueCompare.GREATER
+        else:
+            return AwNotchValueCompare.EQUAL
+
+    @staticmethod
+    def cmp_iso(target_val: int, current_val: int) -> AwNotchValueCompare:
+        # Auto is first in the list make it -1
+        if target_val == AwIso.AUTO.value:
+            target_val = -1
+        if current_val == AwIso.AUTO.value:
+            current_val = -1
+        # continue as normal
+        if target_val < current_val:
+            return AwNotchValueCompare.LESS
+        elif target_val > current_val:
+            return AwNotchValueCompare.GREATER
+        else:
+            return AwNotchValueCompare.EQUAL
 
 
 class AwPtpProperty:
@@ -1142,7 +1207,7 @@ class AwPtpProperty:
     Properties correspond to camera settings such as ISO, shutter speed, or white
     balance. Each property has a code, a data type, and a current value.
     """
-    def __init__(self, control: 'AwControl', ffi_control: typing.Any, allocator: typing.Any, ffi_property: typing.Any) -> None:
+    def __init__(self, control: 'AwControl', ffi_control: typing.Any, allocator: typing.Any, ffi_property: typing.Any):
         self._control: 'AwControl' = control
         self._allocator = allocator
         self._ffi_control = ffi_control
@@ -1331,6 +1396,100 @@ class AwPtpProperty:
         r = lib.AwControl_IsPropertyWritable(self._ffi_control, self._ffi_property)
         return True if r else False
 
+    def _dial_in_notch(self, ctxt: AwNotchContext, current_val, target_val):
+        # If the property has a list of possible value, use those values to figure out how many notches are
+        # needed - we can do this faster because we don't need to wait for the value load before applying notches
+        enums = self.get_enums()
+        if len(enums):
+            # get values and calculate how many notches are needed to get to target value
+            enum_values = [int(e[0]) for e in enums]
+
+            if target_val not in enum_values or current_val not in enum_values:
+                return AwResult(AwResultCode.PARAM_ERROR)
+
+            current_idx = enum_values.index(current_val)
+            target_idx = enum_values.index(target_val)
+
+            # TODO: iso loops it may be useful to calculate notches based off that.
+            diff = target_idx - current_idx
+
+            if diff == 0:
+                return AwResult(AwResultCode.OK)
+
+            log_info(f"current_val: {current_val} diff: {diff}")
+
+            # Execute notch that number of times in the direction needed
+            direction = AwNotchDirection.UP if diff > 0 else AwNotchDirection.DOWN
+            for _ in range(abs(diff)):
+                log_info(f"{ctxt.name} notch")
+                res = self.notch(direction)
+                if res.code != AwResultCode.OK:
+                    return res
+                # Sleep long enough to for the notch to take effect
+                time.sleep(ctxt.notch_apply_wait)
+                # TODO: check after a certain number of cicles
+
+            time.sleep(ctxt.notch_apply_finish_wait)
+            self._control.refresh_properties()
+            current_val = int(self.get_raw_value())
+
+        # Fallback to search in case this didn't work
+
+        #  - no list of shutter speed provide by camera, but we could cache or make up and use this to estimate
+        #    number of notches to hit, if we miss then go back to 1 at a time...
+        #  - check computed value for shutter speed not floats - these can be inaccurate
+        log_info(f"{ctxt.name} current_val: {current_val} target_val: {target_val}")
+
+        cmp = ctxt.cmp_func(target_val, current_val)
+        if cmp == AwNotchValueCompare.EQUAL:
+            return AwResult(AwResultCode.OK)
+
+        if cmp == AwNotchValueCompare.GREATER:
+            direction = ctxt.value_up
+        else:
+            direction = ctxt.value_down
+
+        max_attempts = ctxt.max_attempts
+        attempts = max_attempts
+        while attempts >= 0:
+            attempts -= 1
+            log_info(f"{ctxt.name} notch")
+            res = self.notch(direction)
+            if res.code != AwResultCode.OK:
+                return res
+
+            # Sleep & refresh properties - if no change wait another bit
+            # Retry fresh properties until you see a change in current value
+            # Each notch applies to camera setting immediately - but changes take a second or two
+            # to be reflected in PTP properties returned by the camera
+            last_val = current_val
+            read_attempt = ctxt.read_attempt
+            while ctxt.cmp_func(current_val, last_val) == AwNotchValueCompare.EQUAL and read_attempt >= 0:
+                time.sleep(ctxt.property_sleep)
+                self._control.refresh_properties()
+                read_attempt -= 1
+                current_val = int(self.get_raw_value())
+                log_info(f"{ctxt.name} current_val: {current_val} last_val: {last_val}")
+
+            if read_attempt < 0:
+                return AwResult(AwResultCode.TIMEOUT)
+
+            cmp = ctxt.cmp_func(target_val, current_val)
+            if cmp == AwNotchValueCompare.EQUAL:
+                return AwResult(AwResultCode.OK)
+
+            # if we overshoot - we may want to try again by reversing direction + perhaps the wait wasn't long
+            # enough
+            if ((direction == ctxt.value_down and cmp == AwNotchValueCompare.GREATER) or
+                    (direction == ctxt.value_up and cmp == AwNotchValueCompare.LESS)):
+                log_warn(f"{ctxt.name} overshoot at: {current_val} target: {target_val}")
+                return AwResult(AwResultCode.PARAM_ERROR)
+
+        if attempts <= 0:
+            log_warn(f"Failed to set {ctxt.name} to {target_val} after {max_attempts} attempts")
+
+        return AwResult(AwResultCode.TIMEOUT)
+
     def set_value(self, value: typing.Union[str, int, AwIntEnum]) -> AwResult:
         """
         Set the value of the property.
@@ -1375,47 +1534,19 @@ class AwPtpProperty:
             elif dt == PtpDataType.UINT64: prop_value.u64 = int_value
             else:
                 return AwResult(AwResultCode.PARAM_ERROR)
+
             if self._ffi_property.isNotch:
                 # For some properties in the older protocol, values can't be set directly only incremented/decremented
+                # ('notched' as we call it).
 
-                # 1. Find the list of enum values for the property to see how far we must notch
-                enums = self.get_enums()
-                if not enums:
-                    if self._ffi_property.propCode == AwPropertyCode.SHUTTER_SPEED:
-                        current_val = int(self.get_raw_value())
-                        if int_value == 0xffffffff:
-                            return AwResult(AwResultCode.PARAM_ERROR)
-                        shutter_speed_1 = _shutter_speed_conv(current_val)
-                        shutter_speed_2 = _shutter_speed_conv(int_value)
-
-                enum_values = [int(e[0]) for e in enums]
+                ctxt = AwNotchContext(self.get_id())
                 current_val = int(self.get_raw_value())
+                res = self._dial_in_notch(ctxt, current_val, int_value)
 
-                if int_value not in enum_values or current_val not in enum_values:
-                    return AwResult(AwResultCode.PARAM_ERROR)
-
-                current_idx = enum_values.index(current_val)
-                target_idx = enum_values.index(int_value)
-                diff = target_idx - current_idx
-
-                if diff == 0:
-                    return AwResult(AwResultCode.OK)
-
-                # 3. Execute notch that number of times in the direction needed
-                direction = b'\x01' if diff > 0 else b'\xff'
-                res = None
-                for _ in range(abs(diff)):
-                    res = lib.AwControl_SetPropertyNotch(self._ffi_control, self._ffi_property, direction)
-                    if res.code != AwResultCode.OK:
-                        return AwResult(res.code, res.ptpCode)
-                    time.sleep(0.25)
-                    # add refresh properties here to see if we are changing
-                    #enum position
-
-                return _convert_aw_result(res) if res is not None else AwResult(AwResultCode.OK)
+                return res if res is not None else AwResult(AwResultCode.OK)
             else:
                 res = lib.AwControl_SetPropertyValue(self._ffi_control, self._ffi_property, prop_value[0])
-            return _convert_aw_result(res)
+                return _convert_aw_result(res)
         return AwResult(AwResultCode.PARAM_ERROR)
 
     def set_value_str(self, value: str) -> AwResult:
@@ -1426,49 +1557,31 @@ class AwPtpProperty:
         m_str[0].capacity = 0
         if self._ffi_property.isNotch:
             # For some properties in the older protocol, values can't be set directly only incremented/decremented
-            if self._ffi_property.propCode == AwPropertyCode.SHUTTER_SPEED:
-                # Implement for shutter speed for now
-                current_val = int(self.get_raw_value())
-                target_float_shutter_speed = _shutter_speed_str_conv(value)
-                current_float_shutter_speed = _shutter_speed_conv(current_val)
-                print(f"{target_float_shutter_speed}, {current_float_shutter_speed}")
+            current_val = int(self.get_raw_value())
 
-                if target_float_shutter_speed == current_float_shutter_speed:
-                    return AwResult(AwResultCode.OK)
+            prop_value = ffi.new("AwPtpPropValue*")
+            ok = lib.AwControl_GetPropertyGivenValueFromStr(self._ffi_control,  self._allocator, self._ffi_property,
+                                                            m_str, prop_value)
+            if not ok:
+                return AwResult(AwResultCode.PARAM_ERROR)
 
-                # handle bulb case
-                if target_float_shutter_speed > current_float_shutter_speed:
-                    direction = b'\xff'
-                else:
-                    direction = b'\x01'
+            dt = self._ffi_property.dataType
+            target_val = self._as_raw_val(dt, prop_value)
 
-                attempts = 50
-                while attempts >= 0:
-                    attempts -= 1
-                    res = lib.AwControl_SetPropertyNotch(self._ffi_control, self._ffi_property, direction)
-                    if res.code != AwResultCode.OK:
-                        return _convert_aw_result(res)
-                    # Sleep & refresh properties - if no change wait another bit - this becomes the new def. wait time
-                    # for this property
-                    time.sleep(0.25)
-                    self._control.refresh_properties()
-                    current_val = int(self.get_raw_value())
-                    current_float_shutter_speed = _shutter_speed_conv(current_val)
-                    print(f"{target_float_shutter_speed}, {current_float_shutter_speed}")
-                    # Retry fresh properties until you see a change in current value
-                    if target_float_shutter_speed == current_float_shutter_speed:
-                        return AwResult(AwResultCode.OK)
-                    # if we overshoot - we may want to try again by reversing direction + perhaps the wait wasn't long
-                    # enough
-                    if (direction == b'\xff' and target_float_shutter_speed > current_float_shutter_speed or
-                            direction == b'\x01' and target_float_shutter_speed < current_float_shutter_speed):
-                        return AwResult(AwResultCode.PARAM_ERROR)
-
-                return AwResult(AwResultCode.TIMEOUT)
+            ctxt = AwNotchContext(self.get_id())
+            return self._dial_in_notch(ctxt, current_val, target_val)
         else:
             return _convert_aw_result(lib.AwControl_SetPropertyStr(self._ffi_control, self._ffi_property, m_str[0]))
-        return AwResult(AwResultCode.PARAM_ERROR)
 
+    def is_notch(self) -> bool:
+        return self._ffi_property.isNotch
+
+    def notch(self, direction: AwNotchDirection):
+        if self._ffi_property.isNotch:
+            return _convert_aw_result(
+                lib.AwControl_SetPropertyNotch(self._ffi_control, self._ffi_property, direction.value))
+        else:
+            return AwResult(AwResultCode.PARAM_ERROR)
 
 
 class AwPtpControl:
@@ -1506,7 +1619,7 @@ class AwCaptureStage(enum.Enum):
 
 class AwImageCaptureWorkflow:
     """Configuration for the image capture workflow."""
-    def __init__(self) -> None:
+    def __init__(self):
         self.loop_wait_time: float = 0.1
         self.wait_focus: float = 3.0
         self.wait_file: float = 3.0
@@ -1587,7 +1700,7 @@ class AwControl:
         Returns:
             The protocol version.
         """
-        return self._ffi[0].protocolVersion
+        return AwSonyProtocolVersion(self._ffi[0].protocolVersion)
 
     def refresh_properties(self, full_refresh: bool = True) -> AwResult:
         """

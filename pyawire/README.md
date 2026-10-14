@@ -16,9 +16,9 @@ Python bindings for [AlphaWire](https://github.com/watsonmw/alphawire) - a C lib
 
 ## Installation
 
-```bash
-pip install awire
-```
+   ```bash
+   pip install awire
+   ```
 
 ## Quick Start
 
@@ -61,7 +61,7 @@ To build and install the package in development mode:
 
 1. **Install Build Dependencies**:
    ```bash
-   pip install --upgrade build twine cffi
+   pip install --upgrade build setuptools cffi
    ```
 
 2. **Build the C extension**:
@@ -76,9 +76,9 @@ To build and install the package in development mode:
 
 ### Building Wheels
 
-```bash
-python -m build
-```
+   ```bash
+   python -m build
+   ```
 
 ## Compatibility
 

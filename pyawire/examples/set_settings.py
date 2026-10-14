@@ -3,7 +3,7 @@ import sys
 import time
 
 import awire
-from awire import AwPropertyCode, AwFocusMode, AwDialMode, AwExposureProgramMode
+from awire import AwPropertyCode, AwFocusMode, AwDialMode, AwExposureProgramMode, AwSonyProtocolVersion, AwIso
 
 
 # Set camera settings given a dictionary of settings to set
@@ -35,6 +35,25 @@ def set_settings(settings):
         if device is not None:
             control = device.open_control()
             control.connect()
+
+            # Add workaround for older cameras - where shot parameters are not available initially
+            # It takes a few seconds to fully initialize device side PTP controls for iso, focus, shutter, etc
+            if control.get_protocol_version() == AwSonyProtocolVersion.V2:
+                iso = control.get_property("iso")
+                raw_value = iso.get_raw_value()
+                tries = 0
+                if raw_value == 0:
+                    awire.log_info("Waiting for ISO value to be available")
+
+                while raw_value == 0 and tries < 40:
+                    control.refresh_properties()
+                    raw_value = iso.get_raw_value()
+                    if raw_value == 0:
+                        time.sleep(0.1)
+                    else:
+                        awire.log_info("Settings available")
+
+                    tries += 1
 
             # Override the dial mode while connected
             dial_mode = control.get_property_by_code(AwPropertyCode.DIAL_MODE)
@@ -71,7 +90,7 @@ def set_settings(settings):
                     prop.set_value(setting_value)
 
             # Wait for camera to update settings
-            time.sleep(0.5)
+            time.sleep(0.5 if control.get_protocol_version() == AwSonyProtocolVersion.V3 else 1.0)
             control.refresh_properties()
 
             # Check if any settings didn't apply
@@ -80,6 +99,9 @@ def set_settings(settings):
                 prop = control.get_property(prop_code)
                 if prop is not None:
                     value = prop.get_value()
+                    # Make sure we convert to string if we set with a string (e.g. for iso you can set with int or str)
+                    if isinstance(setting_value, str) and not isinstance(value, str):
+                        value = prop.get_value_as_str()
                     if value != setting_value:
                         didnt_update_settings.append(f"   \'{setting_name}\' set to: \'{value}\' expected: \'{setting_value}\'")
 
@@ -129,7 +151,6 @@ if __name__ == '__main__':
     )
     if len(sys.argv) == 1:
         parser.print_help()
-        main()
         sys.exit(0)
     args = parser.parse_args()
     main(selected_profile=args.set)

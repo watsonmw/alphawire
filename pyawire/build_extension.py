@@ -415,6 +415,11 @@ b32 AwControl_GetEnumsForProperty(AwControl* self, MAllocator* allocator, AwPtpP
 void AwControl_FreePropValueEnums(AwControl* self, AwPtpPropValueEnums* outEnums);
 b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* alloc, AwPtpProperty* property, MStr* strOut);
 b32 AwControl_GetPropertyValueAsKnownStr(AwControl* self, MAllocator* alloc, AwPtpProperty* property, MStr* strOut);
+b32 AwControl_GetPropertyGivenValueAsStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+                                         AwPtpPropValue* value, MStr* outStr);
+b32 AwControl_GetPropertyGivenValueFromStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property, MStr* str,
+                                           AwPtpPropValue* outValue);
+
 AwResult AwControl_SetPropertyValue(AwControl* self, AwPtpProperty* property, AwPtpPropValue value);
 AwResult AwControl_SetPropertyStr(AwControl* self, AwPtpProperty* property, MStr value);
 AwResult AwControl_SetPropertyNotch(AwControl* self, AwPtpProperty* property, i8 notch);

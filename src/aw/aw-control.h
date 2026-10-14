@@ -261,6 +261,32 @@ AW_EXPORT b32 AwControl_GetPropertyValueAsStr(AwControl* self, MAllocator* alloc
     MStr* outStr);
 
 /**
+ * Given a value for a property return it as a human-readable string.
+ * For enums will lookup from list of known strings.
+ * For str types directly return the string.
+ * For properties that have a known str representation e.g. 'focal distance' = '0.3m' return it.
+ * Other types return a null str
+ * @param allocator Allocator to use for the output string.
+ * @param property The property to read.
+ * @param value The property value to convert.
+ * @param outStr Output string containing the property value.
+ * @return TRUE on successful conversion, FALSE on failure.
+ */
+AW_EXPORT b32 AwControl_GetPropertyGivenValueAsStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+    AwPtpPropValue* value, MStr* outStr);
+
+/**
+ * Get the property value corresponding to the Given a str representation.
+ * @param allocator Allocator to use for the output string.
+ * @param property The property to read.
+ * @param str String representation of the property value.
+ * @param outValue The returned property value.
+ * @return TRUE on successful conversion, FALSE on failure.
+ */
+AW_EXPORT b32 AwControl_GetPropertyGivenValueFromStr(AwControl* self, MAllocator* allocator, AwPtpProperty* property,
+    MStr* str, AwPtpPropValue* outValue);
+
+/**
  * Get the property value as a human-readable string.
  * For enums will lookup from list of known strings.
  * For str types directly return the string.
