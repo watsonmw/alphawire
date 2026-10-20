@@ -1,9 +1,65 @@
+import time
+
 import awire
 import argparse
+
+from awire import AwControl
 
 
 # List all exposed settings for all connected cameras
 # Lists current value for each setting, and list any potential values
+
+
+def _list_camera_settings(control: AwControl, show_all: bool):
+    # Print all properties
+    num_props = control.get_num_properties()
+    awire.log_info(f"        Properties: {num_props}")
+    for i in range(num_props):
+        property = control.get_property_at_index(i)
+        prop_label = property.get_label()
+
+        if prop_label is None:
+            if not show_all:
+                continue
+            prop_label = f'0x{property.code:04x}'
+        else:
+            prop_label = f'\'{prop_label}\''
+        prop_line = f"            {prop_label}"
+
+        prop_id = property.get_id()
+        if prop_id is not None:
+            prop_line += f" ({prop_id})"
+        prop_val = property.get_raw_value()
+
+        prop_line += f": {prop_val}"
+
+        prop_val_as_str = property.get_value_as_str()
+        if prop_val_as_str is not None:
+            prop_line += f" \"{prop_val_as_str}\""
+
+        if not property.is_writable():
+            prop_line += " RO"
+
+        awire.log_info(prop_line)
+
+        enums = property.get_enums()
+        if enums:
+            for enum_val, enum_val_as_str in enums:
+                if enum_val_as_str is None:
+                    awire.log_info(f"                {enum_val}")
+                else:
+                    awire.log_info(f"                {enum_val} \"{enum_val_as_str}\"")
+
+    # Print Controls
+    num_controls = control.get_num_controls()
+    awire.log_info(f"        Controls: {num_controls}")
+    for i in range(num_controls):
+        ctrl = control.get_control_at_index(i)
+        if ctrl.label is not None:
+            awire.log_info(f"            '{ctrl.label}' [0x{ctrl.code:04x}]")
+        else:
+            awire.log_info(f"            0x{ctrl.code:04x}")
+
 
 def list_settings(show_all=False):
     awire.log_info(f"Searching for Alpha cameras...")
@@ -34,54 +90,7 @@ def list_settings(show_all=False):
             control = device.open_control()
             control.connect()
 
-            # Print all properties
-            num_props = control.get_num_properties()
-            awire.log_info(f"        Properties: {num_props}")
-            for i in range(num_props):
-                property = control.get_property_at_index(i)
-                prop_label = property.get_label()
-
-                if prop_label is None:
-                    if not show_all:
-                        continue
-                    prop_label = f'0x{property.code:04x}'
-                else:
-                    prop_label = f'\'{prop_label}\''
-                prop_line = f"            {prop_label}"
-
-                prop_id = property.get_id()
-                if prop_id is not None:
-                    prop_line += f" ({prop_id})"
-                prop_val = property.get_raw_value()
-
-                prop_line += f": {prop_val}"
-
-                prop_val_as_str = property.get_value_as_str()
-                if prop_val_as_str is not None:
-                    prop_line += f" \"{prop_val_as_str}\""
-
-                if not property.is_writable():
-                    prop_line += " RO"
-
-                awire.log_info(prop_line)
-
-                enums = property.get_enums()
-                if enums:
-                    for enum_val, enum_val_as_str in enums:
-                        if enum_val_as_str is None:
-                            awire.log_info(f"                {enum_val}")
-                        else:
-                            awire.log_info(f"                {enum_val} \"{enum_val_as_str}\"")
-
-            # Print Controls
-            num_controls = control.get_num_controls()
-            awire.log_info(f"        Controls: {num_controls}")
-            for i in range(num_controls):
-                ctrl = control.get_control_at_index(i)
-                if ctrl.label is not None:
-                    awire.log_info(f"            '{ctrl.label}' [0x{ctrl.code:04x}]")
-                else:
-                    awire.log_info(f"            0x{ctrl.code:04x}")
+            _list_camera_settings(control, show_all)
 
             device.close()
 

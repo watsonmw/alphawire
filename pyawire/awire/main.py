@@ -1142,7 +1142,7 @@ class AwNotchContext:
         self.property_sleep = 0.1
         self.notch_apply_wait = 0.25 # time to wait before we can issue next notch
         self.notch_apply_finish_wait = 0.5
-        self.cmp_func: Callable[[int, int], AwNotchValueCompare] = self.cmp_default
+        self.cmp_func: typing.Callable[[int, int], AwNotchValueCompare] = self.cmp_default
         self.value_up = AwNotchDirection.UP
         self.value_down = AwNotchDirection.DOWN
 
@@ -1863,6 +1863,34 @@ class AwControl:
             return memoryview(buf)
         return None
 
+    def wait_for_writable(self):
+        """
+        Wait for the camera to be ready to accept settings updates.
+
+        This method will block until the camera is ready to accept settings updates.
+        """
+        # Add workaround for older cameras - where shot parameters are not available initially
+        # It takes a few seconds to fully initialize device side PTP controls for iso, focus, shutter, etc
+        if self.get_protocol_version() == AwSonyProtocolVersion.V2:
+            iso = self.get_property("iso")
+            raw_value = iso.get_raw_value()
+            tries = 0
+            if raw_value == 0:
+                log_info("Waiting for ISO value to be available")
+
+            while raw_value == 0 and tries < 40:
+                self.refresh_properties()
+                raw_value = iso.get_raw_value()
+                if raw_value == 0:
+                    time.sleep(0.1)
+                else:
+                    log_info("Settings available")
+                tries += 1
+
+        if self._device.model() == 'DSC-RX0M2':
+            # RX0 - if you try to set settings before the camera is ready, it will fail even if you repeat later
+            time.sleep(1.)
+
     def get_pending_files(self) -> int:
         """
         Get the number of image files queued for download on the camera.
@@ -2088,6 +2116,12 @@ class AwDevice:
                     self._device_list._devices.remove(self)
             self._ffi_device = None
             self._device_list = None
+
+    def model(self) -> str:
+        return _convert_m_str(self._ffi_device.deviceInfo.product)
+
+    def serial(self) -> str:
+        return _convert_m_str(self._ffi_device.deviceInfo.serial)
 
     def __del__(self) -> None:
         self.close()
