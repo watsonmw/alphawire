@@ -743,7 +743,7 @@ void MLogBytes(const u8* mem, u32 len) {
     char buff[M_LOG_BYTES_PERLINE + 1];
     int buffPos = 0;
 
-    for (int j  = 0; j < len; ++j) {
+    for (u32 j  = 0; j < len; ++j) {
         u8 val = mem[j];
         buff[buffPos++] = sHexChars[val >> 4];
         buff[buffPos++] = sHexChars[val & 0xf];
@@ -2070,7 +2070,8 @@ b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
     u64 hash = 0;
     stacktrace->frames = 0;
 
-    for (size_t i = skipFrames; i < frames && stacktrace->frames < MStaticArraySize(stacktrace->addresses); i++) {
+    for (size_t i = (size_t)skipFrames; i < (size_t)frames
+            && stacktrace->frames < (u32)MStaticArraySize(stacktrace->addresses); i++) {
         stacktrace->addresses[stacktrace->frames] = array[i];
         hash = (hash * 31) + (u64)array[i];
         stacktrace->frames++;
@@ -2083,7 +2084,7 @@ b32 MGetStacktrace(MStacktrace* stacktrace, int skipFrames) {
 void MLogStacktrace(MStacktrace* stacktrace) {
     char** strings = backtrace_symbols(stacktrace->addresses, stacktrace->frames);
     if (strings) {
-        for (int i = 0; i < stacktrace->frames; i++) {
+        for (u32 i = 0; i < stacktrace->frames; i++) {
             MLogf("  %s", strings[i]);
         }
         free(strings);
@@ -2097,7 +2098,7 @@ void MLogStacktraceCurrent(int skipFrames) {
 
     char** strings;
     strings = backtrace_symbols(array, frames);
-    for (size_t i = skipFrames; i < frames; i++) {
+    for (size_t i = (size_t)skipFrames; i < (size_t)frames; i++) {
         MLogf("  %s", strings[i]);
     }
 

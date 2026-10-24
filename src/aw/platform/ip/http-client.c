@@ -27,6 +27,9 @@ b32 Http_ParseUrl(MAllocator* allocator, MStrView url, HttpUrl* outUrl) {
     if (portStart >= 0 && portStart < hostEnd) {
         outUrl->host = MStrViewLeft(parse, portStart);
         MParseResult r = MParseI32(parse.str + portStart + 1, parse.str + hostEnd, &outUrl->port);
+        if (r.result != MParse_SUCCESS) {
+            return FALSE;
+        }
         // Do not advance parse yet, path depends on pathStart
     } else {
         outUrl->host = MStrViewLeft(parse, hostEnd);
@@ -81,7 +84,7 @@ static b32 Http_ParseStatusLine(HttpResponse* response) {
     i32 statusCode = 0;
     HttpVersion version = HttpVersion_1_0;
 
-    for (i32 i = 0; i < v.size; i++) {
+    for (size_t i = 0; i < v.size; i++) {
         const char c = v.str[i];
 
         if (c == '\r') {
@@ -135,7 +138,7 @@ static b32 Http_ParseStatusLine(HttpResponse* response) {
             }
             // skip over status code
             i32 len = (i32)(pr.end - numStart);
-            i += (len - 1);
+            i += (size_t)(len - 1);
             state = State_StatusCodeSpace;
         } else if (state == State_StatusCodeSpace) {
             if (c == ' ') {

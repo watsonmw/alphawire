@@ -25,6 +25,7 @@
 //
 #include <string.h> // memcpy() / size_t
 #include <stdint.h> // uintptr_t
+#include <stddef.h> // ptrdiff_t
 
 typedef char i8;
 typedef unsigned char u8;
@@ -595,7 +596,7 @@ MINLINE size_t MSizeAlign(size_t size, size_t alignBytes) {
 }
 
 // Get number of items in a static array
-#define MStaticArraySize(arr) (sizeof(arr) / sizeof(arr[0]))
+#define MStaticArraySize(arr) ((ptrdiff_t)(sizeof(arr) / sizeof(arr[0])))
 
 /////////////////////////////////////////////////////////
 // MArray interface

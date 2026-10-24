@@ -56,7 +56,7 @@ u32 MStrAppendf(MMemIO* memIo, const char* format, ...) {
     } else {
         // Space to write some string, but it might not be enough
         size = vsnprintf((char*)memIo->mem + offset, writableLen, format, vargs1);
-        if ((size + 1) > writableLen) {
+        if (size >= 0 && ((u32)size + 1) > writableLen) {
             // Not enough space to fit format string
             u32 sizeAdded = size + 1;
             MMemGrowBytes(memIo, sizeAdded);

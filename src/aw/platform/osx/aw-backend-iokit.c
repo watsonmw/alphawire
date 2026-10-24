@@ -235,14 +235,7 @@ AwResult AwIokitDeviceList_Open(AwIokitDeviceList* self) {
     AW_TRACE("AwIokitDeviceList_Open");
 
     // Set up device attach notifications
-    mach_port_t mainPort = MACH_PORT_NULL;
-    kern_return_t kr = IOMainPort(MACH_PORT_NULL, &mainPort);
-    if (kr != KERN_SUCCESS) {
-        AW_ERROR("Failed to get IOKit main port for notifications");
-        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
-    }
-
-    self->notifyPort = IONotificationPortCreate(mainPort);
+    self->notifyPort = IONotificationPortCreate(MACH_PORT_NULL);
     if (!self->notifyPort) {
         AW_ERROR("Failed to create IOKit notification port");
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
@@ -261,7 +254,7 @@ AwResult AwIokitDeviceList_Open(AwIokitDeviceList* self) {
     }
 
     // Register for matched (attach) notifications
-    kr = IOServiceAddMatchingNotification(
+    kern_return_t kr = IOServiceAddMatchingNotification(
         self->notifyPort,
         kIOMatchedNotification,
         addDeviceMatchingDict,
@@ -365,7 +358,7 @@ AwResult AwIokitDeviceList_RefreshList(AwIokitDeviceList* self, AwDeviceInfoArra
 
     // Initialize the device list
     io_iterator_t usbDeviceIter = IO_OBJECT_NULL;
-    kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &usbDeviceIter);
+    kern_return_t kr = IOServiceGetMatchingServices(MACH_PORT_NULL, matchingDict, &usbDeviceIter);
     if (kr != KERN_SUCCESS) {
         AW_ERROR_F("IOServiceGetMatchingServices failed: %s (0x%x)", IOReturnToString(kr), kr);
         return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
@@ -506,7 +499,7 @@ static AwResult AwDeviceIokit_SendAndRecv(AwDevice* self, AwPtpRequestHeader* re
     requestData->code = request->OpCode;
     requestData->transactionId = request->TransactionId;
     u32* params = (u32*)(requestData+1);
-    for (int i = 0; i < request->NumParams; i++) {
+    for (u32 i = 0; i < request->NumParams; i++) {
         params[i] = request->Params[i];
     }
 
@@ -594,7 +587,7 @@ static AwResult AwDeviceIokit_SendAndRecv(AwDevice* self, AwPtpRequestHeader* re
     int paramsSize = responseHeader->length - sizeof(PTPContainerHeader);
     MMemInitRead(&memIo, ((u8 *) responseHeader) + sizeof(PTPContainerHeader), paramsSize);
     response->NumParams = paramsSize / sizeof(u32);
-    for (int i = 0; i < response->NumParams; i++) {
+    for (u32 i = 0; i < response->NumParams; i++) {
         MMemReadU32BE(&memIo, response->Params + i);
     }
 
@@ -695,7 +688,7 @@ static b32 GetProcessedEvents(MAllocator *alloc, AwPtpEventArray *outEvents, AwD
     b32 gotEvents = FALSE;
     pthread_mutex_lock(&dev->eventLock);
     if (MArraySize(dev->eventList) > 0) {
-        for (int i = 0; i < MArraySize(dev->eventList); i++) {
+        for (size_t i = 0; i < MArraySize(dev->eventList); i++) {
             AwPtpEvent* event = MArrayAddPtr(alloc, *outEvents);
             *event = dev->eventList.data[i];
         }
@@ -1069,15 +1062,6 @@ AwResult AwIokitDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMillisecon
 
     if (timeoutMilliseconds == 0) {
         timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;
-    }
-
-    // Initialize IOKit mach port
-    mach_port_t mainPort;
-    kern_return_t kr = IOMainPort(MACH_PORT_NULL, &mainPort);
-    if (kr != KERN_SUCCESS) {
-        AW_LOG_ERROR_F(&backend->logger, "Failed to get IOKit master port %s (%08x)",
-            IOReturnToString(kr), kr);
-        return (AwResult){.code=AW_RESULT_TRANSPORT_ERROR};
     }
 
     AwIokitDeviceList* deviceList = MMallocZ(backend->allocator, sizeof(AwIokitDeviceList));

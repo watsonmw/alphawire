@@ -139,7 +139,7 @@ static void AwDeviceIp_FreeBuffer(AwDevice* self, AwBufferType type, void* dataM
 
 static int TcpReadBytesIntoBuffer(MSock socket, MMemIO* in, MMemIO* inRead, u32 bytesToRead) {
     i32 bytesRead = in->size - inRead->size;
-    while (bytesToRead > bytesRead) {
+    while (bytesToRead > (u32)bytesRead) {
         i32 memSize = in->capacity - in->size;
         if (memSize < 1024) {
             MMemGrowBytes(in, 1024 - memSize);
@@ -160,7 +160,7 @@ static int TcpReadBytesIntoBuffer(MSock socket, MMemIO* in, MMemIO* inRead, u32 
 
 static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
     int totalSent = 0;
-    while (totalSent < dataSize) {
+    while ((size_t)totalSent < dataSize) {
         int s = send(socket, (char *) data + totalSent, (int) (dataSize - totalSent), 0);
         if (s == MSOCK_ERROR || s == 0) {
             return s;
@@ -203,7 +203,7 @@ static AwResult AwDeviceIp_SendAndRecv(AwDevice* self, AwPtpRequestHeader* reque
     MMemWriteU32LE(&out, dataInSize == 0 ? 1 : 2);
     MMemWriteU16LE(&out, request->OpCode);
     MMemWriteU32LE(&out, request->TransactionId);
-    for (int i = 0; i < request->NumParams; ++i) {
+    for (u32 i = 0; i < request->NumParams; ++i) {
         MMemWriteU32LE(&out, request->Params[i]);
     }
     int s = TcpSendAllBytes(dev->dataSock, out.mem, out.size);
@@ -289,7 +289,7 @@ static AwResult AwDeviceIp_SendAndRecv(AwDevice* self, AwPtpRequestHeader* reque
                 // Read any params as well
                 if (payloadLen > 6) {
                     u32 numParams = (payloadLen - 6) / 4;
-                    for (int i = 0; i < numParams; ++i) {
+                    for (u32 i = 0; i < numParams; ++i) {
                         u32 param = 0;
                         MMemReadU32LE(&inRead, &param);
                         response->Params[i] = param;
@@ -391,7 +391,7 @@ static AwResult AwDeviceIp_ReadEvents(AwDevice* self, int timeoutMilliseconds, M
         }
     }
 
-    if (dev->eventSockTimeoutMilliseconds != timeoutMilliseconds) {
+    if (dev->eventSockTimeoutMilliseconds != (u32)timeoutMilliseconds) {
         if (timeoutMilliseconds > 0) {
             MSockSetNonBlocking(dev->eventSock, 0);
             MSockSetSocketTimeout(dev->eventSock, timeoutMilliseconds);
