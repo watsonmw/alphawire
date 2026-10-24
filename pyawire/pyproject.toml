@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.8.0", "cffi>=1.15.0", "setuptools>=61.0", "packaging>=24.2"]
+requires = ["hatchling>=1.8.0", "cffi>=1.15.0", "setuptools>=61.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,7 +8,7 @@ version = "0.1.2"
 description = "Python bindings for AlphaWire - Sony camera tethered control"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "MIT"
+license = {file = "LICENSE"}
 authors = [
     {name = "Mark Watson"},
 ]
