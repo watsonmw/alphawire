@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling>=1.8.0", "cffi>=1.15.0", "setuptools>=61.0", "packaging>=24.2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "awire"
+version = "0.1.2"
+description = "Python bindings for AlphaWire - Sony camera tethered control"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+    {name = "Mark Watson"},
+]
+dependencies = ["cffi>=1.15.0"]
+keywords = ["sony", "alpha", "camera", "tethered", "control", "ptp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics :: Capture :: Digital Camera",
+]
+
+[project.urls]
+Homepage = "https://github.com/watsonmw/alphawire"
+Repository = "https://github.com/watsonmw/alphawire"
+Issues = "https://github.com/watsonmw/alphawire/issues"
+
+[tool.hatch.build.targets.wheel]
+pure-python = false
+packages = ["awire"]
+exclude = [
+    "awire/_binding.c",
+    "awire/_binding.o",
+]
+artifacts = ["awire/_binding*.so", "awire/_binding*.pyd"]
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.setuptools]
+packages = ["awire"]
+
+[tool.cibuildwheel]
+build = "cp39-*"
+test-command = "python -c \"import awire; print('Successfully imported awire')\""
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64", "aarch64"]
+before-all = "if command -v yum; then yum install -y pkgconfig libusbx-devel; elif command -v apk; then apk add --no-cache pkgconfig gcc musl-dev libusb-dev; fi"
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+#before-all = "brew install libusb"
+
+[tool.hatch.build.targets.sdist.force-include]
+"../libs" = "libs"
+"../src/aw" = "src/aw"
+"../src/mlib" = "src/mlib"
+"../LICENSE" = "LICENSE"
