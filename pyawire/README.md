@@ -68,6 +68,7 @@ To build and install the package in development mode:
    ```bash
    python build_extension.py --debug
    ```
+   On Windows, this enables native debug symbols and disables optimization while using the regular Python runtime; a debug build of Python is not required.
 
 3. **Install in editable mode**:
    ```bash

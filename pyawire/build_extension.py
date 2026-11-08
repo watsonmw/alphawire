@@ -53,6 +53,45 @@ def root_path(path: str) -> str:
     return os.path.join(project_root(), path)
 
 
+# Compile with debug options while keeping the regular Python runtime.
+# Setuptools' MSVC defaults include release optimization and link-time options,
+# which override the requested debug settings. Filter them only for this compile;
+# enabling setuptools' debug runtime would instead require a debug build of Python.
+def _compile_with_msvc_debug_options(ffi_builder, msvc_compiler_class=None):
+    if msvc_compiler_class is None:
+        import importlib
+        from distutils.ccompiler import compiler_class
+
+        module_name, class_name, _ = compiler_class["msvc"]
+        compiler_module = importlib.import_module(f"distutils.{module_name}")
+        msvc_compiler_class = getattr(compiler_module, class_name)
+
+    original_initialize = msvc_compiler_class.initialize
+
+    def initialize_for_debug(compiler, *args, **kwargs):
+        original_initialize(compiler, *args, **kwargs)
+        release_compile_options = {"/o2", "/gl", "/dndebug"}
+        compiler.compile_options = [
+            option for option in compiler.compile_options
+            if option.lower() not in release_compile_options
+        ]
+
+        release_link_options = {"/ltcg"}
+        for name in (
+            "ldflags_exe", "ldflags_exe_debug", "ldflags_shared",
+            "ldflags_shared_debug", "ldflags_static", "ldflags_static_debug",
+        ):
+            options = getattr(compiler, name, None)
+            if options is not None:
+                options[:] = [option for option in options if option.lower() not in release_link_options]
+
+    msvc_compiler_class.initialize = initialize_for_debug
+    try:
+        ffi_builder.compile(verbose=True)
+    finally:
+        msvc_compiler_class.initialize = original_initialize
+
+
 def get_pkg_config_flags(package: str):
     try:
         cflags = subprocess.check_output(
@@ -547,11 +586,12 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
     if debug:
         define_macros.extend([
             ("DEBUG", None),
-            ("_DEBUG", None),
             ("M_MEM_DEBUG", None),
             ("M_ASSERT", None),
             ("M_STACKTRACE", None),
         ])
+        if not sys.platform.startswith("win32"):
+            define_macros.append(("_DEBUG", None))
         if sys.platform.startswith("linux"):
             define_macros.append(("M_LIBBACKTRACE", None))
             extra_link_args.append("-lbacktrace")
@@ -619,7 +659,10 @@ def main(build_args):
                 print("No changes detected, skipping build.")
                 return
 
-    ffi_builder.compile(verbose=True)
+    if build_args.debug and sys.platform.startswith("win32"):
+        _compile_with_msvc_debug_options(ffi_builder)
+    else:
+        ffi_builder.compile(verbose=True)
 
     # Write build flags
     try:
