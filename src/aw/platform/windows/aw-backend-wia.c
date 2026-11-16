@@ -127,7 +127,7 @@ static HRESULT STDMETHODCALLTYPE WiaEventCallback_ImageEventCallback(IWiaEventCa
     if (IsEqualGUID(pEventGuid, &WIA_EVENT_DEVICE_CONNECTED)) {
         WiaEventCallback* self = (WiaEventCallback*)This;
         self->deviceList->deviceListUpToDate = FALSE;
-        MLogf("Device Connected");
+        AW_LOG_INFO(&self->deviceList->logger, "Device connected (WIA)");
     } else if (IsEqualGUID(pEventGuid, &WIA_EVENT_DEVICE_DISCONNECTED)) {
         WiaEventCallback* self = (WiaEventCallback*)This;
         MArrayEachPtr(self->deviceList->openDevices, it) {
@@ -138,7 +138,7 @@ static HRESULT STDMETHODCALLTYPE WiaEventCallback_ImageEventCallback(IWiaEventCa
             }
         }
         self->deviceList->deviceListUpToDate = FALSE;
-        MLogf("Device Disconnected");
+        AW_LOG_INFO(&self->deviceList->logger, "Device disconnected (WIA)");
     }
 
     return S_OK;
@@ -305,7 +305,7 @@ AwResult AwWiaDeviceList_RefreshList(AwWiaDeviceList* self, AwDeviceInfoArray* d
     propSpec[3].propid = WIA_DIP_PNP_ID;
 
     MArrayInit(self->allocator, self->devices, countElements);
-    for (int i = 0; i < countElements; i++) {
+    for (ULONG i = 0; i < countElements; i++) {
         ULONG countFetched = 0;
         IWiaPropertyStorage* pWiaPropertyStorage = NULL;
         hr = pEnum->lpVtbl->Next(pEnum, 1, &pWiaPropertyStorage, &countFetched);
@@ -399,6 +399,12 @@ static void AwDeviceWia_FreeBuffers(AwDevice* self, AwBufferType type, void* dat
 static AwResult AwDeviceWia_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
                                          AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                          size_t* actualDataOutSize) {
+    *actualDataOutSize = 0;
+    if (request->NumParams > PTP_MAX_PARAMS ||
+        dataInSize > (size_t)U32_MAX - sizeof(WiaPtpRequest) ||
+        dataOutSize > (size_t)U32_MAX - sizeof(WiaPtpResponse)) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
 
     WiaPtpRequest* requestData = (WiaPtpRequest*)(dataIn-sizeof(WiaPtpRequest));
 
@@ -406,7 +412,7 @@ static AwResult AwDeviceWia_SendAndRecv(AwDevice* self, AwPtpRequestHeader* requ
     requestData->SessionId = request->SessionId;
     requestData->TransactionId = request->TransactionId;
     requestData->NumParams = request->NumParams;
-    for (int i = 0; i < request->NumParams; i++) {
+    for (u32 i = 0; i < request->NumParams; i++) {
         requestData->Params[i] = request->Params[i];
     }
     requestData->NextPhase = request->NextPhase;
@@ -414,15 +420,20 @@ static AwResult AwDeviceWia_SendAndRecv(AwDevice* self, AwPtpRequestHeader* requ
     AwDeviceWia* wia = ((AwDevice*)self)->device;
     DWORD dwActualDataOutSize = 0;
     WiaPtpResponse* responseData = (WiaPtpResponse*)(dataOut - sizeof(WiaPtpResponse));
+    DWORD requestSize = (DWORD)(dataInSize + sizeof(WiaPtpRequest));
+    DWORD responseSize = (DWORD)(dataOutSize + sizeof(WiaPtpResponse));
 
     HRESULT hr = wia->device->lpVtbl->Escape(wia->device, ESCAPE_PTP_VENDOR_COMMAND,
-                                             (u8*)requestData, dataInSize + sizeof(WiaPtpRequest),
-                                             (u8*)responseData, dataOutSize + sizeof(WiaPtpResponse),
+                                             (u8*)requestData, requestSize,
+                                             (u8*)responseData, responseSize,
                                              &dwActualDataOutSize);
 
-    *actualDataOutSize = dwActualDataOutSize;
-
     if (SUCCEEDED(hr)) {
+        if (dwActualDataOutSize < sizeof(WiaPtpResponse) || dwActualDataOutSize > responseSize) {
+            return (AwResult){.code=AW_RESULT_MALFORMED_RESPONSE};
+        }
+        *actualDataOutSize = dwActualDataOutSize - sizeof(WiaPtpResponse);
+
         response->ResponseCode = responseData->ResponseCode;
         response->SessionId = responseData->SessionId;
         response->TransactionId = responseData->TransactionId;
@@ -471,6 +482,7 @@ AwResult AwWiaDeviceList_OpenDevice(AwWiaDeviceList* self, AwDeviceInfo* deviceI
     (*deviceOut)->transport.sendAndRecv = AwDeviceWia_SendAndRecv;
     (*deviceOut)->transport.requiresSessionOpenClose = FALSE;
     (*deviceOut)->device = wiaDevice;
+    (*deviceOut)->deviceInfo = deviceInfo;
     (*deviceOut)->backendType = AW_BACKEND_WIA;
     (*deviceOut)->disconnected = FALSE;
     (*deviceOut)->logger = self->logger;

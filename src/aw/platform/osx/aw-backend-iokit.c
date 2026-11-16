@@ -953,6 +953,7 @@ AwResult AwIokitDeviceList_OpenDevice(AwIokitDeviceList* self, AwDeviceInfo* dev
             (*deviceOut)->transport.allocator = self->allocator;
             (*deviceOut)->logger = self->logger;
             (*deviceOut)->device = ioKitDevice;
+            (*deviceOut)->deviceInfo = deviceInfo;
             (*deviceOut)->backendType = AW_BACKEND_IOKIT;
             (*deviceOut)->disconnected = FALSE;
 

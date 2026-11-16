@@ -574,7 +574,7 @@ typedef struct AwMagnifier {
     AwMagnifierRatio ratio;       // Current zoom ratio
     b32 canSet;                   // Whether magnifier can be controlled
     size_t numRatios;             // Number of available zoom ratios
-    i32 ratioIndex;               // Index of current ratio in ratios array
+    i32 ratioIndex;               // Index of current ratio, or -1 when it is not in ratios
     AwMagnifierRatio ratios[8];   // Available zoom ratios
 } AwMagnifier;
 

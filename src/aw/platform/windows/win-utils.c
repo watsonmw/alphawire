@@ -5,19 +5,23 @@
 
 b32 WinUtils_GetLastErrorAsStr(char* buffer, size_t bufferSize)
 {
+    if (bufferSize == 0 || bufferSize > U32_MAX) {
+        return FALSE;
+    }
+
     // Get the error code
     DWORD errorMessageID = GetLastError();
     if (errorMessageID == 0) {
         return FALSE;
     }
 
-    size_t size = FormatMessageA(
+    DWORD size = FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL,
         errorMessageID,
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
         (LPSTR)buffer,
-        bufferSize,
+        (DWORD)bufferSize,
         NULL
     );
 

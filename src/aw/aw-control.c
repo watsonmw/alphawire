@@ -4008,6 +4008,18 @@ b32 AwPropEquals(AwPtpProperty* property, AwPtpPropValue value) {
     return AwPropValueEq((PtpDataType)property->dataType, property->value, value);
 }
 
+static b32 PtpStringGetUtf16Length(MStr str, size_t* utf16Length) {
+    if (str.size && !str.str) {
+        return FALSE;
+    }
+    size_t length = UTF8_GetConvertToUTF16Len(str.str, str.size);
+    if (length > U8_MAX - 1) {
+        return FALSE;
+    }
+    *utf16Length = length;
+    return TRUE;
+}
+
 size_t Ptp_PropValueSize(PtpDataType dataType, AwPtpPropValue value) {
     switch (dataType) {
         case PTP_DT_INT8:
@@ -4046,9 +4058,11 @@ size_t Ptp_PropValueSize(PtpDataType dataType, AwPtpPropValue value) {
         case PTP_DT_AUINT128:
             break;
         case PTP_DT_STR: {
-            size_t size = UTF8_GetConvertToUTF16Len(value.str.str, value.str.size);
-            size = size ? size + 1 : 0;
-            return 1 + (size * 2);
+            size_t size = 0;
+            if (!PtpStringGetUtf16Length(value.str, &size)) {
+                return 0;
+            }
+            return size ? 1 + (size + 1) * 2 : 1;
         }
         default:
             return 0;
@@ -4124,7 +4138,7 @@ static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* outS
         if (utf8Len) {
             if (outStr->capacity < utf8Len) {
                 outStr->str = MRealloc(allocator, outStr->str, outStr->capacity, utf8Len);
-                outStr->capacity = utf8Len;
+                outStr->capacity = (u32)utf8Len;
             }
             if (UTF8_ConvertFromUTF16(buffer, len, outStr->str, outStr->capacity) == 0) {
                 MStrFree(allocator, *outStr);
@@ -4133,9 +4147,9 @@ static int ReadPtpString8BitLen(MAllocator* allocator, MMemIO* memIo, MStr* outS
                 // We allow string to be nul terminated but don't require it
                 // MStr.size must be the length of the string, not including nul terminator
                 if (utf8Len > 0 && outStr->str[utf8Len - 1] == '\0') {
-                    outStr->size = utf8Len - 1;
+                    outStr->size = (u32)(utf8Len - 1);
                 } else {
-                    outStr->size = utf8Len;
+                    outStr->size = (u32)utf8Len;
                 }
                 return TRUE;
             }
@@ -4156,19 +4170,30 @@ static char* ReadPtpString16BitLen(MAllocator* allocator, MMemIO* memIo) {
 }
 
 static int WritePtpString(MStr str, MMemIO* memIo) {
-    MMemWriteU8(memIo, str.size);
-
-    size_t len = UTF8_GetConvertToUTF16Len(str.str, str.size);
-    if (len) {
-        MMemGrowBytes(memIo, (len + 1) * 2);
-        size_t utf16Len = UTF8_ConvertToUTF16(str.str, str.size, (u16*)(memIo->mem + memIo->size), len);
-        memIo->size += utf16Len * 2;
-        MMemWriteU16LE(memIo, 0);
-        if (utf16Len) {
-            return TRUE;
-        }
+    size_t len = 0;
+    if (!PtpStringGetUtf16Length(str, &len)) {
+        return FALSE;
     }
-    return FALSE;
+
+    u32 bytesToGrow = (u32)(len ? (len + 1) * 2 : 0);
+    u32 bytesToWrite = 1 + bytesToGrow;
+    if (bytesToWrite > U32_MAX - memIo->size) {
+        return FALSE;
+    }
+
+    MMemWriteU8(memIo, (u8)(len ? len + 1 : 0));
+    if (!len) {
+        return TRUE;
+    }
+
+    MMemGrowBytes(memIo, bytesToGrow);
+    size_t utf16Len = UTF8_ConvertToUTF16(str.str, str.size, (u16*)(memIo->mem + memIo->size), len);
+    if (utf16Len != len) {
+        return FALSE;
+    }
+    memIo->size += (u32)(utf16Len * 2);
+    MMemWriteU16LE(memIo, 0);
+    return TRUE;
 }
 
 static i32 ReadPropertyValue(MAllocator* allocator, MMemIO* memIo, u16 dataType, AwPtpPropValue* value) {
@@ -4336,11 +4361,14 @@ static void PrintProperties(AwControl* self) {
 }
 
 void AwControl_InitDataBuffers(AwControl* self, size_t dataInSize, size_t dataOutSize) {
+    if (dataInSize > U32_MAX || dataOutSize > U32_MAX) {
+        return;
+    }
     if (dataInSize > self->dataInCapacity || self->dataInMem == NULL) {
         void* mem = self->device->transport.reallocBuffer(self->device, AW_BUFFER_IN,
                                                           self->dataInMem, self->dataInCapacity,
                                                           dataInSize);
-        self->dataInCapacity = dataInSize;
+        self->dataInCapacity = (u32)dataInSize;
         self->dataInMem = mem;
     }
 
@@ -4348,12 +4376,12 @@ void AwControl_InitDataBuffers(AwControl* self, size_t dataInSize, size_t dataOu
         void* mem = self->device->transport.reallocBuffer(self->device, AW_BUFFER_OUT,
                                                           self->dataOutMem, self->dataOutCapacity,
                                                           dataOutSize);
-        self->dataOutCapacity = dataOutSize;
+        self->dataOutCapacity = (u32)dataOutSize;
         self->dataOutMem = mem;
     }
 
-    self->dataInSize = dataInSize;
-    self->dataOutSize = dataOutSize;
+    self->dataInSize = (u32)dataInSize;
+    self->dataOutSize = (u32)dataOutSize;
     memset(self->dataInMem, 0, dataInSize);
     if (dataOutSize) {
         memset(self->dataOutMem, 0, dataOutSize);
@@ -4369,8 +4397,8 @@ void AwControl_FreeDataBuffers(AwControl* self) {
     self->dataOutCapacity = 0;
 }
 
-static AwPtpRequestHeader BuildReq(AwControl* self, size_t dataInSize, size_t dataOutSize, u16 opCode) {
-    AwControl_InitDataBuffers(self, (u32)dataInSize, (u32)dataOutSize);
+static AwPtpRequestHeader BuildReq(AwControl* self, u32 dataInSize, u32 dataOutSize, u16 opCode) {
+    AwControl_InitDataBuffers(self, dataInSize, dataOutSize);
     AwPtpRequestHeader r = {
         .OpCode = opCode,
         .NextPhase = PTP_NEXT_PHASE_READ_DATA,
@@ -4407,8 +4435,12 @@ static PTPResponse SendReq(AwControl* self, AwPtpRequestHeader* request) {
 
     response.dataOut = &self->ptpResponse;
     response.result.ptp = response.dataOut->ResponseCode;
-    if (actualDataOutSize > sizeof(AwPtpResponseHeader)) {
-        MMemInitRead(&response.memIo, self->dataOutMem, actualDataOutSize);
+    if (actualDataOutSize > self->dataOutSize) {
+        response.result.code = AW_RESULT_MALFORMED_RESPONSE;
+        return response;
+    }
+    if (actualDataOutSize > 0) {
+        MMemInitRead(&response.memIo, self->dataOutMem, (u32)actualDataOutSize);
     } else {
         response.memIo.mem = NULL;
         response.memIo.size = 0;
@@ -4418,7 +4450,7 @@ static PTPResponse SendReq(AwControl* self, AwPtpRequestHeader* request) {
     return response;
 }
 
-static PTPResponse DoRequest(AwControl* self, u16 opCode, size_t dataInSize, size_t dataOutSize, int numParams, ...) {
+static PTPResponse DoRequest(AwControl* self, u16 opCode, u32 dataInSize, u32 dataOutSize, int numParams, ...) {
     AwPtpRequestHeader req = BuildReq(self, dataInSize, dataOutSize, opCode);
 
     va_list vargs;
@@ -4730,7 +4762,10 @@ static AwResult SDIO_GetAllExtDevicePropInfo(AwControl* self, b32 initial, b32 i
 }
 
 static AwResult SDIO_SetExtDevicePropValue(AwControl* self, u16 propCode, u16 dataType, AwPtpPropValue value) {
-    size_t size = Ptp_PropValueSize(dataType, value);
+    u32 size = (u32)Ptp_PropValueSize(dataType, value);
+    if (dataType == PTP_DT_STR && !size) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
 
     AwPtpRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_SetExtDevicePropValue);
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
@@ -4765,7 +4800,9 @@ static AwResult SDIO_SetExtDevicePropValue(AwControl* self, u16 propCode, u16 da
             MMemWriteU64LE(&memIo, value.u64);
             break;
         case PTP_DT_STR: {
-            WritePtpString(value.str, &memIo);
+            if (!WritePtpString(value.str, &memIo)) {
+                return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+            }
             break;
         }
     }
@@ -4775,7 +4812,10 @@ static AwResult SDIO_SetExtDevicePropValue(AwControl* self, u16 propCode, u16 da
 }
 
 static AwResult SDIO_ControlDevice(AwControl* self, u16 propCode, u16 dataType, AwPtpPropValue value) {
-    size_t size = Ptp_PropValueSize(dataType, value);
+    u32 size = (u32)Ptp_PropValueSize(dataType, value);
+    if (dataType == PTP_DT_STR && !size) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
 
     AwPtpRequestHeader req = BuildReq(self, size, 0x1000, PTP_OC_SDIO_ControlDevice);
     req.NextPhase = PTP_NEXT_PHASE_WRITE_DATA;
@@ -4804,7 +4844,9 @@ static AwResult SDIO_ControlDevice(AwControl* self, u16 propCode, u16 dataType, 
             MMemWriteI32LE(&memIo, value.i32);
             break;
         case PTP_DT_STR: {
-            WritePtpString(value.str, &memIo);
+            if (!WritePtpString(value.str, &memIo)) {
+                return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+            }
             break;
         }
     }
@@ -4969,12 +5011,15 @@ static AwResult AwGetObjectInfo(AwControl* self, u32 objectHandle, AwObjectInfo*
 }
 
 static AwResult PTP_GetLiveViewImage(AwControl* self, size_t objectSize, MMemIO* fileOut, AwLiveViewFrames* liveViewFrames) {
+    if (objectSize > (size_t)U32_MAX - 0x100) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
     fileOut->size = 0;
 
     PTPResponse r = DoRequest(self,
                               PTP_OC_GetObject,
                               0,
-                              objectSize + 0x100,
+                              (u32)objectSize + 0x100,
                               1,
                               SD_OH_LIVE_VIEW_IMAGE);
 
@@ -5054,13 +5099,16 @@ static AwResult PTP_GetLiveViewImage(AwControl* self, size_t objectSize, MMemIO*
 
 static AwResult Aw_GetObject(AwControl* self, u32 objectHandle, size_t objectSize, MMemIO* fileOut) {
     AW_TRACE("Aw_GetObject");
+    if (objectSize > U32_MAX) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
     fileOut->size = 0;
     fileOut->allocator = self->allocator;
 
     PTPResponse r = DoRequest(self,
                               PTP_OC_GetObject,
                               0,
-                              objectSize,
+                              (u32)objectSize,
                               1,
                               objectHandle);
 
@@ -5226,16 +5274,34 @@ AwResult AwControl_GetMagnifier(AwControl* self, AwMagnifier* outMagnifier) {
                 enumCount = MArraySize(propMag->form.enums.set);
             }
 
-            outMagnifier->numRatios = enumCount;
-            outMagnifier->ratioIndex = 0;
+            size_t currentRatioIndex = 0;
+            b32 currentRatioFound = FALSE;
             for (size_t i = 0; i < enumCount; ++i) {
-                AwPtpPropValue* v = enums + i;
+                i32 ratio = (i32)((enums[i].u64 >> 32) & 0x7fffffff);
+                if (ratio == curRatio) {
+                    currentRatioIndex = i;
+                    currentRatioFound = TRUE;
+                    break;
+                }
+            }
+
+            size_t maxRatios = (size_t)MStaticArraySize(outMagnifier->ratios);
+            size_t numRatios = enumCount < maxRatios ? enumCount : maxRatios;
+            outMagnifier->numRatios = numRatios;
+            outMagnifier->ratioIndex = -1;
+            if (currentRatioFound) {
+                outMagnifier->ratioIndex = (i32)(currentRatioIndex < numRatios ?
+                    currentRatioIndex : numRatios - 1);
+            }
+            for (size_t i = 0; i < numRatios; ++i) {
+                size_t sourceIndex = i;
+                if (currentRatioFound && currentRatioIndex >= numRatios && i == numRatios - 1) {
+                    sourceIndex = currentRatioIndex;
+                }
+                AwPtpPropValue* v = enums + sourceIndex;
                 u64 value = v->u64;
                 i32 ratio = (i32)((value >> 32) & 0x7fffffff);
                 AwMagnifierRatio* r = outMagnifier->ratios + i;
-                if (ratio == curRatio) {
-                    outMagnifier->ratioIndex = i;
-                }
                 if (ratio == 0) {
                     r->ratio = 0;
                     r->ratioByTen = 0;
@@ -6151,10 +6217,13 @@ AW_EXPORT b32 AwControl_GetPropertyGivenValueFromStr(AwControl* self, MAllocator
 }
 
 static void UpdateStr(MAllocator* allocator, MStr* strIn, MStr* strOut) {
-    size_t size = strIn->size + 1;
+    size_t size = (size_t)strIn->size + 1;
+    if (size > U32_MAX) {
+        return;
+    }
     if (strOut->capacity < size) {
         strOut->str = MRealloc(allocator, strOut->str, strOut->capacity, size);
-        strOut->capacity = size;
+        strOut->capacity = (u32)size;
     }
     memcpy(strOut->str, strIn->str, strIn->size);
     strOut->str[strIn->size] = '\0';

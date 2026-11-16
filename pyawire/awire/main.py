@@ -1416,12 +1416,12 @@ class AwPtpProperty:
             if diff == 0:
                 return AwResult(AwResultCode.OK)
 
-            log_info(f"current_val: {current_val} diff: {diff}")
+            # log_info(f"current_val: {current_val} diff: {diff}")
 
             # Execute notch that number of times in the direction needed
             direction = AwNotchDirection.UP if diff > 0 else AwNotchDirection.DOWN
             for _ in range(abs(diff)):
-                log_info(f"{ctxt.name} notch")
+                # log_info(f"{ctxt.name} notch")
                 res = self.notch(direction)
                 if res.code != AwResultCode.OK:
                     return res
@@ -1438,7 +1438,7 @@ class AwPtpProperty:
         #  - no list of shutter speed provide by camera, but we could cache or make up and use this to estimate
         #    number of notches to hit, if we miss then go back to 1 at a time...
         #  - check computed value for shutter speed not floats - these can be inaccurate
-        log_info(f"{ctxt.name} current_val: {current_val} target_val: {target_val}")
+        # log_info(f"{ctxt.name} current_val: {current_val} target_val: {target_val}")
 
         cmp = ctxt.cmp_func(target_val, current_val)
         if cmp == AwNotchValueCompare.EQUAL:
@@ -1453,7 +1453,7 @@ class AwPtpProperty:
         attempts = max_attempts
         while attempts >= 0:
             attempts -= 1
-            log_info(f"{ctxt.name} notch")
+            # log_info(f"{ctxt.name} notch")
             res = self.notch(direction)
             if res.code != AwResultCode.OK:
                 return res
@@ -1469,7 +1469,7 @@ class AwPtpProperty:
                 self._control.refresh_properties()
                 read_attempt -= 1
                 current_val = int(self.get_raw_value())
-                log_info(f"{ctxt.name} current_val: {current_val} last_val: {last_val}")
+                # log_info(f"{ctxt.name} current_val: {current_val} last_val: {last_val}")
 
             if read_attempt < 0:
                 return AwResult(AwResultCode.TIMEOUT)
@@ -1869,25 +1869,27 @@ class AwControl:
 
         This method will block until the camera is ready to accept settings updates.
         """
+
         # Add workaround for older cameras - where shot parameters are not available initially
         # It takes a few seconds to fully initialize device side PTP controls for iso, focus, shutter, etc
         if self.get_protocol_version() == AwSonyProtocolVersion.V2:
             iso = self.get_property("iso")
-            raw_value = iso.get_raw_value()
+            raw_value = iso.get_raw_value() if iso is not None else 0
             tries = 0
             if raw_value == 0:
                 log_info("Waiting for ISO value to be available")
 
             while raw_value == 0 and tries < 40:
                 self.refresh_properties()
-                raw_value = iso.get_raw_value()
+                iso = self.get_property("iso")
+                raw_value = iso.get_raw_value() if iso is not None else 0
                 if raw_value == 0:
                     time.sleep(0.1)
                 else:
                     log_info("Settings available")
                 tries += 1
 
-        if self._device.model() == 'DSC-RX0M2':
+        if self._device is not None and self._device.model() == 'DSC-RX0M2':
             # RX0 - if you try to set settings before the camera is ready, it will fail even if you repeat later
             time.sleep(1.)
 

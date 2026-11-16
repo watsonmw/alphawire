@@ -175,7 +175,7 @@ static b32 ReadEventFromBuffer(PTPUsbkDeviceUsbk* dev, UINT transferred, AwPtpEv
     if (payloadRead.capacity >= sizeof(PTPContainerHeader)) {
         PTPContainerHeader* event = (PTPContainerHeader*)payloadRead.mem;
         if (event->type == PTP_CONTAINER_EVENT) {
-            size_t headerSize = sizeof(PTPContainerHeader);
+            u32 headerSize = (u32)sizeof(PTPContainerHeader);
             outEvent->code = event->code;
             if (event->length > headerSize) {
                 payloadRead.size += headerSize;
@@ -466,7 +466,16 @@ static void AwDeviceUsbk_FreeBuffer(AwDevice* self, AwBufferType type, void* dat
 static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
                                           AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                           size_t* actualDataOutSize) {
+    if (request->NumParams > PTP_MAX_PARAMS ||
+        dataInSize > (size_t)U32_MAX - sizeof(PTPContainerHeader) ||
+        dataOutSize > (size_t)U32_MAX - sizeof(PTPContainerHeader)) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
+
     PTPUsbkDeviceUsbk* deviceUsbk = self->device;
+    if (deviceUsbk->transactionInvalid) {
+        return (AwResult){.code=AW_RESULT_CONNECTION_CLOSED};
+    }
     KUSB_HANDLE usbHandle = deviceUsbk->usbHandle;
     OVERLAPPED overlapped = {0};
     BOOL result;
@@ -479,16 +488,16 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
         return (AwResult){.code=AW_RESULT_UNSUPPORTED};
     }
 
-    size_t requestSize = sizeof(PTPContainerHeader) + (request->NumParams * sizeof(u32));
+    UINT requestSize = (UINT)(sizeof(PTPContainerHeader) + (request->NumParams * sizeof(u32)));
     void* requestHeader = alloca(requestSize);
 
     PTPContainerHeader* requestData = (PTPContainerHeader*)requestHeader;
-    requestData->length = requestSize;
+    requestData->length = (u32)requestSize;
     requestData->type = PTP_CONTAINER_COMMAND;
     requestData->code = request->OpCode;
     requestData->transactionId = request->TransactionId;
     u32* params = (u32*)(requestData+1);
-    for (int i = 0; i < request->NumParams; i++) {
+    for (u32 i = 0; i < request->NumParams; i++) {
         params[i] = request->Params[i];
     }
 
@@ -513,9 +522,9 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
     // 2. Write additional data, if provided
     if (dataInSize) {
         ResetEvent(overlapped.hEvent);
-        requestSize = sizeof(PTPContainerHeader) + dataInSize;
+        requestSize = (UINT)(sizeof(PTPContainerHeader) + dataInSize);
         requestData = (PTPContainerHeader*)(((u8*)dataIn) - sizeof(PTPContainerHeader));
-        requestData->length = requestSize;
+        requestData->length = (u32)requestSize;
         requestData->type = PTP_CONTAINER_DATA;
         requestData->code = request->OpCode;
         requestData->transactionId = request->TransactionId;
@@ -541,8 +550,9 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
     ResetEvent(overlapped.hEvent);
     u32 actual = 0;
     PTPContainerHeader* responseHeader = (PTPContainerHeader*)(((u8*)dataOut) - sizeof(PTPContainerHeader));
+    UINT dataOutBufferSize = (UINT)(sizeof(PTPContainerHeader) + dataOutSize);
     result = deviceUsbk->backend->libk.UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
-                          sizeof(PTPContainerHeader) + dataOutSize, &actual, &overlapped);
+                          dataOutBufferSize, &actual, &overlapped);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
         WinUtils_LogLastError(&self->logger, "Failed to read PTP response");
         CloseHandle(overlapped.hEvent);
@@ -566,6 +576,12 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
     u32 dataBytesTransferred = 0;
     if (responseHeader->type == PTP_CONTAINER_DATA) {
         u32 payloadLength = responseHeader->length;
+        if (payloadLength < sizeof(PTPContainerHeader) ||
+            (size_t)payloadLength > dataOutSize + sizeof(PTPContainerHeader)) {
+            deviceUsbk->transactionInvalid = TRUE;
+            CloseHandle(overlapped.hEvent);
+            return (AwResult){.code=AW_RESULT_MALFORMED_RESPONSE};
+        }
         unsigned char* cp = ((u8*)responseHeader) + actual;
 
         while (actual < payloadLength) {
@@ -600,7 +616,7 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
 
         // Read response packet
         ResetEvent(overlapped.hEvent);
-        size_t responseSize = sizeof(PTPContainerHeader) + (PTP_MAX_PARAMS * sizeof(u32));
+        UINT responseSize = (UINT)(sizeof(PTPContainerHeader) + (PTP_MAX_PARAMS * sizeof(u32)));
         responseHeader = alloca(responseSize);
 
         result = deviceUsbk->backend->libk.UsbK_ReadPipe(usbHandle, deviceUsbk->usbBulkIn, (PUCHAR)responseHeader,
@@ -633,10 +649,16 @@ static AwResult AwDeviceUsbk_SendAndRecv(AwDevice* self, AwPtpRequestHeader* req
     response->ResponseCode = responseHeader->code;
     response->TransactionId = responseHeader->transactionId;
     MMemIO memIo;
-    int paramsSize = responseHeader->length - sizeof(PTPContainerHeader);
+    if (responseHeader->length < sizeof(PTPContainerHeader)) {
+        return (AwResult){.code=AW_RESULT_MALFORMED_RESPONSE};
+    }
+    u32 paramsSize = responseHeader->length - (u32)sizeof(PTPContainerHeader);
+    if (paramsSize > PTP_MAX_PARAMS * sizeof(u32)) {
+        return (AwResult){.code=AW_RESULT_MALFORMED_RESPONSE};
+    }
     MMemInit(&memIo, self->transport.allocator, ((u8*)responseHeader) + sizeof(PTPContainerHeader), paramsSize);
-    response->NumParams = paramsSize / sizeof(u32);
-    for (int i = 0; i < response->NumParams; i++) {
+    response->NumParams = (u32)(paramsSize / sizeof(u32));
+    for (u32 i = 0; i < response->NumParams; i++) {
         MMemReadU32BE(&memIo, response->Params + i);
     }
 
@@ -652,7 +674,11 @@ static b32 AwDeviceUsbk_Reset(AwDevice* device) {
     if (!deviceUsbk || !deviceUsbk->usbHandle) {
         return FALSE;
     }
-    return deviceUsbk->backend->libk.UsbK_ResetDevice(deviceUsbk->usbHandle) ? TRUE : FALSE;
+    b32 reset = deviceUsbk->backend->libk.UsbK_ResetDevice(deviceUsbk->usbHandle) ? TRUE : FALSE;
+    if (reset) {
+        deviceUsbk->transactionInvalid = FALSE;
+    }
+    return reset;
 }
 
 static b32 FindBulkInOutEndpoints(AwUsbkBackend* self, KUSB_HANDLE usbHandle, UCHAR* bulkIn, UCHAR* bulkOut,
@@ -802,6 +828,7 @@ AwResult AwUsbkDeviceList_OpenDevice(AwUsbkBackend* self, AwDeviceInfo* deviceIn
         (*deviceOut)->transport.requiresSessionOpenClose = TRUE;
         (*deviceOut)->logger = self->logger;
         (*deviceOut)->device = usbkDevice;
+        (*deviceOut)->deviceInfo = deviceInfo;
         (*deviceOut)->backendType = AW_BACKEND_LIBUSBK;
         (*deviceOut)->disconnected = FALSE;
 

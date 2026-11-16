@@ -222,8 +222,10 @@ AwResult AwDeviceList_OpenDevice(AwDeviceList* self, AwDeviceInfo* deviceInfo, A
 
     AwBackend* backend = AwDeviceList_GetBackend(self, deviceInfo->backendType);
     AwDevice* device = MArrayAddPtrZ(self->allocator, self->openDevices);
+    device->deviceInfo = deviceInfo;
     AwResult r = backend->openDevice(backend, deviceInfo, &device);
     if (r.code == AW_RESULT_OK) {
+        device->deviceInfo = deviceInfo;
         *deviceOut = device;
     } else {
         MArrayPop(self->openDevices);

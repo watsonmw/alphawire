@@ -191,9 +191,9 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
         }
         MLogf("Releasing Allocator '%s':", name);
 
-        MLogf("   Total allocations: %d", alloc->debug.totalAllocations);
-        MLogf("   Total allocated: %d bytes", alloc->debug.totalAllocatedBytes);
-        MLogf("   Max memory used: %d bytes", alloc->debug.maxAllocatedBytes);
+        MLogf("   Total allocations: %zu", alloc->debug.totalAllocations);
+        MLogf("   Total allocated: %zu bytes", alloc->debug.totalAllocatedBytes);
+        MLogf("   Max memory used: %zu bytes", alloc->debug.maxAllocatedBytes);
     }
 
     MMemDebugCheckAllNoLock(alloc);
@@ -206,7 +206,7 @@ void MMemDebugDeinit2(MAllocator* alloc, b32 logSummary) {
                 MBreakpointf("Leaking allocation: 0x%p (%zu bytes)", memAlloc->start, memAlloc->size);
                 MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-                MBreakpointf("Leaking allocation: %s:%d 0x%p (%d bytes)", memAlloc->file, memAlloc->line, memAlloc->start, memAlloc->size);
+                MBreakpointf("Leaking allocation: %s:%d 0x%p (%zu bytes)", memAlloc->file, memAlloc->line, memAlloc->start, memAlloc->size);
 #endif
             }
         }
@@ -322,7 +322,7 @@ static b32 MMemDebugCheckMemAlloc(MAllocator* alloc, MMemAllocInfo* memAlloc) {
         MBreakpointf("MMemDebugCheck: 0x%p [%zu]", memAlloc->mem, memAlloc->size);
         MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-        MBreakpointf("MMemDebugCheck: %s:%d : 0x%p [%d]", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
+        MBreakpointf("MMemDebugCheck: %s:%d : 0x%p [%zu]", memAlloc->file, memAlloc->line, memAlloc->mem, memAlloc->size);
 #endif
     }
 
@@ -480,16 +480,14 @@ static void* M_MallocDebug(MDEBUG_SOURCE_DEFINE MAllocator* alloc, size_t size) 
     void* r = NULL;
 
     MMemAllocInfo* memAlloc = NULL;
-    int pos = 0;
     if (MArraySize(alloc->debug.freeSlots)) {
-        pos = MArrayPop(alloc->debug.freeSlots);
+        u32 pos = MArrayPop(alloc->debug.freeSlots);
         memAlloc = alloc->debug.allocSlots.data + pos;
     } else {
         memAlloc = MMemDebugArrayAddPtr(alloc, alloc->debug.allocSlots);
         if (memAlloc == NULL) {
             goto done;
         }
-        pos = MArraySize(alloc->debug.allocSlots) - 1;
     }
 
     if (alloc->debug.enableSentinelCheck) {
@@ -593,7 +591,7 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
                 MLog(" allocated @");
                 MMemDebug_LogAllocStacktrace(alloc, memAlloc);
 #else
-                MBreakpointf("MFree %s:%d 0x%p called with wrong size: %zu - should be: %d", file, line, p, size,
+                MBreakpointf("MFree %s:%d 0x%p called with wrong size: %zu - should be: %zu", file, line, p, size,
                              memAlloc->size);
 #endif
             }
@@ -609,7 +607,7 @@ void M_Free(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* p, size_t size) {
             MLogf("free(0x%p) size: %zu %s:%d [allocated @ %s:%d]", p, memAlloc->size, file, line, memAlloc->file, memAlloc->line);
 #endif
 #endif
-            *(MMemDebugArrayAddPtr(alloc, alloc->debug.freeSlots)) = it.i;
+            *(MMemDebugArrayAddPtr(alloc, alloc->debug.freeSlots)) = (u32)it.i;
 #ifdef M_THREADING
             if (lock) {
                 MRWLockReleaseExclusive(&alloc->debug.lock);
@@ -842,7 +840,7 @@ void MMemInitRead(MMemIO* memIO, u8 *mem, u32 size) {
 }
 
 MINLINE void M_MemGrowBytes(MMemIO* memIO, u32 growByBytes) {
-    size_t newSize = memIO->size + growByBytes;
+    u32 newSize = memIO->size + growByBytes;
     if (newSize > memIO->capacity) {
         M_MemResize(memIO, newSize);
     }
@@ -1423,7 +1421,11 @@ MParseResult MParseI32Hex(const char* start, const char* end, i32* out) {
 }
 
 MParseResult MParseBool(const char* start, const char* end, b32* out) {
-    MStrView str = {(char*)start, end - start};
+    ptrdiff_t length = end - start;
+    if (length < 0 || (size_t)length > U32_MAX) {
+        return (MParseResult){MParse_NOT_A_BOOL, start};
+    }
+    MStrView str = {(char*)start, (u32)length};
     if (str.size == 5) {
         if (MStrViewCmpC(str, "false") == 0) {
             *out = FALSE;
@@ -1661,14 +1663,14 @@ u32 MStrAppend(MMemIO* memIo, const char* str) {
     return len;
 }
 
-i32 MFileWriteDataFully(const char* filePath, u8* data, u32 size) {
+MWriteFileResult MFileWriteDataFully(const char* filePath, u8* data, size_t size) {
     MFile file = MFileWriteOpen(filePath);
-    if (file.open) {
-        i32 r = MFileWriteData(&file, data, size);
-        MFileClose(&file);
-        return r;
+    if (!file.open) {
+        return M_STRUCT(MWriteFileResult){-1, 0};
     }
-    return -1;
+    MWriteFileResult r = MFileWriteData(&file, data, size);
+    MFileClose(&file);
+    return r;
 }
 
 #ifdef _WIN32
@@ -1776,9 +1778,9 @@ static u32 MTimeFormatWithMillisOpt(u64 epoch_ms, const char* format, MStrView* 
             return 0; // Buffer space was too small for milliseconds
         }
 
-        return written + (size_t)ms_written;
+        return (u32)(written + (size_t)ms_written);
     } else {
-        return written;
+        return (u32)written;
     }
 }
 
@@ -1988,7 +1990,7 @@ void MLogStacktrace(MStacktrace* stacktrace) {
 
     HANDLE process = GetCurrentProcess();
 
-    for (int i = 0; i < stacktrace->frames; ++i) {
+    for (u32 i = 0; i < stacktrace->frames; ++i) {
         void* pc = stacktrace->addresses[i];
 
 #ifdef M_THREADING

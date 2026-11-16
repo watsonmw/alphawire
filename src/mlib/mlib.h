@@ -189,6 +189,7 @@ typedef MArray(i32) MArrayI32;
 typedef MArray(u32) MArrayU32;
 typedef MArray(i64) MArrayI64;
 typedef MArray(u64) MArrayU64;
+typedef MArray(size_t) MArraySizeT;
 typedef MArray(f32) MArrayF32;
 typedef MArray(f64) MArrayF64;
 
@@ -225,10 +226,10 @@ typedef struct {
     u32 enableLocking : 1;
     MRWLock lock;
 #endif
-    u32 totalAllocations;
-    u32 totalAllocatedBytes;
-    u32 curAllocatedBytes;
-    u32 maxAllocatedBytes;
+    size_t totalAllocations;
+    size_t totalAllocatedBytes;
+    size_t curAllocatedBytes;
+    size_t maxAllocatedBytes;
 } MMemDebugContext;
 #endif
 
@@ -782,24 +783,29 @@ MINLINE void* M_ArrayInsertSpace(MDEBUG_SOURCE_DEFINE MAllocator* alloc, void* d
 // File Reading / Writing
 
 typedef struct {
-    u8* data;
-    u32 size;
-} MReadFileRet;
-
-#define MFileReadFully(alloc, filePath) (MFileReadWithOffset(alloc, filePath, 0, 0))
-#define MFileReadWithSize(alloc, filePath, readSize) (MFileReadWithOffset(alloc, filePath, 0, readSize))
-
-MReadFileRet MFileReadWithOffset(MAllocator* alloc, const char* filePath, u32 offset, u32 readSize);
-i32 MFileWriteDataFully(const char* filePath, u8* data, u32 size);
-
-typedef struct {
     void* handle;
     u32 open;
 } MFile;
 
+typedef struct {
+    u8* data;
+    size_t size;
+} MReadFileResult;
+
+typedef struct {
+    i32 result;
+    size_t written;
+} MWriteFileResult;
+
+#define MFileReadFully(alloc, filePath) (MFileReadWithOffset(alloc, filePath, 0, 0))
+#define MFileReadWithSize(alloc, filePath, readSize) (MFileReadWithOffset(alloc, filePath, 0, readSize))
+
+MReadFileResult MFileReadWithOffset(MAllocator* alloc, const char* filePath, size_t offset, size_t readSize);
+MWriteFileResult MFileWriteDataFully(const char* filePath, u8* data, size_t size);
+
 MFile MFileWriteOpen(const char* filePath);
-i32 MFileWriteData(MFile* file, u8* data, u32 size);
-MINLINE i32 MFileWriteMem(MFile* file, MMemIO* mem) {
+MWriteFileResult MFileWriteData(MFile* file, u8* data, size_t size);
+MINLINE MWriteFileResult MFileWriteMem(MFile* file, MMemIO* mem) {
     return MFileWriteData(file, mem->mem, mem->size);
 }
 void MFileClose(MFile* file);

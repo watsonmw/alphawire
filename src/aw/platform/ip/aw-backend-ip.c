@@ -188,6 +188,10 @@ static int TcpSendAllBytes(MSock socket, const void* data, size_t dataSize) {
 static AwResult AwDeviceIp_SendAndRecv(AwDevice* self, AwPtpRequestHeader* request, u8* dataIn, size_t dataInSize,
                                         AwPtpResponseHeader* response, u8* dataOut, size_t dataOutSize,
                                         size_t* actualDataOutSize) {
+    if (dataInSize > (size_t)U32_MAX - 12) {
+        return (AwResult){.code=AW_RESULT_PARAM_ERROR};
+    }
+
     AwIpDevice* dev = (AwIpDevice*)self->device;
     MAllocator* allocator = self->transport.allocator;
     AwResult error = {AW_RESULT_OK, PTP_OK};
@@ -223,7 +227,7 @@ static AwResult AwDeviceIp_SendAndRecv(AwDevice* self, AwPtpRequestHeader* reque
         MMemWriteU32LE(&out, PTPIP_TYPE_DATA_PACKET_START);
         MMemWriteU32LE(&out, request->TransactionId);
         MMemWriteU64LE(&out, dataInSize);
-        MMemWriteU32LE(&out, 4 + 4 + 4 + dataInSize);
+        MMemWriteU32LE(&out, 4 + 4 + 4 + (u32)dataInSize);
         MMemWriteU32LE(&out, PTPIP_TYPE_DATA_PACKET);
         MMemWriteU32LE(&out, request->TransactionId);
         MMemWriteU8CopyN(&out, dataIn, (u32)dataInSize);
@@ -634,6 +638,7 @@ static AwResult AwIp_OpenDevice(AwPtpIpBackend* self, AwDeviceInfo* deviceInfo, 
     AwDevice* device = *deviceOut;
     device->backendType = AW_BACKEND_IP;
     device->device = newDev;
+    device->deviceInfo = deviceInfo;
     device->transport.allocator = self->allocator;
     device->transport.sendAndRecv = AwDeviceIp_SendAndRecv;
     device->transport.reallocBuffer = AwDeviceIp_ReallocBuffer;
@@ -828,10 +833,10 @@ static AwSdpRecvBuf* AwIp_GetSdpRecvBuf(AwPtpIpBackend* self, const struct socka
 }
 
 static AwSdpRecvBuf* AwIp_FindFreeRecvBuf(AwPtpIpBackend* self) {
-    for (int i = MArraySize(self->sdpRecvBuf) - 1; i >= 0; --i) {
-        struct sockaddr_in* s = &self->sdpRecvBuf.data[i].from;
+    for (size_t i = MArraySize(self->sdpRecvBuf); i > 0; --i) {
+        struct sockaddr_in* s = &self->sdpRecvBuf.data[i - 1].from;
         if (s->sin_addr.s_addr == 0 && s->sin_family == 0 && s->sin_port == 0) {
-            return self->sdpRecvBuf.data + i;
+            return self->sdpRecvBuf.data + i - 1;
         }
     }
 

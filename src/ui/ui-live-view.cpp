@@ -250,11 +250,15 @@ void UiPtpLiveViewShow(AppContext& c) {
                             AwControl_GetMagnifier(&c.aw, &magnifier);
 
                             // Move to next magnification level
+                            if (magnifier.numRatios == 0) {
+                                break;
+                            }
                             i32 index = magnifier.ratioIndex;
                             if (magnifier.ratio.ratioByTen == 0) {
-                                index = 1;
-                            }
-                            if (index < (magnifier.numRatios - 1)) {
+                                index = magnifier.numRatios > 1 ? 1 : 0;
+                            } else if (index < 0 || index >= (i32)magnifier.numRatios) {
+                                index = 0;
+                            } else if (index < (i32)magnifier.numRatios - 1) {
                                 index++;
                             }
 

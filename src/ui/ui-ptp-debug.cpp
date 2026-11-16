@@ -1380,7 +1380,7 @@ void ShowCameraControlsWindow(AppContext& c) {
 
         if (c.cameraSettingsReadEnabled) {
             if (ImGui::Button("Load")) {
-                MReadFileRet file = MFileReadFully(c.aw.allocator, c.cameraSettingsPathBuffer);
+                MReadFileResult file = MFileReadFully(c.aw.allocator, c.cameraSettingsPathBuffer);
                 if (file.size > 0) {
                     MMemIO memIo{};
                     MMemInit(&memIo, c.aw.allocator, file.data, file.size);

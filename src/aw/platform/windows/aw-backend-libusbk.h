@@ -29,6 +29,7 @@ typedef struct {
     u8 usbBulkOut;
     u8 usbInterrupt;
     b32 disconnected;
+    b32 transactionInvalid;
     // Request timeout - can be adjust before requests
     u32 timeoutMilliseconds;
     MAllocator* allocator;

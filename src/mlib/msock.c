@@ -365,7 +365,7 @@ int MSockGetInterfaces(MAllocator* allocator, MArraySockInterface* outAddr, int 
         return FALSE;
     }
 
-    DWORD r = GetAdaptersAddresses(family, flags, NULL, aa, &aaBufSize);
+    DWORD r = GetAdaptersAddresses(family, gaaFlags, NULL, aa, &aaBufSize);
     if (r != NO_ERROR) {
         MFree(allocator, aa, aaBufSize);
         return FALSE;
@@ -376,7 +376,7 @@ int MSockGetInterfaces(MAllocator* allocator, MArraySockInterface* outAddr, int 
         int isLoopback = (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
 
         const char* nameA = a->AdapterName ? a->AdapterName : "";
-        int nameALen = MCStrLen(nameA);
+        size_t nameALen = MCStrLen(nameA);
 
         for (IP_ADAPTER_UNICAST_ADDRESS* u = a->FirstUnicastAddress; u; u = u->Next) {
             if (!u->Address.lpSockaddr) {
@@ -389,8 +389,12 @@ int MSockGetInterfaces(MAllocator* allocator, MArraySockInterface* outAddr, int 
             }
 
             MSockInterface* e = MArrayAddPtrZ(allocator, *outAddr);
-            memcpy(e->nameBuffer, nameA, nameALen + 1); // this is not the friendly name, but stable
-            e->name = (MStrView){ e->nameBuffer, nameALen};
+            if (nameALen >= sizeof(e->nameBuffer)) {
+                nameALen = sizeof(e->nameBuffer) - 1;
+            }
+            memcpy(e->nameBuffer, nameA, nameALen);
+            e->nameBuffer[nameALen] = '\0'; // this is not the friendly name, but stable
+            e->name = (MStrView){ e->nameBuffer, (u32)nameALen};
             e->family = fam;
             e->isUp = isUp;
             e->isLoopback = isLoopback;
@@ -400,5 +404,10 @@ int MSockGetInterfaces(MAllocator* allocator, MArraySockInterface* outAddr, int 
 
     MFree(allocator, aa, aaBufSize);
 #endif
-    return MArraySize(*outAddr);
+    size_t interfaceCount = MArraySize(*outAddr);
+    if (interfaceCount > I32_MAX) {
+        MArrayClear(*outAddr);
+        return FALSE;
+    }
+    return (int)interfaceCount;
 }
