@@ -73,6 +73,7 @@ Release build:
     cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
     cmake --build cmake-build
 
+Windows MinGW builds link the GCC runtime statically, so MinGW runtime DLLs should not be required.
 
 Alphawire Development
 ===

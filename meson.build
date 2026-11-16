@@ -142,12 +142,17 @@ ui_inc = include_directories('src', 'src/imgui')
 ui_deps = [sdl3_dep]
 ui_args = ['-DSDL_MAIN_USE_CALLBACKS']
 ui_args += debug_args
+ui_link_args = []
 
 if host_system == 'darwin'
   ui_deps += dependency('appleframeworks', modules : ['Cocoa', 'IOKit', 'OpenGL'])
 elif host_system == 'windows'
   ui_deps += cc.find_library('opengl32')
   ui_args += ['-DWINVER=0x0A00', '-D_WIN32_WINNT=0x0600', '-DAW_ENABLE_LIBUSBK', '-DAW_ENABLE_WIA', '-DAW_ENABLE_IP']
+  if cc.get_id() == 'gcc' # MinGW
+    # Don't require mingw dlls on Windows
+    ui_link_args += ['-static']
+  endif
 elif host_system == 'linux'
   ui_deps += dependency('gl')
 endif
@@ -158,6 +163,7 @@ executable('alphawireui',
   dependencies : ui_deps + [alphawire_lib_static_dep],
   c_args : ui_args,
   cpp_args : ui_args,
+  link_args: ui_link_args,
   install : true,
   win_subsystem : 'console'
 )
