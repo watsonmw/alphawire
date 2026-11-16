@@ -1,0 +1,47 @@
+name: Build AlphaWire UI (Windows MinGW64)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build alphawireui with Meson
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 MinGW64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+
+      - name: Configure and build alphawireui
+        shell: msys2 {0}
+        run: |
+          meson setup builddir --buildtype=release --default-library=static --wrap-mode=forcefallback
+          meson compile -C builddir alphawireui
+
+      - name: Prepare build artifact
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist
+          cp builddir/alphawireui.exe dist/
+          cp libs/libusbk/amd64/libusbK.dll dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alphawireui-windows-mingw64
+          path: dist/
