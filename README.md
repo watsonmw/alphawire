@@ -5,6 +5,10 @@ support.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<p align="center">
+  <img src="docs/alphawireui.png" alt="AlphaWire UI" width="800">
+</p>
+
 ## Overview
 
 AlphaWire provides both low-level and high-level APIs for controlling Sony Alpha cameras.
