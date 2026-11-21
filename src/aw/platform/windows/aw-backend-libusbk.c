@@ -10,6 +10,7 @@
 #endif
 
 #include <stdlib.h>
+#include <string.h>
 #ifdef _MSC_VER
 #include <malloc.h>
 #endif
@@ -329,15 +330,25 @@ b32 AwUsbkDeviceList_NeedsRefresh(AwUsbkBackend* self) {
     return FALSE;
 }
 
+static void AwUsbkDeviceList_LogLibKVersion(AwUsbkBackend* self) {
+    self->libk.LibK_GetVersion(&self->libkVersion);
+    AW_INFO_F("LibK version: %d.%d.%d.%d", self->libkVersion.Major, self->libkVersion.Minor,
+        self->libkVersion.Micro, self->libkVersion.Nano);
+
+    KLIB_VERSION* version = &self->libkVersion;
+    b32 versionMayNotFindCameras = version->Major < 3 ||
+        (version->Major == 3 && (version->Minor < 0 ||
+        (version->Minor == 0 && (version->Micro < 7 ||
+        (version->Micro == 7 && version->Nano <= 0)))));
+
+    if (versionMayNotFindCameras) {
+        AW_WARNING_F("LibusbK version %d.%d.%d.%d may not be able to find cameras.  Update to a version 3.1.0.0 or newer.",
+            version->Major, version->Minor, version->Micro, version->Nano);
+    }
+}
+
 AwResult AwUsbkDeviceList_RefreshList(AwUsbkBackend* self, AwDeviceInfoArray* devices) {
     AW_TRACE("AwUsbkDeviceList_RefreshList");
-
-    // Print libusbk version number
-    if (!self->libkVersion.Major || !self->libkVersion.Minor || !self->libkVersion.Micro || !self->libkVersion.Nano) {
-        self->libk.LibK_GetVersion(&self->libkVersion);
-        AW_INFO_F("LibK version: %d.%d.%d.%d", self->libkVersion.Major, self->libkVersion.Minor,
-            self->libkVersion.Micro, self->libkVersion.Nano);
-    }
 
     KLST_HANDLE deviceList = NULL;
     KLST_DEVINFO_HANDLE deviceInfo = NULL;
@@ -953,7 +964,7 @@ AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMillisecond
 
     HMODULE hLib = LoadLibraryA("libusbk.dll");
     if (!hLib) {
-        AW_LOG_ERROR(&backend->logger, "Failed to load libusbk.dll. USB Sony backend will be unavailable.");
+        AW_LOG_ERROR(&backend->logger, "Failed to load libusbk.dll - backend will be unavailable.");
         return (AwResult){.code=AW_RESULT_BACKEND_NOT_FOUND};
     }
 
@@ -994,5 +1005,6 @@ AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMillisecond
     deviceList->allocator = backend->allocator;
     deviceList->logger = backend->logger;
     deviceList->backend = backend;
+    AwUsbkDeviceList_LogLibKVersion(deviceList);
     return AwUsbkDeviceList_Open(deviceList);
 }
