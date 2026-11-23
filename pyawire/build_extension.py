@@ -595,8 +595,7 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
             ("_WIN32_WINNT", "0x0600"),
             ("AW_ENABLE_LIBUSBK", None),
             ("AW_ENABLE_WIA", None),
-            ("AW_ENABLE_IP", None),
-            ("AW_PYTHON_EXTENSION", None),
+            ("AW_ENABLE_IP", None)
         ]
         include_dirs.append(os.path.normpath(root_path("libs/libusbk")))
         extra_link_args = ['ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
@@ -622,6 +621,7 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
     define_macros = [
                         ("M_THREADING", None),
                         ("AW_LOG_LEVEL", "3"),
+                        ("AW_PYTHON_EXTENSION", None),
                     ] + platform_defines
 
     if debug:
