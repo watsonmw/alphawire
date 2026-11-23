@@ -66,6 +66,9 @@ typedef MArray(AwDevice) AwDeviceArray;
 
 typedef struct MBackendConfig {
     b32 disallowSpawnEventThread;
+#ifdef AW_PYTHON_EXTENSION
+    b32 useSystemLibusbK;
+#endif
 } AwBackendConfig;
 
 struct AwBackend;

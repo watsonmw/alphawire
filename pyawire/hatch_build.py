@@ -21,6 +21,9 @@ class CustomBuildHook(BuildHookInterface):
             import sysconfig
             # Get the raw platform string (e.g., 'macosx-11.1-arm64')
             raw_platform = sysconfig.get_platform()
+
+            if sys.platform.startswith('win'):
+                build_extension.add_libusbk_wheel_files(build_data)
             
             # For macOS 11+, the standard compatibility tag is often 'macosx_11_0_arm64'
             # regardless of the minor version, especially for Apple Silicon.

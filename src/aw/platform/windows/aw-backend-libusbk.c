@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #ifdef _MSC_VER
 #include <malloc.h>
 #endif
@@ -955,6 +956,110 @@ static AwResult AwUsbkDeviceList_CloseDevice_(AwBackend* backend, AwDevice* devi
     return AwUsbkDeviceList_CloseDevice(self, device);
 }
 
+#ifdef AW_PYTHON_EXTENSION
+static void AwUsbkModuleAnchor(void) {}
+
+static b32 AwUsbkIsAbsolutePathW(const WCHAR* path) {
+    return path && ((path[0] == L'\\' && path[1] == L'\\') ||
+        (path[0] == L'/' && path[1] == L'/') ||
+        (path[0] && path[1] == L':' && (path[2] == L'\\' || path[2] == L'/')));
+}
+
+static void AwUsbkLogModulePath(MAllocator* allocator, AwLog* logger, HMODULE hLib) {
+    WCHAR path[32768];
+    DWORD pathLength = GetModuleFileNameW(hLib, path, MStaticArraySize(path));
+    if (pathLength == 0 || pathLength >= MStaticArraySize(path)) {
+        AW_LOG_WARNING_F(logger, "Failed to get loaded libusbK module path (error %lu).", GetLastError());
+        return;
+    }
+
+    int utf8Length = WideCharToMultiByte(CP_UTF8, 0, path, (int)pathLength, NULL, 0, NULL, NULL);
+    if (utf8Length <= 0) {
+        AW_LOG_WARNING_F(logger, "Failed to convert loaded libusbK module path (error %lu).", GetLastError());
+        return;
+    }
+
+    size_t utf8PathSize = (size_t)utf8Length + 1;
+    char* utf8Path = MMallocZ(allocator, utf8PathSize);
+    if (!utf8Path) {
+        AW_LOG_WARNING(logger, "Failed to allocate memory for loaded libusbK module path.");
+        return;
+    }
+
+    int bytesWritten = WideCharToMultiByte(CP_UTF8, 0, path, (int)pathLength, utf8Path, utf8Length, NULL, NULL);
+    if (bytesWritten > 0) {
+        utf8Path[bytesWritten] = '\0';
+        AW_LOG_INFO_F(logger, "Loaded libusbK module: %s", utf8Path);
+    } else {
+        AW_LOG_WARNING_F(logger, "Failed to convert loaded libusbK module path (error %lu).", GetLastError());
+    }
+    MFree(allocator, utf8Path, utf8PathSize);
+}
+
+static HMODULE AwUsbkLoadAbsolutePath(MAllocator* allocator, AwLog* logger, const WCHAR* path, const char* source) {
+    if (!AwUsbkIsAbsolutePathW(path)) {
+        AW_LOG_WARNING_F(logger, "%s libusbK path must be absolute; trying next location.", source);
+        return NULL;
+    }
+
+    HMODULE hLib = LoadLibraryExW(path, NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    if (!hLib) {
+        AW_LOG_WARNING_F(logger, "Failed to load %s libusbK DLL (error %lu); trying next location.",
+            source, GetLastError());
+        return NULL;
+    }
+
+    AwUsbkLogModulePath(allocator, logger, hLib);
+    return hLib;
+}
+
+static HMODULE AwUsbkLoadBundledLibrary(MAllocator* allocator, AwLog* logger) {
+    HMODULE extensionModule = NULL;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCWSTR)&AwUsbkModuleAnchor, &extensionModule)) {
+        AW_LOG_WARNING_F(logger, "Failed to locate Python extension module (error %lu).", GetLastError());
+        return NULL;
+    }
+
+    WCHAR path[32768];
+    DWORD pathLength = GetModuleFileNameW(extensionModule, path, MStaticArraySize(path));
+    if (pathLength == 0 || pathLength >= MStaticArraySize(path)) {
+        AW_LOG_WARNING_F(logger, "Failed to get Python extension path (error %lu).", GetLastError());
+        return NULL;
+    }
+
+    DWORD directoryEnd = pathLength;
+    while (directoryEnd > 0 && path[directoryEnd - 1] != L'\\' && path[directoryEnd - 1] != L'/') {
+        --directoryEnd;
+    }
+    static const WCHAR dllName[] = L"libusbK.dll";
+    if (directoryEnd == 0 || directoryEnd + MStaticArraySize(dllName) > MStaticArraySize(path)) {
+        AW_LOG_WARNING(logger, "Python extension path is invalid or too long for bundled libusbK.");
+        return NULL;
+    }
+    memcpy(path + directoryEnd, dllName, sizeof(dllName));
+    return AwUsbkLoadAbsolutePath(allocator, logger, path, "bundled");
+}
+
+static HMODULE AwUsbkLoadPythonLibrary(AwBackend* backend) {
+    AwLog* logger = &backend->logger;
+    HMODULE hLib = NULL;
+    if (!backend->config.useSystemLibusbK) {
+        hLib = AwUsbkLoadBundledLibrary(backend->allocator, logger);
+        if (hLib) {
+            return hLib;
+        }
+    }
+
+    hLib = LoadLibraryW(L"libusbK.dll");
+    if (hLib) {
+        AW_LOG_INFO(logger, "Loaded libusbK using the Windows DLL search path.");
+        AwUsbkLogModulePath(backend->allocator, logger, hLib);
+    }
+    return hLib;
+}
+#endif
+
 AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMilliseconds) {
     AW_LOG_TRACE(&backend->logger, "AwUsbkDeviceList_OpenBackend");
 
@@ -962,7 +1067,11 @@ AwResult AwUsbkDeviceList_OpenBackend(AwBackend* backend, u32 timeoutMillisecond
         timeoutMilliseconds = USB_TIMEOUT_DEFAULT_MILLISECONDS;
     }
 
+#ifdef AW_PYTHON_EXTENSION
+    HMODULE hLib = AwUsbkLoadPythonLibrary(backend);
+#else
     HMODULE hLib = LoadLibraryA("libusbk.dll");
+#endif
     if (!hLib) {
         AW_LOG_ERROR(&backend->logger, "Failed to load libusbk.dll - backend will be unavailable.");
         return (AwResult){.code=AW_RESULT_BACKEND_NOT_FOUND};

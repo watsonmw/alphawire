@@ -2136,8 +2136,9 @@ class AwDeviceList:
     across various backends (LibUSBK, LibUSB, WIA, and TCP/IP). It tracks which
     devices are available and which are currently open.
     """
-    def __init__(self) -> None:
+    def __init__(self, use_system_libusbk: bool = False) -> None:
         self._devlist = ffi.new("AwDeviceList[1]")
+        self._devlist[0].backendConfig.useSystemLibusbK = use_system_libusbk
         self._allocator = ffi.new("MAllocator[1]")
         lib.Aw_InitDefaultAllocator(self._allocator)
         self._is_open: bool = False

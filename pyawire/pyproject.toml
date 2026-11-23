@@ -37,6 +37,8 @@ packages = ["awire"]
 exclude = [
     "awire/_binding.c",
     "awire/_binding.o",
+    "awire/libusbK.dll",
+    "awire/licenses/libusbK-LICENSE.txt",
 ]
 artifacts = ["awire/_binding*.so", "awire/_binding*.pyd"]
 

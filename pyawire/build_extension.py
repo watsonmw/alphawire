@@ -10,6 +10,8 @@ import cffi
 import os
 import sys
 import glob
+import shutil
+import sysconfig
 
 
 def get_latest_mod_time(files):
@@ -51,6 +53,42 @@ def project_root():
 
 def root_path(path: str) -> str:
     return os.path.join(project_root(), path)
+
+
+def validate_libusbk_arch(platform_tag=None):
+    if platform_tag is None:
+        platform_tag = sysconfig.get_platform()
+
+    platform_parts = platform_tag.lower().replace("_", "-").split("-")
+    if "win" not in platform_parts or not any(arch in platform_parts for arch in ("amd64", "x86-64")):
+        raise RuntimeError(
+            f"Windows libusbK wheels require AMD64; the current platform is {platform_tag}."
+        )
+
+    dll_path = root_path(os.path.join("libs", "libusbk", "amd64", "libusbK.dll"))
+    if not os.path.isfile(dll_path):
+        raise FileNotFoundError(f"Bundled libusbK DLL is missing: {dll_path}")
+    return dll_path
+
+
+def copy_libusbk_runtime(output_dir):
+    dll_path = validate_libusbk_arch()
+    os.makedirs(output_dir, exist_ok=True)
+    destination = os.path.join(output_dir, "libusbK.dll")
+    if os.path.normcase(os.path.abspath(dll_path)) != os.path.normcase(os.path.abspath(destination)):
+        shutil.copy2(dll_path, destination)
+    return destination
+
+
+def add_libusbk_wheel_files(build_data):
+    dll_path = validate_libusbk_arch()
+    license_path = root_path(os.path.join("libs", "libusbk", "LICENSE-bsd.txt"))
+    if not os.path.isfile(license_path):
+        raise FileNotFoundError(f"libusbK license notice is missing: {license_path}")
+
+    force_include = build_data.setdefault("force_include", {})
+    force_include[dll_path] = "awire/libusbK.dll"
+    force_include[license_path] = "awire/licenses/libusbK-LICENSE.txt"
 
 
 # Compile with debug options while keeping the regular Python runtime.
@@ -198,6 +236,7 @@ typedef struct AwDevice {
 
 typedef struct {
     b32 disallowSpawnEventThread;
+    b32 useSystemLibusbK;
 } AwBackendConfig;
 
 typedef struct {
@@ -545,6 +584,7 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
             extra_link_args.append("-lusb-1.0")
         extra_compile_args = ["-fvisibility=hidden"]
     elif sys.platform.startswith("win32"):
+        validate_libusbk_arch()
         platform_sources = [
             "src/aw/platform/windows/aw-backend-libusbk.c",
             "src/aw/platform/windows/aw-backend-wia.c",
@@ -556,6 +596,7 @@ void Aw_PtpEventArrayFree(MAllocator* allocator, AwPtpEventArray* array);
             ("AW_ENABLE_LIBUSBK", None),
             ("AW_ENABLE_WIA", None),
             ("AW_ENABLE_IP", None),
+            ("AW_PYTHON_EXTENSION", None),
         ]
         include_dirs.append(os.path.normpath(root_path("libs/libusbk")))
         extra_link_args = ['ws2_32.lib', 'Iphlpapi.lib', 'dbghelp.lib',
@@ -657,12 +698,17 @@ def main(build_args):
             
             if latest_out_time > latest_src_time:
                 print("No changes detected, skipping build.")
+                if sys.platform.startswith("win32"):
+                    copy_libusbk_runtime(output_dir)
                 return
 
     if build_args.debug and sys.platform.startswith("win32"):
         _compile_with_msvc_debug_options(ffi_builder)
     else:
         ffi_builder.compile(verbose=True)
+
+    if sys.platform.startswith("win32"):
+        copy_libusbk_runtime(output_dir)
 
     # Write build flags
     try:

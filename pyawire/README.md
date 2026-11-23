@@ -81,6 +81,15 @@ To build and install the package in development mode:
    python -m build
    ```
 
+On 64-bit Windows, wheels include a bundled `libusbK.dll` next to the extension.  This is so the extension can find any
+Sony cameras using a `libusbk` driver.  Depending on the driver version and how devices are registered, the system 
+`libusbK.dll` may not be able to find Sony cameras, but the bundled version can.  To override using the bundled
+`libusbK.dll` and search for it on the path instead, set the following option when creating the device list:
+
+```python
+device_list = awire.AwDeviceList(use_system_libusbk=True)
+```
+
 ## Compatibility
 
 The package is built using the Python Stable ABI (Limited API), meaning a single wheel should work on all CPython versions from 3.9 onwards for a given platform.
