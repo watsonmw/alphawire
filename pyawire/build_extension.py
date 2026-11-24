@@ -59,13 +59,19 @@ def validate_libusbk_arch(platform_tag=None):
     if platform_tag is None:
         platform_tag = sysconfig.get_platform()
 
-    platform_parts = platform_tag.lower().replace("_", "-").split("-")
-    if "win" not in platform_parts or not any(arch in platform_parts for arch in ("amd64", "x86-64")):
-        raise RuntimeError(
-            f"Windows libusbK wheels require AMD64; the current platform is {platform_tag}."
-        )
+    platform_tag = platform_tag.lower()
+    if platform_tag == 'win-amd64':
+        arch = "amd64"
+    elif platform_tag == 'win32':
+        arch = "x86"
+    elif platform_tag == 'win-arm64':
+        print("libusbK.dll not bundled for arm64 - currently untested on arm")
+        return None
+    else:
+        print(f"libusbK.dll not bundled for {platform_tag}")
+        return None
 
-    dll_path = root_path(os.path.join("libs", "libusbk", "amd64", "libusbK.dll"))
+    dll_path = root_path(os.path.join("libs", "libusbk", arch, "libusbK.dll"))
     if not os.path.isfile(dll_path):
         raise FileNotFoundError(f"Bundled libusbK DLL is missing: {dll_path}")
     return dll_path
@@ -73,15 +79,21 @@ def validate_libusbk_arch(platform_tag=None):
 
 def copy_libusbk_runtime(output_dir):
     dll_path = validate_libusbk_arch()
-    os.makedirs(output_dir, exist_ok=True)
-    destination = os.path.join(output_dir, "libusbK.dll")
-    if os.path.normcase(os.path.abspath(dll_path)) != os.path.normcase(os.path.abspath(destination)):
-        shutil.copy2(dll_path, destination)
-    return destination
+    if dll_path is None:
+        return None
+    else:
+        os.makedirs(output_dir, exist_ok=True)
+        destination = os.path.join(output_dir, "libusbK.dll")
+        if os.path.normcase(os.path.abspath(dll_path)) != os.path.normcase(os.path.abspath(destination)):
+            shutil.copy2(dll_path, destination)
+        return destination
 
 
 def add_libusbk_wheel_files(build_data):
     dll_path = validate_libusbk_arch()
+    if dll_path is None:
+        return
+
     license_path = root_path(os.path.join("libs", "libusbk", "LICENSE-bsd.txt"))
     if not os.path.isfile(license_path):
         raise FileNotFoundError(f"libusbK license notice is missing: {license_path}")
@@ -717,6 +729,7 @@ def main(build_args):
     except OSError:
         pass
     print(f"Built alphawire extension")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True)
